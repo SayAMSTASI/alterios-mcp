@@ -32,6 +32,8 @@ CONTENT_ROW_TITLE = "MCP Practice. Тестовая запись"
 SAVE_ICON_ID = "95ec6613-fdcc-4ad5-b93f-16e871b8cbbc"
 ADD_ICON_ID = "de3b1bed-27d2-4963-8024-64e7d71d9fb2"
 EDIT_ICON_ID = "aa4c573e-104e-46a2-934f-780e105f3b1b"
+COMMENT_ENTITY = "content"
+COMMENT_TEXT = "MCP Practice comment: comments write/readback coverage."
 
 
 @dataclass(frozen=True)
@@ -238,7 +240,11 @@ def setup_metadata(
         return results, verify_metadata(client, content_type["_id"])
 
     ensure_group(client, results, main_form["_id"], profile=profile, project_id=project_id, execute=execute)
-    ensure_practice_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
+    content = ensure_practice_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
+    if content and content.get("_id"):
+        ensure_practice_comment(client, results, content["_id"], profile=profile, project_id=project_id, execute=execute)
+    else:
+        results.append(Result("blocked", "comment", COMMENT_TEXT, details={"reason": "content row does not exist in dry-run"}))
     return results, verify_metadata(client, content_type["_id"])
 
 
@@ -715,6 +721,35 @@ def ensure_practice_content(
     return created
 
 
+def ensure_practice_comment(
+    client: AlteriosClient,
+    results: list[Result],
+    content_id: str,
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    comments = list_comments(client, content_id, entity=COMMENT_ENTITY)
+    existing = find_comment_by_body(comments, COMMENT_TEXT)
+    details = {"entity": COMMENT_ENTITY, "entityId": content_id}
+    if existing:
+        results.append(Result("exists", "comment", COMMENT_TEXT, existing.get("_id"), details))
+        return existing
+
+    payload = {"entity": COMMENT_ENTITY, "entityId": content_id, "body": COMMENT_TEXT}
+    write_rest(client, "POST", "/api/v1/comments", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "comment", COMMENT_TEXT, details=details))
+        return None
+
+    refreshed = find_comment_by_body(list_comments(client, content_id, entity=COMMENT_ENTITY), COMMENT_TEXT)
+    if not refreshed or not refreshed.get("_id"):
+        raise RuntimeError("Create practice comment was not visible on comments readback.")
+    results.append(Result("created", "comment", COMMENT_TEXT, refreshed["_id"], details))
+    return refreshed
+
+
 def build_add_form(content_type_id: str, fields: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "name": ADD_FORM_NAME,
@@ -1007,6 +1042,8 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
             ),
             None,
         )
+    comments = list_comments(client, content["_id"], entity=COMMENT_ENTITY) if content else []
+    practice_comment = find_comment_by_body(comments, COMMENT_TEXT)
     view_probe = view_data_probe(client, view.get("_id") if view else None)
     return {
         "content_type_found": bool(content_type),
@@ -1022,6 +1059,9 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "group_form_id": group.get("formId") if group else None,
         "content_id": content.get("_id") if content else None,
         "content_title": first((content.get("fields") or {}).get(field_mnames["title"])) if content and field_mnames else None,
+        "comment_found": bool(practice_comment),
+        "comment_id": practice_comment.get("_id") if practice_comment else None,
+        "comment_count": len(flatten_comments(comments)),
         "view_data_probe": view_probe,
     }
 
@@ -1072,6 +1112,37 @@ def list_view_fields(client: AlteriosClient, view_id: str) -> list[dict[str, Any
 def list_content_rows(client: AlteriosClient, content_type_id: str, *, limit: int) -> list[dict[str, Any]]:
     response = client.request("GET", "/api/contents/listandcount", params={"contentTypeId": content_type_id, "limit": limit, "offset": 0})
     return listandcount_items(response.body)
+
+
+def list_comments(client: AlteriosClient, entity_id: str, *, entity: str, limit: int = 50, depth: int = 4, page: int = 1) -> list[dict[str, Any]]:
+    response = client.request(
+        "GET",
+        "/api/v1/comments",
+        params={"entity": entity, "entityId": entity_id, "limit": limit, "depth": depth, "page": page},
+    )
+    body = response.body
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if isinstance(body, dict):
+        for key in ("items", "comments", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    raise RuntimeError("GET /api/v1/comments returned unexpected payload")
+
+
+def flatten_comments(comments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    flattened: list[dict[str, Any]] = []
+    for comment in comments:
+        flattened.append(comment)
+        children = comment.get("children")
+        if isinstance(children, list):
+            flattened.extend(flatten_comments([item for item in children if isinstance(item, dict)]))
+    return flattened
+
+
+def find_comment_by_body(comments: list[dict[str, Any]], body: str) -> dict[str, Any] | None:
+    return next((comment for comment in flatten_comments(comments) if (comment.get("body") or "").strip() == body), None)
 
 
 def view_data_probe(client: AlteriosClient, view_id: str | None) -> dict[str, Any]:

@@ -285,6 +285,23 @@ class AlteriosClient:
             params={"entity": entity, "entityId": entity_id, "limit": limit, "depth": depth, "page": page},
         )
 
+    def add_comment(
+        self,
+        entity_id: str,
+        body: str,
+        *,
+        entity: str = "content",
+        parent_id: str | None = None,
+    ) -> AlteriosResponse:
+        if not entity_id.strip():
+            raise ValueError("entity_id must not be empty")
+        if not body.strip():
+            raise ValueError("comment body must not be empty")
+        payload: dict[str, Any] = {"entity": entity, "entityId": entity_id, "body": body}
+        if parent_id:
+            payload["parentId"] = parent_id
+        return self.request("POST", "/api/v1/comments", body=payload)
+
     def view_data(
         self,
         view_id: str,

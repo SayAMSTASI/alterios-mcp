@@ -71,6 +71,22 @@ def _rest_write_operation(method: str, path: str, params: dict[str, Any], body: 
     )
 
 
+def _add_comment_operation(entity_id: str, body: str, entity: str, parent_id: str | None) -> WriteOperation:
+    request: dict[str, Any] = {"entity": entity, "entityId": entity_id, "body": body}
+    if parent_id:
+        request["parentId"] = parent_id
+    return WriteOperation(
+        name="POST /api/v1/comments",
+        kind="comment",
+        risk_level="write",
+        summary="Create a comment on an Alterios entity and verify it through comments readback.",
+        method="POST",
+        path="/api/v1/comments",
+        target_ids=collect_target_ids(request),
+        request=request,
+    )
+
+
 @mcp.tool()
 def alterios_config(profile: str | None = None) -> dict[str, Any]:
     """Return redacted Alterios configuration and missing required values."""
@@ -264,6 +280,40 @@ def alterios_list_comments(
         depth=depth,
         page=page,
     ).as_dict()
+
+
+@mcp.tool()
+def alterios_add_comment(
+    entity_id: str,
+    body: str,
+    entity: str = "content",
+    parent_id: str | None = None,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create an Alterios comment. Execution requires explicit write gates and returns readback."""
+    operation = _add_comment_operation(entity_id, body, entity, parent_id)
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    if dry_run:
+        return controlled_write_result(audit=audit)
+
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+    )
+    client = _client(profile, project_id)
+    created = client.add_comment(entity_id, body, entity=entity, parent_id=parent_id).as_dict()
+    readback = client.list_comments(entity_id, entity=entity, limit=20, depth=4, page=1).as_dict()
+    return controlled_write_result(audit=audit, response={"created": created, "readback": readback})
 
 
 @mcp.tool()

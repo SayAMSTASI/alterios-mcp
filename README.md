@@ -47,12 +47,15 @@
 - `alterios_file_metadata` - чтение метаданных файлов через `/api/file/list`.
 - `alterios_list_comments` - инвентаризация комментариев через
   `/api/v1/comments`.
+- `alterios_add_comment` - создание комментария через `/api/v1/comments` с
+  dry-run по умолчанию, write-gate и readback.
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
-- `alterios_call_write_service` и `alterios_rest_write` - отключены, пока явно
-  не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают dry-run
-  audit и не выполняют запись.
+- `alterios_add_comment`, `alterios_call_write_service` и
+  `alterios_rest_write` - отключены, пока явно не выставлен
+  `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают dry-run audit и не
+  выполняют запись.
 - `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
   UUID скрипта; также по умолчанию работает как dry-run и требует
   `ALTERIOS_MCP_ALLOW_WRITE=1` для выполнения.

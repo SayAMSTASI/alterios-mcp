@@ -16,10 +16,10 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 22 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| MCP tools | 23 | Публичные callable tools в `src/alterios_mcp/server.py`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
-| REST route/method patterns in coverage registry | 50 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
+| REST route/method patterns in coverage registry | 51 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
 | Виды обращений | 13 | Классы операций: от config/read до workflow, files, comments, security. |
 
 Это не означает, что в Alterios больше нет скрытых внутренних endpoint-ов.
@@ -42,11 +42,11 @@ browser/HAR capture и sandbox write-практику.
 | Script execution/services | Частично | `POST /api/scripts/execute-manual`, 14 service names | Cataloged; execution depends on UUID/endpoint. |
 | Workflow/process/task | Частично | `startProcess`, `reassignTask`, task complete | Cataloged; needs dedicated sandbox BPMN. |
 | Files | Частично | `GET /api/file/list`, upload file routes | Metadata read live; upload needs file-field capture. |
-| Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Read tool exists; write needs sandbox capture. |
+| Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write live verified; `writeLog` remains cataloged as runtime service. |
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Частично | report full/read/save | Read route exists; write/dashboard needs report sandbox. |
 
-## MCP Tools: 22
+## MCP Tools: 23
 
 | Tool | Вид |
 |---|---|
@@ -67,6 +67,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_list_groups` | Group metadata read |
 | `alterios_file_metadata` | File metadata read |
 | `alterios_list_comments` | Comment read |
+| `alterios_add_comment` | Controlled comment write |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
 | `alterios_call_write_service` | Controlled runtime write/service call |
@@ -87,7 +88,7 @@ browser/HAR capture и sandbox write-практику.
 Runtime service names are not manual script UUIDs. If the configured endpoint is
 `/api/scripts/execute-manual`, only saved script UUIDs can be executed there.
 
-## REST Route/Method Registry: 50
+## REST Route/Method Registry: 51
 
 Statuses:
 
@@ -122,35 +123,36 @@ Statuses:
 | 19 | GET | `/api/view-entities/by-view/{viewId}` | View entity read | `live_read` |
 | 20 | GET | `/api/view-fields/populated/{viewId}` | View field read | `live_read` |
 | 21 | GET | `/api/file/list?id=...` | File metadata read | `live_read` |
-| 22 | GET | `/api/v1/comments` | Comment read | `cataloged` |
-| 23 | POST | `/api/views/v2/get-data-simplified` | Runtime data read | `live_read`, `live_ui` |
-| 24 | POST | `/api/views/v2/get-data` | Runtime data read | `cataloged` |
-| 25 | POST | `/api/helps` | Help create/write | `live_write`, `live_ui` |
-| 26 | PATCH | `/api/helps/{helpId}` | Help update variant | `cataloged` |
-| 27 | PUT | `/api/helps/{helpId}` | Help update variant | `cataloged` |
-| 28 | POST | `/api/content-types/save` | Content type save | `live_write` |
-| 29 | POST | `/api/fields/save` | Field save | `live_write`, `live_ui` |
-| 30 | POST | `/api/views` | View create | `live_write`, `live_ui` |
-| 31 | PATCH | `/api/views/{viewId}` | View update variant | `cataloged` |
-| 32 | PUT | `/api/views` | View update variant | `cataloged` |
-| 33 | POST | `/api/view-entities` | View entity create | `live_write`, `live_ui` |
-| 34 | PATCH | `/api/view-entities/{entityId}` | View entity update variant | `cataloged` |
-| 35 | PUT | `/api/view-entities` | View entity update variant | `cataloged` |
-| 36 | POST | `/api/view-entities/add-one-field` | View field attach | `live_write`, `live_ui` |
-| 37 | POST | `/api/view-fields/save` | View field save | `live_write`, `live_ui` |
-| 38 | POST | `/api/forms` | Form create | `live_write`, `live_ui` |
-| 39 | PATCH | `/api/forms/{formId}` | Form update variant | `cataloged` |
-| 40 | PUT | `/api/forms` | Form update variant | `cataloged` |
-| 41 | POST | `/api/groups` | Menu group create | `live_write`, `live_ui` |
-| 42 | PATCH | `/api/groups/{groupId}` | Menu group update variant | `cataloged` |
-| 43 | PUT | `/api/groups` | Menu group update variant | `cataloged` |
-| 44 | POST | `/api/contents/save` | Content create | `live_write`, `live_ui` |
-| 45 | PATCH | `/api/contents/save` | Content update | `cataloged` |
-| 46 | POST | `/api/scripts` | Script create | `cataloged` |
-| 47 | PUT | `/api/scripts` | Script update | `cataloged` |
-| 48 | POST | `/api/scripts/execute-manual` | Manual script execution | `cataloged` |
-| 49 | PUT | `/api/reports` | Report save | `cataloged` |
-| 50 | POST | `/api/file/upload/field` | File upload | `needs_har` |
+| 22 | GET | `/api/v1/comments` | Comment read | `live_read` |
+| 23 | POST | `/api/v1/comments` | Comment write | `live_write` |
+| 24 | POST | `/api/views/v2/get-data-simplified` | Runtime data read | `live_read`, `live_ui` |
+| 25 | POST | `/api/views/v2/get-data` | Runtime data read | `cataloged` |
+| 26 | POST | `/api/helps` | Help create/write | `live_write`, `live_ui` |
+| 27 | PATCH | `/api/helps/{helpId}` | Help update variant | `cataloged` |
+| 28 | PUT | `/api/helps/{helpId}` | Help update variant | `cataloged` |
+| 29 | POST | `/api/content-types/save` | Content type save | `live_write` |
+| 30 | POST | `/api/fields/save` | Field save | `live_write`, `live_ui` |
+| 31 | POST | `/api/views` | View create | `live_write`, `live_ui` |
+| 32 | PATCH | `/api/views/{viewId}` | View update variant | `cataloged` |
+| 33 | PUT | `/api/views` | View update variant | `cataloged` |
+| 34 | POST | `/api/view-entities` | View entity create | `live_write`, `live_ui` |
+| 35 | PATCH | `/api/view-entities/{entityId}` | View entity update variant | `cataloged` |
+| 36 | PUT | `/api/view-entities` | View entity update variant | `cataloged` |
+| 37 | POST | `/api/view-entities/add-one-field` | View field attach | `live_write`, `live_ui` |
+| 38 | POST | `/api/view-fields/save` | View field save | `live_write`, `live_ui` |
+| 39 | POST | `/api/forms` | Form create | `live_write`, `live_ui` |
+| 40 | PATCH | `/api/forms/{formId}` | Form update variant | `cataloged` |
+| 41 | PUT | `/api/forms` | Form update variant | `cataloged` |
+| 42 | POST | `/api/groups` | Menu group create | `live_write`, `live_ui` |
+| 43 | PATCH | `/api/groups/{groupId}` | Menu group update variant | `cataloged` |
+| 44 | PUT | `/api/groups` | Menu group update variant | `cataloged` |
+| 45 | POST | `/api/contents/save` | Content create | `live_write`, `live_ui` |
+| 46 | PATCH | `/api/contents/save` | Content update | `cataloged` |
+| 47 | POST | `/api/scripts` | Script create | `cataloged` |
+| 48 | PUT | `/api/scripts` | Script update | `cataloged` |
+| 49 | POST | `/api/scripts/execute-manual` | Manual script execution | `cataloged` |
+| 50 | PUT | `/api/reports` | Report save | `cataloged` |
+| 51 | POST | `/api/file/upload/field` | File upload | `needs_har` |
 
 ## What Counts As "All Types"
 
@@ -167,7 +169,6 @@ every internal route in advance. A class is considered covered only when it has:
 By that definition, all main operation classes are represented. The not-yet
 closed areas are:
 
-- comments write;
 - file upload into a file field;
 - script creation/execution sandbox;
 - BPMN/process/task side effects;

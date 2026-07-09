@@ -357,6 +357,29 @@ def test_list_comments_builds_v1_query_without_network() -> None:
     }
 
 
+def test_add_comment_posts_v1_payload_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.add_comment("entity-1", "Body", entity="content", parent_id="parent-1")
+
+    prepared = send.call_args.args[0]
+    parsed = urlparse(prepared.url)
+    assert parsed.path == "/api/v1/comments"
+    assert prepared.method == "POST"
+    assert prepared.body == {
+        "entity": "content",
+        "entityId": "entity-1",
+        "body": "Body",
+        "parentId": "parent-1",
+    }
+
+
 def test_mutating_service_requires_allow_write() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

@@ -16,8 +16,10 @@ The ARTX sandbox metadata chain now exists as a reproducible practice script:
 content type plus representative fields with dry-run, write gate, and readback.
 The same practice script now covers the sandbox UI/data chain: table view,
 view entity, view fields, add/edit/main forms, menu group, and one content row.
-Method coverage is now tracked explicitly: 22 MCP tools, 14 runtime services,
-15 live read-only route probes, 50 REST route/method patterns, and 13 operation
+The same practice script now covers comment write/readback for the sandbox
+content row.
+Method coverage is now tracked explicitly: 23 MCP tools, 14 runtime services,
+15 live read-only route probes, 51 REST route/method patterns, and 13 operation
 classes.
 
 ## Completed
@@ -35,6 +37,7 @@ classes.
 | Practice. ARTX metadata sandbox chain | Added reproducible `scripts/artx_practice_metadata.py`, created `MCP Practice. Песочница` content type and 6 fields through controlled REST writes. | `5d3e057` | Profile/project check OK; initial dry-run blocked fields until content type existed; `POST /api/content-types/save` created id `572aedf5-500f-4538-82be-ae2170ff174a`; `POST /api/fields/save` created 6 fields; readback confirmed actual mnames and `contentNameTemplate={{field_test__mcp_practice_mcp_practice_title}}`; final dry-run was idempotent with no planned writes. |
 | Practice. ARTX UI/data sandbox chain | Extended `scripts/artx_practice_metadata.py` to create and verify view, view entity, view fields, add/edit/main forms, menu group, and one content row for the same sandbox. | `347841f` | Created view `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`, forms `281442af-bb94-43a2-bc80-f5303c05d0fc`, `15f5fb26-5db4-4153-8131-23a54411cd63`, `3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`, group `aa997c9a-d81e-4042-91c5-bafa90b32819`, content `bd51e83f-201e-4d53-bdc6-c4cd16754756`; `get-data-simplified` row_count=1; final dry-run was all `exists`; browser UI showed columns, add action, record, and date `10.07.2026`. |
 | Analysis. Method coverage matrix | Added `docs/alterios-method-coverage.md` with counted MCP tools, runtime services, REST route/method patterns, operation classes, and live/cataloged/needs-HAR statuses. | `63cd9c3` | Counted from source: 22 MCP tools, 14 runtime services, 15 live readonly probes; registry now tracks 50 REST route/method patterns and 13 operation classes; explicitly marks comments/files/scripts/workflow/reports/security/destructive flows as not complete until sandbox/HAR/readback verification exists. |
+| Practice. ARTX comments sandbox write | Added typed `alterios_add_comment`, extended `scripts/artx_practice_metadata.py`, and created one idempotent sandbox comment on the existing practice content row. | `pending` | Profile/project check OK; dry-run planned only `POST /api/v1/comments`; execution with `ALTERIOS_MCP_ALLOW_WRITE=1` created comment `7c8d6eb2-6a0b-4029-bbd9-63322bce1294` on content `bd51e83f-201e-4d53-bdc6-c4cd16754756`; final dry-run was all `exists` with `comment_found=true`, `comment_count=1`. |
 
 ## Active Stage
 
@@ -46,9 +49,9 @@ classes.
 
 | Priority | Task | Status | Notes |
 |---:|---|---|---|
-| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | Prioritize comments write, file upload, scripts, BPMN/process/task side effects, reports, and destructive/security flows from `docs/alterios-method-coverage.md`. |
+| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | Prioritize file upload, scripts, BPMN/process/task side effects, reports, and destructive/security flows from `docs/alterios-method-coverage.md`. |
 | 1 | Prepare first typed write candidate: `alterios_update_content_fields`. | Next | Use one existing scratch/test content record; require preflight read, field allowlist, dry-run diff, execution gate, and readback verification. |
-| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; next extension points are comments, files, scripts, diagrams/processes, and reports. |
+| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments are now covered; next extension points are files, scripts, diagrams/processes, and reports. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -67,12 +70,12 @@ classes.
 ## Next Concrete Actions
 
 1. Capture representative UI/network flows for content open, content save, form
-   actions, file fields, process/task actions, and comments in a scratch/test
+   actions, file fields, and process/task actions in a scratch/test
    project.
 2. Run `alterios-ui-flow` on each capture and save sanitized JSON artifacts.
 3. Map captured UI flows to REST routes or script-service calls.
 4. Continue the cataloged entity order from the completed UI/data sandbox:
-   comments, files, scripts, diagrams/processes, and reports.
+   files, scripts, diagrams/processes, and reports.
 5. Add a typed `alterios_upsert_help` or practice-write helper based on the
    verified `/api/helps` flow.
 6. Design `alterios_update_content_fields` around one scratch/test content

@@ -645,8 +645,10 @@ Write:
 - `depth`;
 - `page`.
 
-Риск: низкий-средний. Можно практиковать на sandbox content/help entity, но
-удаление все равно destructive и требует отдельного allow flag.
+Риск: низкий-средний. `POST /api/v1/comments` live verified на sandbox content
+`bd51e83f-201e-4d53-bdc6-c4cd16754756`; комментарий read back через
+`GET /api/v1/comments` как `7c8d6eb2-6a0b-4029-bbd9-63322bce1294`. Удаление
+все равно destructive и требует отдельного allow flag.
 
 ## Пользователи, Группы Пользователей, Роли
 
@@ -701,7 +703,8 @@ Write:
    UI-list.
 7. **Contents** - выполнено: создана одна sandbox-запись через
    `/api/contents/save`.
-8. **Comments** - добавить комментарий к sandbox-записи, проверить readback.
+8. **Comments** - выполнено: добавлен комментарий к sandbox-записи, readback
+   подтвердил `comment_found=true`.
 9. **Files** - загрузить маленький тестовый файл в file-field после HAR capture.
 10. **Scripts** - создать безопасный manual script, который только пишет в
     sandbox-запись или возвращает диагностический результат.
@@ -722,7 +725,6 @@ Write:
 - `alterios_upsert_view`;
 - `alterios_upsert_form`;
 - `alterios_update_content_fields`;
-- `alterios_add_comment`;
 - `alterios_upload_file_to_field`;
 - `alterios_execute_manual_script` уже есть, но нужен preflight по script UUID и
   аргументам.

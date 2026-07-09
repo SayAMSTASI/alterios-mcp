@@ -128,6 +128,21 @@ def test_rest_write_defaults_to_dry_run_without_network() -> None:
     assert result["audit"]["operation"]["target_ids"] == ["report-1"]
 
 
+def test_add_comment_defaults_to_dry_run_without_network() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        result = server.alterios_add_comment(
+            "content-1",
+            "Practice comment",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["response"] is None
+    assert result["audit"]["operation"]["path"] == "/api/v1/comments"
+    assert result["audit"]["operation"]["target_ids"] == ["content-1"]
+
+
 def test_server_lists_configured_profiles_without_secrets() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",
@@ -230,3 +245,52 @@ def test_rest_write_execution_returns_audit_and_response_without_real_network() 
     assert result["audit"]["status"] == "ready_to_execute"
     assert result["audit"]["write_enabled"] is True
     assert result["response"]["body"] == {"ok": True, "token": "<redacted>"}
+
+
+def test_add_comment_execution_returns_created_comment_and_readback_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self._body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self._body}
+
+    class FakeClient:
+        def add_comment(self, entity_id: str, body: str, *, entity: str, parent_id: str | None = None) -> FakeResponse:
+            assert entity_id == "content-1"
+            assert body == "Practice comment"
+            assert entity == "content"
+            assert parent_id is None
+            return FakeResponse({"_id": "comment-1", "body": body})
+
+        def list_comments(
+            self,
+            entity_id: str,
+            *,
+            entity: str = "any",
+            limit: int = 20,
+            depth: int = 1,
+            page: int = 1,
+        ) -> FakeResponse:
+            assert entity_id == "content-1"
+            assert entity == "content"
+            assert limit == 20
+            assert depth == 4
+            assert page == 1
+            return FakeResponse([{"_id": "comment-1", "body": "Practice comment"}])
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_add_comment(
+            "content-1",
+            "Practice comment",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["created"]["body"]["_id"] == "comment-1"
+    assert result["response"]["readback"]["body"] == [{"_id": "comment-1", "body": "Practice comment"}]
