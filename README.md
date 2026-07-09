@@ -21,6 +21,9 @@
 
 - `alterios_config` - проверка профиля и конфигурации с редактированием
   секретов и списками недостающих значений.
+- `alterios_list_profiles` - список настроенных экземпляров Alterios с
+  редактированием секретов, выбранным профилем и missing-check по каждому
+  профилю.
 - `alterios_list_projects` - инвентаризация проектов на уровне экземпляра.
 - `alterios_service_catalog` - каталог известных script-service функций с
   метками чтения/записи, уровнями риска, подсказками по аргументам и примерами.
@@ -80,6 +83,7 @@ Copy-Item .env.example .env
 
 ```dotenv
 ALTERIOS_PROFILE=vniimt
+ALTERIOS_PROFILES=vniimt,artx
 
 ALTERIOS_VNIIMT_BASE_URL=http://lims.vniimt.local
 ALTERIOS_VNIIMT_API_TOKEN=put-token-here
@@ -94,9 +98,45 @@ ALTERIOS_VNIIMT_AUTH_SCHEME=
 ALTERIOS_VNIIMT_TIMEOUT_SECONDS=20
 ```
 
-`BASE_URL`, `API_TOKEN` и настройки транспорта намеренно изолированы по
-профилю. Если выбран профиль, сервер не делает скрытый переход на другой
-экземпляр.
+Несколько экземпляров Alterios можно держать в одном приватном dotenv-файле.
+Добавьте второй профиль с собственным префиксом:
+
+```dotenv
+ALTERIOS_ARTX_BASE_URL=https://alterios-artx.example.local
+ALTERIOS_ARTX_API_TOKEN=put-token-here
+ALTERIOS_ARTX_PROJECT_ID=put-optional-default-project-id-here
+ALTERIOS_ARTX_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
+ALTERIOS_ARTX_BODY_STYLE=manual_script
+ALTERIOS_ARTX_AUTH_HEADER=Authorization
+ALTERIOS_ARTX_AUTH_SCHEME=Bearer
+ALTERIOS_ARTX_TIMEOUT_SECONDS=20
+```
+
+Профили можно перечислить явно через `ALTERIOS_PROFILES` или оставить
+автодетект по переменным вида `ALTERIOS_<PROFILE>_*`. Проверка всех настроенных
+экземпляров без сетевых вызовов:
+
+```powershell
+python -m alterios_mcp.discovery --profiles --json
+```
+
+Чтобы посмотреть список профилей с другим выбранным экземпляром, не меняя
+dotenv, передайте профиль явно:
+
+```powershell
+python -m alterios_mcp.discovery --profiles --profile artx --json
+```
+
+Для конкретного экземпляра используйте `--profile` в CLI или аргумент `profile`
+в MCP tool-е. Для конкретного проекта внутри выбранного экземпляра передавайте
+`project_id` явно.
+
+`BASE_URL`, `API_TOKEN` и `PROJECT_ID` намеренно изолированы по профилю. Если
+выбран профиль, сервер не делает скрытый переход на другой экземпляр или проект.
+Профильные настройки транспорта (`AUTH_HEADER`, `AUTH_SCHEME`,
+`ENDPOINT_TEMPLATE`, `BODY_STYLE`, `TIMEOUT_SECONDS`) также можно задавать с тем
+же префиксом `ALTERIOS_<PROFILE>_...`; при их отсутствии применяются обычные
+дефолты клиента или явно заданные общие значения.
 
 Чтобы использовать уже существующую приватную конфигурацию и не копировать
 секреты в этот репозиторий, задайте `ALTERIOS_DOTENV_PATH` вне репозитория:

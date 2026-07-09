@@ -9,6 +9,8 @@ work is to make coverage complete, safety explicit, and releases repeatable.
 
 - Keep the profile model instance-scoped: one profile equals one Alterios
   instance, not one project.
+- Keep profile registry extensible through `ALTERIOS_PROFILES` and
+  `ALTERIOS_<PROFILE>_*` auto-discovery.
 - Require project-scoped tools to accept explicit `project_id`.
 - Use `ALTERIOS_<PROFILE>_PROJECT_ID` only as an optional default for local
   convenience.

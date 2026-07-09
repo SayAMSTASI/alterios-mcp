@@ -6,7 +6,14 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from .client import AlteriosClient, AlteriosConfig, AlteriosConfigError, AlteriosRequestError, encode_filter
+from .client import (
+    AlteriosClient,
+    AlteriosConfig,
+    AlteriosConfigError,
+    AlteriosRequestError,
+    configured_profiles,
+    encode_filter,
+)
 
 
 @dataclass(frozen=True)
@@ -114,19 +121,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run read-only Alterios endpoint discovery.")
     parser.add_argument("--profile", help="Alterios profile, e.g. vniimt or artx.")
     parser.add_argument("--project-id", help="Explicit Alterios project id for project-scoped probes.")
+    parser.add_argument("--profiles", action="store_true", help="List configured Alterios instance profiles only.")
     parser.add_argument("--projects", action="store_true", help="List projects only.")
     parser.add_argument("--json", action="store_true", help="Print JSON output.")
     args = parser.parse_args(argv)
 
     try:
-        client = AlteriosClient(AlteriosConfig.from_env(profile=args.profile).with_project_id(args.project_id))
-        payload = list_projects(client) if args.projects else discover_readonly(client)
+        if args.profiles:
+            payload = configured_profiles(selected_profile=args.profile)
+        else:
+            client = AlteriosClient(AlteriosConfig.from_env(profile=args.profile).with_project_id(args.project_id))
+            payload = list_projects(client) if args.projects else discover_readonly(client)
     except AlteriosConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif args.profiles:
+        for profile in payload["profiles"]:
+            selected = "*" if profile["selected"] else " "
+            missing = len(profile["missing_for_instance_call"])
+            print(f"{selected} {profile['profile']}: instance_missing={missing} base_url={profile['config']['base_url']}")
     elif args.projects:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:

@@ -13,6 +13,9 @@ from alterios_mcp.client import (
     AlteriosRequestError,
     AlteriosResponse,
     build_script_body,
+    configured_profiles,
+    discover_profile_names,
+    redact_url_value,
 )
 
 
@@ -63,6 +66,87 @@ def test_profile_overrides_shared_settings() -> None:
     assert config.project_id == "profile-project"
     assert config.auth_header == "x-api-key"
     assert config.auth_scheme == ""
+
+
+def test_discover_profile_names_from_explicit_list_and_prefixes() -> None:
+    values = {
+        "ALTERIOS_PROFILE": "vniimt",
+        "ALTERIOS_PROFILES": "artx-prod; demo",
+        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
+        "ALTERIOS_EXTRA_INSTANCE_API_TOKEN": "token",
+    }
+
+    assert discover_profile_names(values) == ["vniimt", "artx-prod", "demo", "extra_instance"]
+
+
+def test_configured_profiles_returns_redacted_multi_instance_inventory() -> None:
+    env = {
+        "ALTERIOS_PROFILE": "vniimt",
+        "ALTERIOS_PROFILES": "vniimt, artx-prod",
+        "ALTERIOS_ENDPOINT_TEMPLATE": "{base_url}/api/scripts/execute-manual",
+        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_API_TOKEN": "vniimt-token",
+        "ALTERIOS_VNIIMT_PROJECT_ID": "vniimt-project",
+        "ALTERIOS_VNIIMT_AUTH_HEADER": "x-api-key",
+        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
+        "ALTERIOS_ARTX_PROD_API_TOKEN": "artx-token",
+    }
+
+    with patch.dict(os.environ, env, clear=True):
+        payload = configured_profiles(dotenv_path=None)
+
+    assert payload["selected_profile"] == "vniimt"
+    assert payload["profile_count"] == 2
+    by_profile = {item["profile"]: item for item in payload["profiles"]}
+    assert by_profile["vniimt"]["selected"] is True
+    assert by_profile["vniimt"]["config"]["api_token"] == "<set>"
+    assert by_profile["vniimt"]["config"]["project_id"] == "vniimt-project"
+    assert by_profile["vniimt"]["missing_for_instance_call"] == []
+    assert by_profile["artx-prod"]["selected"] is False
+    assert by_profile["artx-prod"]["config"]["api_token"] == "<set>"
+    assert by_profile["artx-prod"]["missing_for_project_call"] == ["ALTERIOS_ARTX_PROD_PROJECT_ID"]
+    assert "vniimt-token" not in json_dump(payload)
+    assert "artx-token" not in json_dump(payload)
+
+
+def test_configured_profiles_can_inventory_default_config() -> None:
+    env = {
+        "ALTERIOS_BASE_URL": "https://default.example",
+        "ALTERIOS_API_TOKEN": "default-token",
+        "ALTERIOS_PROJECT_ID": "default-project",
+    }
+
+    with patch.dict(os.environ, env, clear=True):
+        payload = configured_profiles(dotenv_path=None)
+
+    assert payload["profile_count"] == 1
+    assert payload["profiles"][0]["profile"] == "<default>"
+    assert payload["profiles"][0]["profile_argument"] is None
+    assert payload["profiles"][0]["selected"] is True
+    assert payload["profiles"][0]["missing_for_instance_call"] == []
+    assert "default-token" not in json_dump(payload)
+
+
+def test_profile_script_missing_key_is_profile_scoped() -> None:
+    env = {
+        "ALTERIOS_PROFILE": "artx-prod",
+        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
+        "ALTERIOS_ARTX_PROD_API_TOKEN": "artx-token",
+        "ALTERIOS_ARTX_PROD_PROJECT_ID": "artx-project",
+    }
+
+    with patch.dict(os.environ, env, clear=True):
+        config = AlteriosConfig.from_env(dotenv_path=None)
+
+    assert config.missing_for_script_call() == ["ALTERIOS_ARTX_PROD_ENDPOINT_TEMPLATE"]
+
+
+def test_redacted_config_strips_url_credentials_and_sensitive_query() -> None:
+    assert (
+        redact_url_value("https://user:password@example.local/path?token=secret&limit=1")
+        == "https://<redacted>@example.local/path?token=%3Credacted%3E&limit=1"
+    )
 
 
 def test_alterios_dotenv_path_overrides_default_dotenv(tmp_path) -> None:
@@ -322,3 +406,9 @@ def test_manual_script_body_requires_uuid() -> None:
     }
     with pytest.raises(AlteriosConfigError):
         build_script_body("getTasks", {"limit": 1}, "manual_script")
+
+
+def json_dump(value: object) -> str:
+    import json
+
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 from .services import get_service
@@ -19,6 +19,23 @@ class AlteriosConfigError(RuntimeError):
 
 class AlteriosRequestError(RuntimeError):
     pass
+
+
+PROFILE_CONFIG_SUFFIXES = (
+    "BASE_URL",
+    "API_TOKEN",
+    "PROJECT_ID",
+    "ENDPOINT_TEMPLATE",
+    "BODY_STYLE",
+    "AUTH_HEADER",
+    "AUTH_SCHEME",
+    "TIMEOUT_SECONDS",
+)
+PROFILE_KEY_RE = re.compile(
+    r"^ALTERIOS_(?P<profile>[A-Z0-9_]+)_(?P<suffix>"
+    + "|".join(re.escape(suffix) for suffix in PROFILE_CONFIG_SUFFIXES)
+    + r")$"
+)
 
 
 @dataclass(frozen=True)
@@ -35,15 +52,9 @@ class AlteriosConfig:
 
     @classmethod
     def from_env(cls, dotenv_path: str | Path | None = ".env", profile: str | None = None) -> "AlteriosConfig":
-        if dotenv_path == ".env":
-            dotenv_path = os.environ.get("ALTERIOS_DOTENV_PATH", ".env")
+        values = load_config_values(dotenv_path)
 
-        values: dict[str, str] = {}
-        if dotenv_path is not None:
-            values.update(read_dotenv(dotenv_path))
-        values.update(os.environ)
-
-        selected_profile = (profile or values.get("ALTERIOS_PROFILE", "")).strip()
+        selected_profile = (values.get("ALTERIOS_PROFILE", "") if profile is None else profile).strip()
         effective_values = apply_profile_values(values, selected_profile)
 
         timeout_raw = effective_values.get("ALTERIOS_TIMEOUT_SECONDS", "20")
@@ -89,7 +100,7 @@ class AlteriosConfig:
     def missing_for_script_call(self) -> list[str]:
         missing = self.missing_for_project_call()
         if not self.endpoint_template:
-            missing.append("ALTERIOS_ENDPOINT_TEMPLATE")
+            missing.append(profile_env_key(self.profile, "ENDPOINT_TEMPLATE"))
         return missing
 
     def with_project_id(self, project_id: str | None) -> "AlteriosConfig":
@@ -111,10 +122,10 @@ class AlteriosConfig:
     def redacted(self) -> dict[str, Any]:
         return {
             "profile": self.profile or "<default>",
-            "base_url": self.base_url,
+            "base_url": redact_url_value(self.base_url),
             "api_token": "<set>" if self.api_token else "<missing>",
             "project_id": self.project_id,
-            "endpoint_template": self.endpoint_template,
+            "endpoint_template": redact_url_value(self.endpoint_template),
             "body_style": self.body_style,
             "auth_header": self.auth_header,
             "auth_scheme": self.auth_scheme,
@@ -408,6 +419,85 @@ def read_dotenv(path: str | Path) -> dict[str, str]:
     return values
 
 
+def load_config_values(dotenv_path: str | Path | None = ".env") -> dict[str, str]:
+    if dotenv_path == ".env":
+        dotenv_path = os.environ.get("ALTERIOS_DOTENV_PATH", ".env")
+
+    values: dict[str, str] = {}
+    if dotenv_path is not None:
+        values.update(read_dotenv(dotenv_path))
+    values.update(os.environ)
+    return values
+
+
+def configured_profiles(
+    dotenv_path: str | Path | None = ".env",
+    *,
+    selected_profile: str | None = None,
+) -> dict[str, Any]:
+    values = load_config_values(dotenv_path)
+    effective_selected_profile = (values.get("ALTERIOS_PROFILE", "") if selected_profile is None else selected_profile).strip()
+    profile_names = discover_profile_names(values, selected_profile=effective_selected_profile)
+    profiles = []
+    for profile_name in profile_names:
+        config = AlteriosConfig.from_env(dotenv_path=dotenv_path, profile=profile_name)
+        profiles.append(
+            {
+                "profile": profile_name or "<default>",
+                "profile_argument": profile_name or None,
+                "selected": _same_profile(profile_name, effective_selected_profile),
+                "config": config.redacted(),
+                "missing_for_instance_call": config.missing_for_instance_call(),
+                "missing_for_project_call": config.missing_for_project_call(),
+                "missing_for_script_call": config.missing_for_script_call(),
+                "has_project_default": bool(config.project_id),
+            }
+        )
+
+    return {
+        "selected_profile": effective_selected_profile or None,
+        "profile_count": len(profiles),
+        "profiles": profiles,
+    }
+
+
+def discover_profile_names(values: dict[str, str], *, selected_profile: str | None = None) -> list[str]:
+    profile_names: dict[str, str] = {}
+
+    for raw_profile in _split_profile_list(values.get("ALTERIOS_PROFILES", "")):
+        profile_names[normalize_profile_key(raw_profile)] = raw_profile
+
+    effective_selected_profile = (values.get("ALTERIOS_PROFILE", "") if selected_profile is None else selected_profile).strip()
+    if effective_selected_profile:
+        profile_names.setdefault(normalize_profile_key(effective_selected_profile), effective_selected_profile)
+
+    for key in values:
+        match = PROFILE_KEY_RE.fullmatch(key)
+        if not match:
+            continue
+        profile_key = match.group("profile")
+        profile_names.setdefault(profile_key, profile_key.lower())
+
+    if not profile_names and any(values.get(f"ALTERIOS_{suffix}", "").strip() for suffix in PROFILE_CONFIG_SUFFIXES):
+        profile_names[""] = ""
+
+    def sort_key(profile_name: str) -> tuple[int, str]:
+        if _same_profile(profile_name, effective_selected_profile):
+            return (0, profile_name.lower())
+        return (1, profile_name.lower())
+
+    return sorted(profile_names.values(), key=sort_key)
+
+
+def _split_profile_list(value: str) -> list[str]:
+    profiles = []
+    for raw_item in re.split(r"[,;\s]+", value):
+        item = raw_item.strip()
+        if item:
+            profiles.append(item)
+    return profiles
+
+
 def apply_profile_values(values: dict[str, str], profile: str) -> dict[str, str]:
     if not profile:
         return values
@@ -415,16 +505,7 @@ def apply_profile_values(values: dict[str, str], profile: str) -> dict[str, str]
     profile_key = normalize_profile_key(profile)
     effective = dict(values)
     target_suffixes = {"BASE_URL", "API_TOKEN", "PROJECT_ID"}
-    for suffix in (
-        "BASE_URL",
-        "API_TOKEN",
-        "PROJECT_ID",
-        "ENDPOINT_TEMPLATE",
-        "BODY_STYLE",
-        "AUTH_HEADER",
-        "AUTH_SCHEME",
-        "TIMEOUT_SECONDS",
-    ):
+    for suffix in PROFILE_CONFIG_SUFFIXES:
         profile_env_key = f"ALTERIOS_{profile_key}_{suffix}"
         if profile_env_key in values:
             effective[f"ALTERIOS_{suffix}"] = values[profile_env_key]
@@ -433,11 +514,60 @@ def apply_profile_values(values: dict[str, str], profile: str) -> dict[str, str]
     return effective
 
 
+def profile_env_key(profile: str, suffix: str) -> str:
+    return f"ALTERIOS_{normalize_profile_key(profile)}_{suffix}" if profile else f"ALTERIOS_{suffix}"
+
+
 def normalize_profile_key(profile: str) -> str:
     key = re.sub(r"[^A-Za-z0-9]+", "_", profile.strip()).strip("_").upper()
     if not key:
         raise AlteriosConfigError("ALTERIOS_PROFILE cannot be empty")
     return key
+
+
+def redact_url_value(value: str) -> str:
+    if not value:
+        return value
+    if "://" not in value:
+        return _redact_sensitive_query_text(value)
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return "<redacted-url>"
+
+    netloc = parsed.netloc
+    if "@" in netloc:
+        host = netloc.rsplit("@", 1)[1]
+        netloc = f"<redacted>@{host}"
+
+    query_pairs = []
+    for key, item in parse_qsl(parsed.query, keep_blank_values=True):
+        query_pairs.append((key, "<redacted>" if _is_sensitive_config_key(key) else item))
+    query = urlencode(query_pairs)
+    return urlunsplit((parsed.scheme, netloc, parsed.path, query, parsed.fragment))
+
+
+def _redact_sensitive_query_text(value: str) -> str:
+    if "?" not in value:
+        return value
+    prefix, query = value.split("?", 1)
+    query_pairs = []
+    for key, item in parse_qsl(query, keep_blank_values=True):
+        query_pairs.append((key, "<redacted>" if _is_sensitive_config_key(key) else item))
+    return prefix + "?" + urlencode(query_pairs)
+
+
+def _is_sensitive_config_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return normalized in {"api_key", "apikey", "authorization", "password", "secret", "token"} or normalized.endswith("_token")
+
+
+def _same_profile(left: str, right: str) -> bool:
+    if not left and not right:
+        return True
+    if not left or not right:
+        return False
+    return normalize_profile_key(left) == normalize_profile_key(right)
 
 
 def redact_sensitive(value: Any) -> Any:

@@ -13,6 +13,15 @@ project context used.
 - `project_id` is call context. Project-scoped tools accept explicit
   `project_id` and use `ALTERIOS_<PROFILE>_PROJECT_ID` only as an optional
   default.
+- Multiple instances are configured as multiple profiles in one private dotenv
+  file. Use `ALTERIOS_PROFILES` for an explicit registry or rely on
+  `ALTERIOS_<PROFILE>_*` auto-discovery.
+- Profile inventory is read locally with `alterios_list_profiles` or
+  `python -m alterios_mcp.discovery --profiles --json`; it must not make
+  network calls or expose API tokens.
+- `--profiles --profile <name>` and `alterios_list_profiles(profile=...)` only
+  change which profile is marked as selected in the inventory output; they do
+  not rewrite dotenv state.
 - Instance-scoped discovery, especially project listing, must work without a
   project id.
 - Secrets are loaded from environment variables or `ALTERIOS_DOTENV_PATH`; they
@@ -22,6 +31,7 @@ project context used.
 
 1. Foundation and safety:
    - Confirm selected profile with `alterios_config`.
+   - Confirm available instance profiles with `alterios_list_profiles`.
    - Verify redaction of auth headers, tokens, passwords, and API keys.
    - Verify missing-value diagnostics for instance, project, and script calls.
    - Confirm explicit `project_id` overrides the optional env default.

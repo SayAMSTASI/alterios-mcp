@@ -5,7 +5,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .client import AlteriosClient, AlteriosConfig, looks_like_uuid
+from .client import AlteriosClient, AlteriosConfig, configured_profiles, looks_like_uuid
 from .discovery import discover_readonly, list_objects, list_projects
 from .services import get_service, list_services, service_to_dict
 from .write_control import (
@@ -82,6 +82,12 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
         "missing_for_script_call": config.missing_for_script_call(),
         "write_enabled": _write_enabled(),
     }
+
+
+@mcp.tool()
+def alterios_list_profiles(profile: str | None = None) -> dict[str, Any]:
+    """Return configured Alterios instance profiles with redacted settings and missing values."""
+    return configured_profiles(selected_profile=profile)
 
 
 @mcp.tool()

@@ -128,6 +128,27 @@ def test_rest_write_defaults_to_dry_run_without_network() -> None:
     assert result["audit"]["operation"]["target_ids"] == ["report-1"]
 
 
+def test_server_lists_configured_profiles_without_secrets() -> None:
+    env = {
+        "ALTERIOS_PROFILE": "vniimt",
+        "ALTERIOS_PROFILES": "vniimt, artx",
+        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_API_TOKEN": "vniimt-token",
+        "ALTERIOS_ARTX_BASE_URL": "http://artx.local",
+        "ALTERIOS_ARTX_API_TOKEN": "artx-token",
+    }
+
+    with patch.dict("os.environ", env, clear=True):
+        result = server.alterios_list_profiles(profile="artx")
+
+    assert result["profile_count"] == 2
+    assert result["selected_profile"] == "artx"
+    assert [item["profile"] for item in result["profiles"]] == ["artx", "vniimt"]
+    assert result["profiles"][0]["config"]["api_token"] == "<set>"
+    assert "vniimt-token" not in str(result)
+    assert "artx-token" not in str(result)
+
+
 def test_rest_write_execution_fails_without_write_env() -> None:
     with patch.dict("os.environ", {}, clear=True), pytest.raises(ControlledWriteError, match="disabled"):
         server.alterios_rest_write(
