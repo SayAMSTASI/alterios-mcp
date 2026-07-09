@@ -157,6 +157,33 @@ python -m alterios_mcp.static_scan C:\Users\admin\Documents\AlteriosCodex `
 `--include-generated` только когда нужно намеренное полное медленное
 сканирование.
 
+## Снятие Browser/UI Вызовов
+
+Для снятия фактических вызовов из веб-интерфейса Alterios используйте
+анализатор HAR/JSON-событий. Он не выполняет запросы к Alterios сам: только
+читает сохраненный сетевой дамп, выкидывает не-API шум, редактирует секреты и
+классифицирует маршруты по риску.
+
+```powershell
+python -m alterios_mcp.ui_flow .\capture.har `
+  --profile vniimt `
+  --project-id 40466687-b093-4d80-b4f2-ba0ed0245bfa `
+  --scenario content-form-open `
+  --json > artifacts\alterios-mcp\ui-flow-content-form-open.json
+```
+
+Команда доступна и как console script:
+
+```powershell
+alterios-ui-flow .\capture.har --scenario content-form-open --json
+```
+
+Неизвестные `POST`, `PUT`, `PATCH` и `DELETE` маршруты считаются write-like и
+попадают в write-gate. Известные read-only исключения, например
+`POST /api/views/v2/get-data`, описаны явно. Подробный workflow и правила
+редактирования артефактов описаны в
+[docs/browser-ui-discovery.md](docs/browser-ui-discovery.md).
+
 ## Запуск MCP-Сервера
 
 ```powershell
