@@ -22,7 +22,7 @@ The core contract is:
 - `alterios_config` - redacted profile/config check with missing-value lists.
 - `alterios_list_projects` - instance-scoped project inventory.
 - `alterios_service_catalog` - known script-service catalog with read/write
-  labels.
+  labels, risk levels, argument hints, and examples.
 - `alterios_call_readonly_service` - guarded calls to known read-only script
   services such as `getTasks`, `getContents`, and `getViewData` when an
   external service endpoint is configured.
@@ -173,6 +173,8 @@ Project coordination is tracked in
 [docs/project-status.md](docs/project-status.md). Multi-agent operating rules
 and PM stage gates are documented in
 [docs/project-management.md](docs/project-management.md).
+The script runtime catalog is documented in
+[docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
 
 Important: `/api/scripts/execute-manual` executes saved Alterios scripts by
 UUID. It does not call runtime service names such as `getTasks` directly. Keep

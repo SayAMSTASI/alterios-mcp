@@ -101,30 +101,35 @@ IDs, so they are not part of the route matrix probe:
 
 ## Current Script-Service Catalog
 
-Read-only:
+The source of truth is `src/alterios_mcp/services.py`; the operator-facing
+catalog is documented in [script-runtime-catalog.md](script-runtime-catalog.md).
+
+Read-only and safe-to-probe through a compatible runtime endpoint:
 
 - `getContents`
 - `getDependentContents`
 - `getTasks`
 - `getViewData`
 
-Mutating, disabled unless `ALTERIOS_MCP_ALLOW_WRITE=1`:
+Mutating and disabled unless `ALTERIOS_MCP_ALLOW_WRITE=1`:
 
-- `createContent`
-- `updateContent`
-- `deleteManyContents`
-- `createDependentContent`
-- `startProcess`
-- `reassignTask`
-- `messageToAnotherProcess`
-- `uploadFile`
-- `notify`
-- `writeLog`
+- `createContent` - `write`
+- `updateContent` - `write`
+- `deleteManyContents` - `destructive`
+- `createDependentContent` - `write`
+- `startProcess` - `workflow_side_effect`
+- `reassignTask` - `workflow_side_effect`
+- `messageToAnotherProcess` - `workflow_side_effect`
+- `uploadFile` - `write`
+- `notify` - `external_side_effect`
+- `writeLog` - `audit_side_effect`
 
 Manual script execution:
 
 - `/api/scripts/execute-manual` requires a script UUID and is exposed only as a
   write-gated operation.
+- Runtime service names such as `getTasks` are not script UUIDs and are rejected
+  when the endpoint template points at `/api/scripts/execute-manual`.
 
 ## Safety Rules
 

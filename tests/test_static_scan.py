@@ -70,6 +70,31 @@ def test_scan_directory_ignores_common_generated_directories(tmp_path) -> None:
     assert payload["services"] == []
 
 
+def test_scan_directory_keeps_likely_false_positives_unknown(tmp_path) -> None:
+    (tmp_path / "workflow.py").write_text(
+        "\n".join(
+            [
+                '"createNew"',
+                '"createOnStart"',
+                '"listDirectionTasks"',
+                '"startPayload"',
+                '"uploadResponse"',
+                "services.getContents({})",
+                "services.createDependentContent({})",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = scan_directory(tmp_path)
+    by_name = {item["name"]: item["known"] for item in payload["services"]}
+
+    assert by_name["getContents"] is True
+    assert by_name["createDependentContent"] is True
+    for name in ["createNew", "createOnStart", "listDirectionTasks", "startPayload", "uploadResponse"]:
+        assert by_name[name] is False
+
+
 def test_scan_directory_can_include_generated_directories(tmp_path) -> None:
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
