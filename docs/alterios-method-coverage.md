@@ -19,7 +19,7 @@
 | MCP tools | 23 | Публичные callable tools в `src/alterios_mcp/server.py`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
-| REST route/method patterns in coverage registry | 51 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
+| REST route/method patterns in coverage registry | 57 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
 | Виды обращений | 13 | Классы операций: от config/read до workflow, files, comments, security. |
 
 Это не означает, что в Alterios больше нет скрытых внутренних endpoint-ов.
@@ -38,13 +38,13 @@ browser/HAR capture и sandbox write-практику.
 | Populated/config reads | Да | `GET /api/view-fields/populated/{viewId}` | Live verified in sandbox chain. |
 | Runtime data reads | Да | `POST /api/views/v2/get-data`, `get-data-simplified` | Live verified for sandbox view. |
 | Metadata create/update | Да | content types, fields, forms, views, groups | Live sandbox write. |
-| Content create/update | Частично | `POST /api/contents/save`, `PATCH /api/contents/save` | Create live verified; update contract prepared. |
-| Script execution/services | Частично | `POST /api/scripts/execute-manual`, 14 service names | Cataloged; execution depends on UUID/endpoint. |
-| Workflow/process/task | Частично | `startProcess`, `reassignTask`, task complete | Cataloged; needs dedicated sandbox BPMN. |
-| Files | Частично | `GET /api/file/list`, upload file routes | Metadata read live; upload needs file-field capture. |
+| Content create/update | Да | `POST /api/contents/save`, `PATCH /api/contents/save` | Create and update live verified in sandbox; update used for file-field value. |
+| Script execution/services | Да | `POST /api/scripts`, `POST /api/scripts/execute-manual`, 14 service names | Saved manual script UUID created and executed in sandbox; runtime service names remain cataloged separately. |
+| Workflow/process/task | Да | `POST /api/diagrams`, `POST /api/processes`, `GET /api/tasks/`, `DELETE /api/tasks/complete` | Dedicated sandbox BPMN created; process started; user task completed; process readback completed. |
+| Files | Да | `POST /api/file/upload/field`, `GET /api/file/list` | File-field created; multipart upload executed; content value patched; file metadata readback verified. |
 | Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
-| Reports/dashboards | Частично | report full/read/save | Read route exists; write/dashboard needs report sandbox. |
+| Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
 ## MCP Tools: 23
 
@@ -88,7 +88,7 @@ browser/HAR capture и sandbox write-практику.
 Runtime service names are not manual script UUIDs. If the configured endpoint is
 `/api/scripts/execute-manual`, only saved script UUIDs can be executed there.
 
-## REST Route/Method Registry: 51
+## REST Route/Method Registry: 57
 
 Statuses:
 
@@ -117,7 +117,7 @@ Statuses:
 | 13 | GET | `/api/users/listandcount` | User read | `live_read` |
 | 14 | GET | `/api/groups` | Group read | `live_read` |
 | 15 | GET | `/api/helps` | Help read | `live_read` |
-| 16 | GET | `/api/reports/full/{filter}` | Report detail read | `cataloged` |
+| 16 | GET | `/api/reports/full/{filter}` | Report detail read | `live_read` |
 | 17 | GET | `/api/views/{viewId}` | View detail read | `cataloged` |
 | 18 | GET | `/api/forms/{formId}` | Form detail read | `cataloged` |
 | 19 | GET | `/api/view-entities/by-view/{viewId}` | View entity read | `live_read` |
@@ -147,12 +147,18 @@ Statuses:
 | 43 | PATCH | `/api/groups/{groupId}` | Menu group update variant | `cataloged` |
 | 44 | PUT | `/api/groups` | Menu group update variant | `cataloged` |
 | 45 | POST | `/api/contents/save` | Content create | `live_write`, `live_ui` |
-| 46 | PATCH | `/api/contents/save` | Content update | `cataloged` |
-| 47 | POST | `/api/scripts` | Script create | `cataloged` |
+| 46 | PATCH | `/api/contents/save` | Content update | `live_write` |
+| 47 | POST | `/api/scripts` | Script create | `live_write` |
 | 48 | PUT | `/api/scripts` | Script update | `cataloged` |
-| 49 | POST | `/api/scripts/execute-manual` | Manual script execution | `cataloged` |
-| 50 | PUT | `/api/reports` | Report save | `cataloged` |
-| 51 | POST | `/api/file/upload/field` | File upload | `needs_har` |
+| 49 | POST | `/api/scripts/execute-manual` | Manual script execution | `live_write` |
+| 50 | PUT | `/api/reports` | Report save | `live_write` |
+| 51 | POST | `/api/file/upload/field` | File upload | `live_write` |
+| 52 | POST | `/api/reports` | Report create | `live_write` |
+| 53 | POST | `/api/diagrams` | BPMN diagram create | `live_write` |
+| 54 | PUT | `/api/diagrams` | BPMN diagram update variant | `cataloged` |
+| 55 | POST | `/api/processes` | Process start | `live_write` |
+| 56 | GET | `/api/tasks/` | Active task read | `live_read` |
+| 57 | DELETE | `/api/tasks/complete` | Task transition/complete | `live_write` |
 
 ## What Counts As "All Types"
 
@@ -169,10 +175,6 @@ every internal route in advance. A class is considered covered only when it has:
 By that definition, all main operation classes are represented. The not-yet
 closed areas are:
 
-- file upload into a file field;
-- script creation/execution sandbox;
-- BPMN/process/task side effects;
-- report/dashboard save;
 - users/roles/security writes;
 - destructive delete flows.
 

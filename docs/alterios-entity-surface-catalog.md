@@ -27,7 +27,7 @@
 | Контент | 145 | Записи данных по типам материалов. |
 | Активные задачи | 1 | Текущие workflow tasks. |
 | Процессы | 16 | Запущенные/завершенные process instances. |
-| Отчеты | 0 | В этом проекте отчетов не найдено. |
+| Отчеты | 1 | `MCP Practice. Report Sandbox` создан как sandbox dashboard. |
 | Группы меню | 11 | Навигационные разделы workspace. |
 | Группы пользователей | 2 | Проектные группы доступа/назначений. |
 | Пользователи | 2 | Пользователи проекта. |
@@ -460,7 +460,7 @@ Write:
 
 - `name`;
 - `description`;
-- `type`: в проекте `manual` - 8, `event` - 2, `diagram` - 1;
+- `type`: в проекте `manual` - 9, `event` - 2, `diagram` - 1;
 - `active`;
 - `share`;
 - `librariesIds`;
@@ -517,7 +517,7 @@ Runtime/write:
 - `Демо HR-маршрутизация. Процесс`;
 - `Статус согласования отчета`;
 - 1 активная task: `1. Первичная задача`;
-- 16 процессов: 15 completed, 1 executing.
+- 17 процессов: 16 completed, 1 executing.
 
 Настройки task, найденные в проекте:
 
@@ -530,7 +530,7 @@ Runtime/write:
 
 ## Отчеты
 
-В проекте сейчас 0 отчетов, но API и локальные скрипты подтверждают модель.
+В проекте сейчас 1 отчет: `MCP Practice. Report Sandbox`.
 
 Read:
 
@@ -699,8 +699,8 @@ Write:
 2. **Typed `alterios_upsert_help`** - вынести подтвержденный `/api/helps` flow в
    отдельный tool с dry-run diff и readback.
 3. **Группы меню** - выполнено: создана sandbox-группа `MCP Practice`.
-4. **Content type + fields** - выполнено: создан `MCP Practice. Песочница` и 6
-   безопасных полей: text, list, number, date, boolean, textarea text.
+4. **Content type + fields** - выполнено: создан `MCP Practice. Песочница` и 7
+   безопасных полей: text, list, number, date, boolean, textarea text, file.
 5. **Forms** - выполнено: созданы add/edit/main формы для sandbox content type.
 6. **Views** - выполнено: создан table view, проверены `get-data-simplified` и
    UI-list.
@@ -709,12 +709,14 @@ Write:
 8. **Comments** - выполнено: добавлен UI-compatible комментарий к
    sandbox-записи, readback подтвердил `comment_found=true`, блок `Обсуждение`
    в карточке записи показал текст комментария.
-9. **Files** - загрузить маленький тестовый файл в file-field после HAR capture.
-10. **Scripts** - создать безопасный manual script, который только пишет в
-    sandbox-запись или возвращает диагностический результат.
-11. **Diagrams/tasks/processes** - только после отдельного sandbox BPMN:
-    start -> task -> complete -> readback.
-12. **Reports** - создать отчет поверх sandbox view.
+9. **Files** - выполнено: создан file-field, загружен `mcp-practice-upload.txt`,
+   content value сохранен, `/api/file/list` подтвердил metadata.
+10. **Scripts** - выполнено: создан и выполнен безопасный manual script
+    `MCP Practice. Manual Script Sandbox`.
+11. **Diagrams/tasks/processes** - выполнено: создан sandbox BPMN,
+    выполнена цепочка start -> task -> complete -> process readback.
+12. **Reports** - выполнено: создан dashboard report поверх sandbox view,
+    `/api/reports/full` подтвердил Stimulsoft dashboard template.
 13. **Users/groups/roles** - отложить до отдельного security workflow.
 
 ## Что Нужно Добавить В MCP

@@ -2,12 +2,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
+import time
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
-from alterios_mcp.client import AlteriosClient, AlteriosConfig, AlteriosConfigError, AlteriosRequestError
+from alterios_mcp.client import (
+    AlteriosClient,
+    AlteriosConfig,
+    AlteriosConfigError,
+    AlteriosRequestError,
+    encode_filter,
+    parse_response_body,
+    safe_error,
+)
 from alterios_mcp.write_control import (
     ControlledWriteError,
     WriteOperation,
@@ -35,6 +52,20 @@ EDIT_ICON_ID = "aa4c573e-104e-46a2-934f-780e105f3b1b"
 COMMENT_ENTITY = "any"
 COMMENT_TEXT = "MCP Practice comment: comments write/readback coverage."
 COMMENTS_BLOCK_TITLE = "Обсуждение"
+UPLOAD_FILENAME = "mcp-practice-upload.txt"
+UPLOAD_BYTES = b"alterios-mcp file-field upload sandbox\n"
+MANUAL_SCRIPT_NAME = "MCP Practice. Manual Script Sandbox"
+MANUAL_SCRIPT_MARKER = "Codex-managed: alterios-mcp manual script sandbox."
+BPMN_DIAGRAM_NAME = "MCP Practice. BPMN Sandbox"
+BPMN_DIAGRAM_MARKER = "Codex-managed: alterios-mcp BPMN/process/task sandbox."
+REPORT_NAME = "MCP Practice. Report Sandbox"
+REPORT_MARKER = "Codex-managed: alterios-mcp report sandbox."
+
+BPMN_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL"
+BPMNDI_NS = "http://www.omg.org/spec/BPMN/20100524/DI"
+DC_NS = "http://www.omg.org/spec/DD/20100524/DC"
+DI_NS = "http://www.omg.org/spec/DD/20100524/DI"
+CAMUNDA_NS = "http://camunda.org/schema/1.0/bpmn"
 
 
 @dataclass(frozen=True)
@@ -140,6 +171,21 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         "Используется для тестирования textarea и длинных значений.",
         {"widget": "textarea", "required": False, "maxLength": 2000, "valueCount": 1, "defaultValue": [None]},
     ),
+    FieldSpec(
+        "attachment",
+        "Файл",
+        "file",
+        "Проверяет загрузку файла в file-field.",
+        "Используется для тестирования multipart upload и сохранения file value в content row.",
+        {
+            "storage": "public",
+            "folder": "mcp-practice",
+            "extensions": ["txt"],
+            "valueCount": 1,
+            "required": False,
+            "defaultValue": [],
+        },
+    ),
 )
 
 
@@ -205,6 +251,7 @@ def setup_metadata(
         return results, verify_metadata(client, content_type["_id"])
 
     view_fields = ensure_view_fields(client, results, view["_id"], entity["_id"], fields, profile=profile, project_id=project_id, execute=execute)
+    report = ensure_report(client, results, view["_id"], view_fields, profile=profile, project_id=project_id, execute=execute)
     add_form = ensure_form(
         client,
         results,
@@ -231,7 +278,14 @@ def setup_metadata(
         client,
         results,
         MAIN_FORM_NAME,
-        build_main_form(view["_id"], entity["_id"], add_form["_id"], edit_form["_id"], view_fields),
+        build_main_form(
+            view["_id"],
+            entity["_id"],
+            add_form["_id"],
+            edit_form["_id"],
+            view_fields,
+            report_id=report.get("_id") if report else None,
+        ),
         profile=profile,
         project_id=project_id,
         execute=execute,
@@ -244,6 +298,25 @@ def setup_metadata(
     content = ensure_practice_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
     if content and content.get("_id"):
         ensure_practice_comment(client, results, content["_id"], profile=profile, project_id=project_id, execute=execute)
+        ensure_file_upload(client, results, content_type["_id"], fields, content, profile=profile, project_id=project_id, execute=execute)
+        manual_script = ensure_manual_script(client, results, profile=profile, project_id=project_id, execute=execute)
+        if manual_script and manual_script.get("_id"):
+            execute_manual_script(client, results, manual_script["_id"], content["_id"], profile=profile, project_id=project_id, execute=execute)
+        else:
+            results.append(Result("blocked", "manual_script_execution", MANUAL_SCRIPT_NAME, details={"reason": "manual script does not exist in dry-run"}))
+        diagram = ensure_bpmn_diagram(
+            client,
+            results,
+            content_type["_id"],
+            edit_form["_id"],
+            profile=profile,
+            project_id=project_id,
+            execute=execute,
+        )
+        if diagram and diagram.get("_id"):
+            ensure_process_task_side_effect(client, results, diagram["_id"], content["_id"], profile=profile, project_id=project_id, execute=execute)
+        else:
+            results.append(Result("blocked", "process_task", BPMN_DIAGRAM_NAME, details={"reason": "diagram does not exist in dry-run"}))
     else:
         results.append(Result("blocked", "comment", COMMENT_TEXT, details={"reason": "content row does not exist in dry-run"}))
     return results, verify_metadata(client, content_type["_id"])
@@ -357,6 +430,7 @@ def ensure_fields(
         write_rest(client, "POST", "/api/fields/save", payload, profile=profile, project_id=project_id, execute=execute)
         if not execute:
             results.append(Result("planned", "field", spec.name, details={"mname": spec.mname, "type": spec.field_type}))
+            ensured.append({**payload, "_id": f"dry-run-{spec.suffix}", "mname": spec.mname})
             continue
         refreshed = list_fields(client, content_type_id)
         created = next((field for field in refreshed if mname_matches(field, spec) or field.get("name") == spec.name), None)
@@ -751,6 +825,340 @@ def ensure_practice_comment(
     return refreshed
 
 
+def ensure_file_upload(
+    client: AlteriosClient,
+    results: list[Result],
+    content_type_id: str,
+    fields: list[dict[str, Any]],
+    content: dict[str, Any],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    file_field = field_by_suffix(fields, "attachment")
+    values = normalize_file_values((content.get("fields") or {}).get(file_field["mname"]))
+    existing = find_uploaded_value(client, values, UPLOAD_FILENAME)
+    if existing:
+        results.append(
+            Result(
+                "exists",
+                "file_upload",
+                UPLOAD_FILENAME,
+                file_value_id(existing),
+                {"field": file_field["mname"], "filename": UPLOAD_FILENAME},
+            )
+        )
+        return existing
+
+    if not execute:
+        audit_file_upload(profile=profile, project_id=project_id, content_type_id=content_type_id, field_id=file_field["_id"], execute=False)
+        results.append(Result("planned", "file_upload", UPLOAD_FILENAME, details={"field": file_field["mname"]}))
+        return None
+
+    uploaded = upload_multipart(
+        client,
+        UPLOAD_BYTES,
+        {
+            "filename": UPLOAD_FILENAME,
+            "mimeType": "text/plain",
+            "size": len(UPLOAD_BYTES),
+        },
+        content_type_id,
+        file_field["_id"],
+        profile=profile,
+        project_id=project_id,
+        execute=execute,
+    )
+    uploaded_id = uploaded.get("_id") if isinstance(uploaded, dict) else None
+    if not uploaded_id:
+        raise RuntimeError(f"POST /api/file/upload/field returned no _id: {safe_error(uploaded)}")
+
+    uploaded_value = {
+        "id": uploaded_id,
+        "filename": uploaded.get("filename") or UPLOAD_FILENAME,
+        "name": uploaded.get("filename") or UPLOAD_FILENAME,
+        "mimeType": uploaded.get("mimeType") or "text/plain",
+        "size": uploaded.get("size") or len(UPLOAD_BYTES),
+    }
+    updated = dict(content)
+    updated["fields"] = dict(content.get("fields") or {})
+    updated["fields"][file_field["mname"]] = [uploaded_value]
+    write_rest(
+        client,
+        "PATCH",
+        "/api/contents/save",
+        content_save_payload(updated),
+        profile=profile,
+        project_id=project_id,
+        execute=execute,
+    )
+    metadata = list_file_metadata(client, [uploaded_id])
+    if not metadata:
+        raise RuntimeError(f"Uploaded file {uploaded_id} was not visible through /api/file/list.")
+    results.append(
+        Result(
+            "created",
+            "file_upload",
+            UPLOAD_FILENAME,
+            uploaded_id,
+            {"field": file_field["mname"], "size": len(UPLOAD_BYTES), "metadata_found": True},
+        )
+    )
+    return uploaded_value
+
+
+def ensure_manual_script(
+    client: AlteriosClient,
+    results: list[Result],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    body = build_manual_script_body()
+    payload = {
+        "name": MANUAL_SCRIPT_NAME,
+        "description": MANUAL_SCRIPT_MARKER,
+        "type": "manual",
+        "active": True,
+        "body": body,
+        "share": False,
+        "apiKey": client.config.api_token,
+        "config": {"cron": None, "arguments": [{"key": "contentId"}, {"key": "source"}, {"key": "mode"}]},
+        "librariesIds": [],
+    }
+    existing = find_named(list_scripts(client), MANUAL_SCRIPT_NAME)
+    if existing:
+        ensure_marked("Script", MANUAL_SCRIPT_NAME, existing, MANUAL_SCRIPT_MARKER)
+        comparable_keys = ("description", "type", "active", "body", "share", "config", "librariesIds")
+        if not resource_needs_update(existing, payload, comparable_keys):
+            results.append(Result("exists", "manual_script", MANUAL_SCRIPT_NAME, existing["_id"]))
+            return existing
+        updated = {**strip_metadata(existing), **payload, "_id": existing["_id"]}
+        saved = write_rest(client, "PUT", "/api/scripts", updated, profile=profile, project_id=project_id, execute=execute)
+        if not execute:
+            results.append(Result("planned", "manual_script", MANUAL_SCRIPT_NAME, existing["_id"]))
+            return existing
+        results.append(Result("updated", "manual_script", MANUAL_SCRIPT_NAME, existing["_id"]))
+        return saved if isinstance(saved, dict) else updated
+
+    write_rest(client, "POST", "/api/scripts", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "manual_script", MANUAL_SCRIPT_NAME))
+        return None
+    refreshed = find_named(list_scripts(client), MANUAL_SCRIPT_NAME)
+    if not refreshed or not refreshed.get("_id"):
+        raise RuntimeError(f"Create script {MANUAL_SCRIPT_NAME!r} was not visible on readback.")
+    results.append(Result("created", "manual_script", MANUAL_SCRIPT_NAME, refreshed["_id"]))
+    return refreshed
+
+
+def execute_manual_script(
+    client: AlteriosClient,
+    results: list[Result],
+    script_id: str,
+    content_id: str,
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> Any:
+    payload = {"_id": script_id, "args": {"contentId": content_id, "source": "alterios-mcp", "mode": "sandbox"}}
+    response = write_rest(
+        client,
+        "POST",
+        "/api/scripts/execute-manual",
+        payload,
+        profile=profile,
+        project_id=project_id,
+        execute=execute,
+        risk_level="manual_script",
+    )
+    if not execute:
+        results.append(Result("planned", "manual_script_execution", MANUAL_SCRIPT_NAME, script_id, {"contentId": content_id}))
+        return None
+    results.append(
+        Result(
+            "executed",
+            "manual_script_execution",
+            MANUAL_SCRIPT_NAME,
+            script_id,
+            {"contentId": content_id, "response_shape": response_shape(response)},
+        )
+    )
+    return response
+
+
+def ensure_bpmn_diagram(
+    client: AlteriosClient,
+    results: list[Result],
+    content_type_id: str,
+    task_form_id: str,
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    xml = build_process_xml(task_form_id)
+    payload = {
+        "name": BPMN_DIAGRAM_NAME,
+        "description": BPMN_DIAGRAM_MARKER,
+        "value": xml,
+        "contentTypeId": content_type_id,
+        "createOnStart": False,
+        "delayedStart": False,
+    }
+    existing = find_named(list_diagrams(client), BPMN_DIAGRAM_NAME)
+    if existing:
+        ensure_marked("Diagram", BPMN_DIAGRAM_NAME, existing, BPMN_DIAGRAM_MARKER)
+        if not resource_needs_update(existing, payload, ("description", "value", "contentTypeId", "createOnStart", "delayedStart")):
+            results.append(Result("exists", "diagram", BPMN_DIAGRAM_NAME, existing["_id"]))
+            return existing
+        updated = strip_metadata({**existing, **payload})
+        saved = update_resource(client, "diagrams", updated, profile=profile, project_id=project_id, execute=execute)
+        if not execute:
+            results.append(Result("planned", "diagram", BPMN_DIAGRAM_NAME, existing["_id"]))
+            return existing
+        results.append(Result("updated", "diagram", BPMN_DIAGRAM_NAME, existing["_id"]))
+        return saved if isinstance(saved, dict) else updated
+
+    write_rest(client, "POST", "/api/diagrams", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "diagram", BPMN_DIAGRAM_NAME))
+        return None
+    refreshed = find_named(list_diagrams(client), BPMN_DIAGRAM_NAME)
+    if not refreshed or not refreshed.get("_id"):
+        raise RuntimeError(f"Create diagram {BPMN_DIAGRAM_NAME!r} was not visible on readback.")
+    results.append(Result("created", "diagram", BPMN_DIAGRAM_NAME, refreshed["_id"]))
+    return refreshed
+
+
+def ensure_process_task_side_effect(
+    client: AlteriosClient,
+    results: list[Result],
+    diagram_id: str,
+    content_id: str,
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    processes = list_processes(client, diagram_id=diagram_id, content_id=content_id)
+    completed = next((process for process in processes if process.get("completed") and not process.get("error")), None)
+    if completed:
+        results.append(Result("exists", "process_task", BPMN_DIAGRAM_NAME, completed.get("_id"), {"completed": True, "contentId": content_id}))
+        return completed
+
+    active_tasks = active_tasks_for_processes(client, processes, diagram_id=diagram_id, content_id=content_id)
+    if not active_tasks and not processes:
+        payload = {"diagramId": diagram_id, "contentId": content_id, "params": {"source": "alterios-mcp", "sandbox": True}}
+        start_response = write_rest(
+            client,
+            "POST",
+            "/api/processes",
+            payload,
+            profile=profile,
+            project_id=project_id,
+            execute=execute,
+            risk_level="workflow_side_effect",
+        )
+        if not execute:
+            results.append(Result("planned", "process_start", BPMN_DIAGRAM_NAME, diagram_id, {"contentId": content_id}))
+            return None
+        process_id = process_id_from_response(start_response)
+        active_tasks = wait_for_tasks(client, diagram_id=diagram_id, content_id=content_id, process_id=process_id)
+        processes = list_processes(client, diagram_id=diagram_id, content_id=content_id)
+        results.append(Result("started", "process", BPMN_DIAGRAM_NAME, process_id or (processes[0].get("_id") if processes else None), {"contentId": content_id}))
+
+    task = active_tasks[0] if active_tasks else None
+    if task and task.get("_id"):
+        response = write_rest(
+            client,
+            "DELETE",
+            "/api/tasks/complete",
+            {"_id": task["_id"], "nextFlowId": "Flow_to_end", "processContent": None, "contents": []},
+            profile=profile,
+            project_id=project_id,
+            execute=execute,
+            risk_level="workflow_side_effect",
+        )
+        if not execute:
+            results.append(Result("planned", "task_complete", task.get("name") or "MCP Practice task", task["_id"]))
+            return None
+        completed_process = wait_for_completed_process(client, diagram_id=diagram_id, content_id=content_id)
+        results.append(
+            Result(
+                "completed",
+                "task",
+                task.get("name") or "MCP Practice task",
+                task["_id"],
+                {"processId": (completed_process or {}).get("_id"), "response_shape": response_shape(response)},
+            )
+        )
+        return completed_process
+
+    latest = processes[0] if processes else None
+    results.append(
+        Result(
+            "blocked",
+            "process_task",
+            BPMN_DIAGRAM_NAME,
+            latest.get("_id") if latest else None,
+            {"reason": "process exists but no active task or completed process was found", "contentId": content_id},
+        )
+    )
+    return latest
+
+
+def ensure_report(
+    client: AlteriosClient,
+    results: list[Result],
+    view_id: str,
+    view_fields: dict[str, dict[str, Any]],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    template = build_dashboard_template(client.config.base_url, view_id, view_fields)
+    payload = {"name": REPORT_NAME, "description": REPORT_MARKER, "type": "dashboard", "template": template}
+    existing = find_named(list_reports(client), REPORT_NAME)
+    if existing:
+        full = report_full_payload(client, existing["_id"])
+        if not report_is_manageable(existing, full):
+            raise RuntimeError(f"Report {REPORT_NAME!r} exists but is not Codex-managed; refusing to update it.")
+        full_type = (full or {}).get("type") if isinstance(full, dict) else None
+        needs_update = (
+            (existing.get("type") or full_type) != payload["type"]
+            or not report_has_dashboard_page(full)
+            or not report_template_has_marker(full)
+        )
+        if not needs_update:
+            results.append(Result("exists", "report", REPORT_NAME, existing["_id"]))
+            return existing
+        updated = strip_metadata({**existing, **payload})
+        saved = write_rest(client, "PUT", "/api/reports", updated, profile=profile, project_id=project_id, execute=execute)
+        if not execute:
+            results.append(Result("planned", "report", REPORT_NAME, existing["_id"]))
+            return existing
+        results.append(Result("updated", "report", REPORT_NAME, existing["_id"]))
+        return saved if isinstance(saved, dict) else updated
+
+    write_rest(client, "POST", "/api/reports", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "report", REPORT_NAME))
+        return None
+    refreshed = find_named(list_reports(client), REPORT_NAME)
+    if not refreshed or not refreshed.get("_id"):
+        raise RuntimeError(f"Create report {REPORT_NAME!r} was not visible on readback.")
+    full = report_full_payload(client, refreshed["_id"])
+    if not full:
+        raise RuntimeError(f"Create report {REPORT_NAME!r} was not visible through /api/reports/full.")
+    results.append(Result("created", "report", REPORT_NAME, refreshed["_id"], {"full_readback": True}))
+    return refreshed
+
+
 def build_add_form(content_type_id: str, fields: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "name": ADD_FORM_NAME,
@@ -775,37 +1183,58 @@ def build_main_form(
     add_form_id: str,
     edit_form_id: str,
     view_fields: dict[str, dict[str, Any]],
+    *,
+    report_id: str | None,
 ) -> dict[str, Any]:
+    rows = [
+        {
+            "cells": [
+                {
+                    "name": VIEW_NAME,
+                    "type": "view_data_list",
+                    "adding": {"items": []},
+                    "params": {"openId": True, "viewId": view_id, "engineVersion": "v2"},
+                    "styles": flex_styles(),
+                    "editing": {},
+                    "emitting": {"listeners": []},
+                    "reporting": {"reports": []},
+                    "displaying": {"list": {"pageSizeOptions": []}, "fields": view_display_fields(view_fields), "header": {}, "editForm": {}},
+                    "cellActionContainers": [open_form_container("Добавить", ADD_ICON_ID, add_form_id, ADD_FORM_NAME, entity_id, "top_left")],
+                    "valueActionContainers": [open_form_container("Редактировать", EDIT_ICON_ID, edit_form_id, EDIT_FORM_NAME, entity_id, "toolbar")],
+                }
+            ],
+            "styles": row_styles(),
+            "reverse": False,
+        }
+    ]
+    if report_id:
+        rows.append(report_row(report_id))
     return {
         "name": MAIN_FORM_NAME,
         "pageTitle": MAIN_FORM_NAME,
-        "tabs": [
+        "tabs": [{"name": None, "rows": rows}],
+        "formActionContainers": [],
+    }
+
+
+def report_row(report_id: str) -> dict[str, Any]:
+    return {
+        "cells": [
             {
-                "name": None,
-                "rows": [
-                    {
-                        "cells": [
-                            {
-                                "name": VIEW_NAME,
-                                "type": "view_data_list",
-                                "adding": {"items": []},
-                                "params": {"openId": True, "viewId": view_id, "engineVersion": "v2"},
-                                "styles": flex_styles(),
-                                "editing": {},
-                                "emitting": {"listeners": []},
-                                "reporting": {"reports": []},
-                                "displaying": {"list": {"pageSizeOptions": []}, "fields": view_display_fields(view_fields), "header": {}, "editForm": {}},
-                                "cellActionContainers": [open_form_container("Добавить", ADD_ICON_ID, add_form_id, ADD_FORM_NAME, entity_id, "top_left")],
-                                "valueActionContainers": [open_form_container("Редактировать", EDIT_ICON_ID, edit_form_id, EDIT_FORM_NAME, entity_id, "toolbar")],
-                            }
-                        ],
-                        "styles": row_styles(),
-                        "reverse": False,
-                    }
-                ],
+                "name": REPORT_NAME,
+                "type": "report",
+                "adding": {},
+                "params": {"reportId": report_id, "fullscreenMode": False},
+                "styles": flex_styles(),
+                "editing": {},
+                "emitting": {},
+                "reporting": {"reports": []},
+                "displaying": {"fields": {}, "header": {}},
+                "cellActionContainers": [],
             }
         ],
-        "formActionContainers": [],
+        "styles": row_styles(),
+        "reverse": False,
     }
 
 
@@ -924,6 +1353,405 @@ def save_action_container() -> dict[str, Any]:
     }
 
 
+def field_by_suffix(fields: list[dict[str, Any]], suffix: str) -> dict[str, Any]:
+    spec = next((item for item in FIELD_SPECS if item.suffix == suffix), None)
+    if not spec:
+        raise RuntimeError(f"Unknown field suffix {suffix!r}.")
+    field = next((item for item in fields if item.get("name") == spec.name or mname_matches(item, spec)), None)
+    if not field or not field.get("_id") or not field.get("mname"):
+        raise RuntimeError(f"Field {spec.name!r} was not found.")
+    return field
+
+
+def normalize_file_values(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        return [value] if file_value_id(value) else []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict) and file_value_id(item)]
+    return []
+
+
+def file_value_id(value: dict[str, Any]) -> str | None:
+    raw = value.get("id") or value.get("_id") or value.get("fileId")
+    return str(raw) if raw else None
+
+
+def find_uploaded_value(client: AlteriosClient, values: list[dict[str, Any]], filename: str) -> dict[str, Any] | None:
+    ids = [file_id for value in values if (file_id := file_value_id(value))]
+    if not ids:
+        return None
+    metadata = list_file_metadata(client, ids)
+    by_id = {str(item.get("_id")): item for item in metadata if item.get("_id")}
+    for value in values:
+        file_id = file_value_id(value)
+        meta = by_id.get(str(file_id)) if file_id else None
+        names = {str(item) for item in (value.get("filename"), value.get("name"), (meta or {}).get("filename")) if item}
+        if filename in names:
+            return value
+    return None
+
+
+def audit_file_upload(*, profile: str, project_id: str, content_type_id: str, field_id: str, execute: bool) -> None:
+    operation = WriteOperation(
+        name="POST /api/file/upload/field",
+        kind="file_upload",
+        risk_level="write",
+        summary="Upload a file into an Alterios file field.",
+        method="POST",
+        path="/api/file/upload/field",
+        target_ids=collect_target_ids({"contentTypeId": content_type_id, "fieldId": field_id}),
+        request={"filename": UPLOAD_FILENAME, "size": len(UPLOAD_BYTES), "contentTypeId": content_type_id, "fieldId": field_id},
+    )
+    build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=not execute,
+        write_enabled=write_enabled(),
+    )
+    if execute:
+        assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=write_enabled())
+
+
+def upload_multipart(
+    client: AlteriosClient,
+    data: bytes,
+    meta: dict[str, Any],
+    content_type_id: str,
+    field_id: str,
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> Any:
+    audit_file_upload(profile=profile, project_id=project_id, content_type_id=content_type_id, field_id=field_id, execute=execute)
+    if not execute:
+        return None
+    boundary = "----CodexAlteriosBoundary" + uuid.uuid4().hex
+    filename = str(meta.get("filename") or "upload.bin")
+    mime_type = str(meta.get("mimeType") or mimetypes.guess_type(filename)[0] or "application/octet-stream")
+    body = build_multipart(boundary, "upload", filename, mime_type, data)
+    headers = dict(client._headers())  # Uses the same project/auth headers as JSON requests.
+    headers.update(
+        {
+            "Accept": "application/json",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(body)),
+            "contenttype": content_type_id,
+            "field": field_id,
+            "ngsw-bypass": "true",
+        }
+    )
+    url = client.config.base_url.rstrip("/") + "/api/file/upload/field"
+    request = Request(url, data=body, headers=headers, method="POST")
+    try:
+        with urlopen(request, timeout=client.config.timeout_seconds) as response:
+            return parse_response_body(response.read(), response.headers.get("Content-Type", ""))
+    except HTTPError as exc:
+        parsed = parse_response_body(exc.read(), exc.headers.get("Content-Type", "") if exc.headers else "")
+        raise RuntimeError(f"POST /api/file/upload/field failed with HTTP {exc.code}: {safe_error(parsed)}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"POST /api/file/upload/field failed: {exc.reason}") from exc
+
+
+def build_multipart(boundary: str, field_name: str, filename: str, mime_type: str, data: bytes) -> bytes:
+    safe_filename = filename.replace('"', "'")
+    head_text = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{field_name}"; filename="{safe_filename}"\r\n'
+        f"Content-Type: {mime_type}\r\n\r\n"
+    )
+    head = head_text.encode("cp1251", errors="replace")
+    tail = f"\r\n--{boundary}--\r\n".encode("ascii")
+    return head + data + tail
+
+
+def build_manual_script_body() -> str:
+    return r"""
+var Handler = class McpPracticeManualSandbox {
+  async onStart(startArgs) {
+    const input = startArgs && typeof startArgs === "object" ? startArgs : {};
+    if (typeof args !== "undefined" && args) {
+      for (const key in args) input[key] = args[key];
+    }
+    if (typeof contentId !== "undefined" && contentId) input.contentId = contentId;
+    if (typeof source !== "undefined" && source) input.source = source;
+    if (typeof mode !== "undefined" && mode) input.mode = mode;
+    const result = {
+      ok: true,
+      marker: "alterios-mcp manual script sandbox",
+      contentId: input.contentId || null,
+      source: input.source || null,
+      mode: input.mode || null,
+      receivedKeys: Object.keys(input).sort()
+    };
+    if (typeof writeLog === "function") {
+      await writeLog("alterios-mcp manual script sandbox: " + JSON.stringify(result), "info");
+      result.writeLog = true;
+    }
+    return result;
+  }
+}
+
+new Handler();
+""".strip()
+
+
+def build_process_xml(task_form_id: str) -> str:
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="{BPMN_NS}" xmlns:bpmndi="{BPMNDI_NS}" xmlns:dc="{DC_NS}" xmlns:di="{DI_NS}" xmlns:camunda="{CAMUNDA_NS}" id="mcp-practice-sandbox" targetNamespace="http://bpmn.io/schema/bpmn" xsi:schemaLocation="{BPMN_NS} BPMN20.xsd">
+  <bpmn2:process id="Process_mcp_practice_sandbox" name="{BPMN_DIAGRAM_NAME}" isExecutable="true">
+    <bpmn2:startEvent id="StartEvent_mcp_practice" camunda:formKey="{task_form_id}">
+      <bpmn2:outgoing>Flow_to_task</bpmn2:outgoing>
+      <camunda:nextTasks>Activity_mcp_practice_task</camunda:nextTasks>
+    </bpmn2:startEvent>
+    <bpmn2:sequenceFlow id="Flow_to_task" sourceRef="StartEvent_mcp_practice" targetRef="Activity_mcp_practice_task" />
+    <bpmn2:userTask id="Activity_mcp_practice_task" name="MCP Practice task" camunda:formKey="{task_form_id}" camunda:savable="true" camunda:candidateUsers="" camunda:candidateGroups="">
+      <bpmn2:incoming>Flow_to_task</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_to_end</bpmn2:outgoing>
+    </bpmn2:userTask>
+    <bpmn2:sequenceFlow id="Flow_to_end" name="Complete sandbox task" sourceRef="Activity_mcp_practice_task" targetRef="EndEvent_mcp_practice" />
+    <bpmn2:endEvent id="EndEvent_mcp_practice" name="Done">
+      <bpmn2:incoming>Flow_to_end</bpmn2:incoming>
+      <bpmn2:terminateEventDefinition id="TerminateEventDefinition_mcp_practice" />
+    </bpmn2:endEvent>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_mcp_practice">
+    <bpmndi:BPMNPlane id="BPMNPlane_mcp_practice" bpmnElement="Process_mcp_practice_sandbox">
+      <bpmndi:BPMNShape id="StartEvent_mcp_practice_di" bpmnElement="StartEvent_mcp_practice"><dc:Bounds x="180" y="210" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_mcp_practice_task_di" bpmnElement="Activity_mcp_practice_task"><dc:Bounds x="300" y="188" width="190" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_mcp_practice_di" bpmnElement="EndEvent_mcp_practice"><dc:Bounds x="570" y="210" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_to_task_di" bpmnElement="Flow_to_task"><di:waypoint x="216" y="228" /><di:waypoint x="300" y="228" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_end_di" bpmnElement="Flow_to_end"><di:waypoint x="490" y="228" /><di:waypoint x="570" y="228" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>"""
+
+
+def process_id_from_response(response: Any) -> str | None:
+    if isinstance(response, dict):
+        raw = response.get("processId") or response.get("_id") or response.get("id")
+        return str(raw) if raw else None
+    return None
+
+
+def wait_for_tasks(
+    client: AlteriosClient,
+    *,
+    diagram_id: str,
+    content_id: str,
+    process_id: str | None,
+    attempts: int = 20,
+) -> list[dict[str, Any]]:
+    for _ in range(attempts):
+        if process_id:
+            tasks = list_tasks_by_process(client, process_id)
+        else:
+            tasks = list_tasks(client, diagram_id=diagram_id, content_id=content_id)
+        if tasks:
+            return tasks
+        time.sleep(0.5)
+    return []
+
+
+def active_tasks_for_processes(
+    client: AlteriosClient,
+    processes: list[dict[str, Any]],
+    *,
+    diagram_id: str,
+    content_id: str,
+) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    for process in processes:
+        process_id = process.get("_id")
+        if process_id:
+            tasks.extend(list_tasks_by_process(client, str(process_id)))
+    if tasks:
+        return tasks
+    return list_tasks(client, diagram_id=diagram_id, content_id=content_id)
+
+
+def wait_for_completed_process(
+    client: AlteriosClient,
+    *,
+    diagram_id: str,
+    content_id: str,
+    attempts: int = 20,
+) -> dict[str, Any] | None:
+    for _ in range(attempts):
+        processes = list_processes(client, diagram_id=diagram_id, content_id=content_id)
+        completed = next((process for process in processes if process.get("completed") and not process.get("error")), None)
+        if completed:
+            return completed
+        time.sleep(0.5)
+    return None
+
+
+def response_shape(value: Any) -> str:
+    if isinstance(value, dict):
+        return "dict:" + ",".join(sorted(str(key) for key in value.keys())[:8])
+    if isinstance(value, list):
+        return f"list:{len(value)}"
+    return type(value).__name__
+
+
+def build_dashboard_template(base_url: str, view_id: str, view_fields: dict[str, dict[str, Any]]) -> str:
+    node_path = find_node()
+    scripts_dir = ensure_stimulsoft_assets(base_url)
+    helper_path = Path(tempfile.gettempdir()) / "alterios-stimulsoft" / "build_mcp_practice_dashboard.js"
+    helper_path.write_text(STIMULSOFT_TEMPLATE_HELPER, encoding="utf-8")
+    payload = {
+        "scriptsDir": str(scripts_dir),
+        "reportName": REPORT_NAME,
+        "marker": REPORT_MARKER,
+        "viewName": VIEW_NAME,
+        "viewId": view_id,
+        "columns": dashboard_columns(view_fields),
+    }
+    completed = subprocess.run(
+        [str(node_path), str(helper_path)],
+        input=json.dumps(payload, ensure_ascii=False),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"Stimulsoft dashboard template generation failed: {completed.stderr.strip()[:800]}")
+    template = completed.stdout.strip()
+    if not template.startswith("{") or "StiDashboard" not in template:
+        raise RuntimeError("Stimulsoft dashboard template generation returned unexpected output.")
+    return template
+
+
+def dashboard_columns(view_fields: dict[str, dict[str, Any]]) -> list[dict[str, str]]:
+    columns: list[dict[str, str]] = [{"name": "_id", "alias": "ID", "type": "System.String"}]
+    for field in FIELD_SPECS:
+        view_field = next((item for key, item in view_fields.items() if key.endswith(f"_{field.suffix}")), None)
+        mname = (view_field or {}).get("mname")
+        if not mname:
+            continue
+        column_type = "System.String"
+        if field.field_type == "number":
+            column_type = "System.Decimal"
+        elif field.field_type == "boolean":
+            column_type = "System.Boolean"
+        elif field.field_type == "date":
+            column_type = "System.DateTime"
+        columns.append({"name": mname, "alias": field.name, "type": column_type})
+    return columns
+
+
+def find_node() -> Path:
+    node = shutil.which("node")
+    if node:
+        return Path(node)
+    runtime_node = Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies" / "node" / "bin" / "node.exe"
+    if runtime_node.exists():
+        return runtime_node
+    raise RuntimeError(f"Node.js is required to generate a Stimulsoft dashboard template. Checked PATH and {runtime_node}.")
+
+
+def ensure_stimulsoft_assets(base_url: str) -> Path:
+    if not base_url:
+        raise RuntimeError("ALTERIOS_BASE_URL is required to download Stimulsoft assets.")
+    target = Path(tempfile.gettempdir()) / "alterios-stimulsoft"
+    target.mkdir(parents=True, exist_ok=True)
+    for filename in ("stimulsoft.reports.pack.js", "stimulsoft.dashboards.pack.js"):
+        path = target / filename
+        if path.exists() and path.stat().st_size > 1000:
+            continue
+        request = Request(base_url.rstrip("/") + f"/assets/stimulsoft/{filename}", headers={"User-Agent": "AlteriosCodex/1.0"})
+        try:
+            with urlopen(request, timeout=45) as response:
+                path.write_bytes(response.read())
+        except OSError as exc:
+            raise RuntimeError(f"Download Stimulsoft asset failed: {filename}: {exc}") from exc
+    return target
+
+
+def ensure_marked(kind: str, name: str, existing: dict[str, Any], marker: str) -> None:
+    if marker not in str(existing.get("description") or ""):
+        raise RuntimeError(f"{kind} {name!r} exists but is not Codex-managed; refusing to update it.")
+
+
+STIMULSOFT_TEMPLATE_HELPER = r"""
+const fs = require('fs');
+const path = require('path');
+
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const reports = require(path.join(input.scriptsDir, 'stimulsoft.reports.pack.js'));
+const dashboards = require(path.join(input.scriptsDir, 'stimulsoft.dashboards.pack.js'));
+const Stimulsoft = dashboards.Stimulsoft || reports.Stimulsoft;
+const S = Stimulsoft;
+const PROJECT_DATABASE_SERVICE = 'Project Database';
+
+function guid() {
+  return 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+}
+
+function makeTemplate() {
+  const report = S.Report.StiReport.createNewDashboard();
+  const json = JSON.parse(report.saveToJsonString());
+  json.ReportName = input.reportName;
+  json.ReportAlias = input.reportName;
+  json.Pages['0'].Name = 'McpPracticeDashboard';
+  json.Pages['0'].Width = 1280;
+  json.Pages['0'].Height = 720;
+  json.Pages['0'].Components = {
+    '0': {
+      Ident: 'StiTextElement',
+      Name: 'DashboardTitle',
+      Guid: guid(),
+      ClientRectangle: '24,24,900,56',
+      Border: ';;;;',
+      Text: 'MCP Practice sandbox report',
+      ForeColor: '30,41,59',
+      SizeMode: 'Fit',
+      VertAlignment: 'Center',
+      CornerRadius: '0,0,0,0',
+      Shadow: ';;;'
+    }
+  };
+
+  const loaded = new S.Report.StiReport();
+  loaded.load(JSON.stringify(json));
+  loaded.reportName = input.reportName;
+  loaded.reportAlias = input.reportName;
+
+  const connection = JSON.stringify({ type: 'view-data-v2', filter: { viewId: input.viewId } });
+  const database = new S.Report.Dictionary.StiCustomDatabase(input.viewName, PROJECT_DATABASE_SERVICE, connection);
+  database.serviceName = PROJECT_DATABASE_SERVICE;
+  database.castToColumnType = 'CastToColumnType';
+  loaded.dictionary.databases.add(database);
+
+  const dataSource = new S.Report.Dictionary.StiCustomSource(input.viewName, 'data', input.viewName);
+  dataSource.serviceName = PROJECT_DATABASE_SERVICE;
+  dataSource.sqlCommand = 'data';
+  for (const column of input.columns) {
+    let type = S.System.String;
+    if (column.type === 'System.DateTime') type = S.System.DateTime;
+    if (column.type === 'System.Decimal') type = S.System.Decimal;
+    if (column.type === 'System.Boolean') type = S.System.Boolean;
+    dataSource.columns.add(new S.Report.Dictionary.StiDataColumn(column.name, column.name, column.alias, type));
+  }
+  loaded.dictionary.dataSources.add(dataSource);
+
+  const saved = JSON.parse(loaded.saveToJsonString());
+  saved.CodexMarker = input.marker;
+  for (const key of Object.keys(saved.Dictionary?.Databases || {})) {
+    saved.Dictionary.Databases[key].CastToColumnType = 'CastToColumnType';
+  }
+  return JSON.stringify(saved);
+}
+
+process.stdout.write(makeTemplate());
+"""
+
+
 def update_resource(
     client: AlteriosClient,
     collection: str,
@@ -1015,11 +1843,12 @@ def write_rest(
     profile: str,
     project_id: str,
     execute: bool,
+    risk_level: str | None = None,
 ) -> Any:
     operation = WriteOperation(
         name=f"{method} {path}",
         kind="rest",
-        risk_level="destructive" if method.upper() == "DELETE" else "write",
+        risk_level=risk_level or ("destructive" if method.upper() == "DELETE" else "write"),
         summary=f"Run {method} against an Alterios REST API path.",
         method=method.upper(),
         path=path,
@@ -1066,6 +1895,15 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         )
     comments = list_comments(client, content["_id"], entity=COMMENT_ENTITY) if content else []
     practice_comment = find_comment_by_body(comments, COMMENT_TEXT)
+    file_values = normalize_file_values((content.get("fields") or {}).get(field_mnames.get("attachment"))) if content and field_mnames else []
+    file_ids = [file_id for value in file_values if (file_id := file_value_id(value))]
+    file_metadata = list_file_metadata(client, file_ids) if file_ids else []
+    manual_script = find_named(list_scripts(client), MANUAL_SCRIPT_NAME)
+    diagram = find_named(list_diagrams(client), BPMN_DIAGRAM_NAME)
+    report = find_named(list_reports(client), REPORT_NAME)
+    processes = list_processes(client, diagram_id=diagram["_id"], content_id=content["_id"]) if diagram and content else []
+    tasks = active_tasks_for_processes(client, processes, diagram_id=diagram["_id"], content_id=content["_id"]) if diagram and content else []
+    full_report = report_full_payload(client, report["_id"]) if report and report.get("_id") else None
     view_probe = view_data_probe(client, view.get("_id") if view else None)
     return {
         "content_type_found": bool(content_type),
@@ -1084,6 +1922,18 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "comment_found": bool(practice_comment),
         "comment_id": practice_comment.get("_id") if practice_comment else None,
         "comment_count": len(flatten_comments(comments)),
+        "file_upload_found": bool(file_metadata),
+        "file_upload_ids": file_ids,
+        "file_upload_names": [item.get("filename") for item in file_metadata],
+        "manual_script_id": manual_script.get("_id") if manual_script else None,
+        "manual_script_active": manual_script.get("active") is True if manual_script else False,
+        "diagram_id": diagram.get("_id") if diagram else None,
+        "process_count": len(processes),
+        "process_completed": any(process.get("completed") and not process.get("error") for process in processes),
+        "task_count": len(tasks),
+        "report_id": report.get("_id") if report else None,
+        "report_full_readback": bool(full_report),
+        "report_has_dashboard_page": report_has_dashboard_page(full_report),
         "view_data_probe": view_probe,
     }
 
@@ -1115,6 +1965,84 @@ def list_groups(client: AlteriosClient) -> list[dict[str, Any]]:
     if not isinstance(response.body, list):
         raise RuntimeError("GET /api/groups returned unexpected payload")
     return [item for item in response.body if isinstance(item, dict)]
+
+
+def list_scripts(client: AlteriosClient) -> list[dict[str, Any]]:
+    response = client.request("GET", "/api/scripts/listandcount", params={"limit": 5000, "offset": 0})
+    return listandcount_items(response.body)
+
+
+def list_diagrams(client: AlteriosClient) -> list[dict[str, Any]]:
+    response = client.request("GET", "/api/diagrams/listandcount", params={"limit": 1000, "offset": 0})
+    return listandcount_items(response.body)
+
+
+def list_reports(client: AlteriosClient) -> list[dict[str, Any]]:
+    response = client.request("GET", "/api/reports/listandcount/" + encode_filter({}), params={"limit": 1000, "offset": 0})
+    return listandcount_items(response.body)
+
+
+def report_full_payload(client: AlteriosClient, report_id: str) -> Any:
+    body = client.report_full(report_id).body
+    if isinstance(body, list):
+        return body[0] if body else None
+    if isinstance(body, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list):
+                return value[0] if value else None
+        return body
+    return body
+
+
+def list_file_metadata(client: AlteriosClient, file_ids: list[str]) -> list[dict[str, Any]]:
+    if not file_ids:
+        return []
+    response = client.request("GET", "/api/file/list", params={"id": file_ids})
+    body = response.body
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if isinstance(body, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    raise RuntimeError("GET /api/file/list returned unexpected payload")
+
+
+def list_processes(client: AlteriosClient, *, diagram_id: str, content_id: str) -> list[dict[str, Any]]:
+    response = client.request(
+        "GET",
+        "/api/processes/listandcount",
+        params={"diagramId": diagram_id, "contentId": content_id, "limit": 20, "offset": 0},
+    )
+    return listandcount_items(response.body)
+
+
+def list_tasks(client: AlteriosClient, *, diagram_id: str, content_id: str) -> list[dict[str, Any]]:
+    response = client.request("GET", "/api/tasks/", params={"diagramId": diagram_id, "contentId": content_id})
+    body = response.body
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if isinstance(body, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    raise RuntimeError("GET /api/tasks/ returned unexpected payload")
+
+
+def list_tasks_by_process(client: AlteriosClient, process_id: str) -> list[dict[str, Any]]:
+    response = client.request("GET", "/api/tasks/", params={"processId": process_id})
+    body = response.body
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if isinstance(body, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    raise RuntimeError("GET /api/tasks/ returned unexpected payload")
 
 
 def list_view_entities(client: AlteriosClient, view_id: str) -> list[dict[str, Any]]:
@@ -1181,6 +2109,46 @@ def view_data_probe(client: AlteriosClient, view_id: str | None) -> dict[str, An
         rows = next((body.get(key) for key in ("items", "rows", "data", "results") if isinstance(body.get(key), list)), None)
         return {"ok": True, "status_code": response.status_code, "shape": "dict", "row_count": len(rows) if rows is not None else None}
     return {"ok": True, "status_code": response.status_code, "shape": type(body).__name__}
+
+
+def report_has_dashboard_page(report: Any) -> bool:
+    if not isinstance(report, dict):
+        return False
+    template = report.get("template")
+    if isinstance(template, str):
+        try:
+            template = json.loads(template)
+        except json.JSONDecodeError:
+            return False
+    if not isinstance(template, dict):
+        return False
+    page = (template.get("Pages") or {}).get("0")
+    return isinstance(page, dict) and page.get("Ident") == "StiDashboard"
+
+
+def report_template_has_marker(report: Any) -> bool:
+    template = report_template_payload(report)
+    return isinstance(template, dict) and template.get("CodexMarker") == REPORT_MARKER
+
+
+def report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
+    if REPORT_MARKER in str(existing.get("description") or "") or REPORT_MARKER in str((full or {}).get("description") if isinstance(full, dict) else ""):
+        return True
+    if report_template_has_marker(full):
+        return True
+    return existing.get("name") == REPORT_NAME and report_has_dashboard_page(full)
+
+
+def report_template_payload(report: Any) -> dict[str, Any] | None:
+    if not isinstance(report, dict):
+        return None
+    template = report.get("template")
+    if isinstance(template, str):
+        try:
+            template = json.loads(template)
+        except json.JSONDecodeError:
+            return None
+    return template if isinstance(template, dict) else None
 
 
 def listandcount_items(payload: Any) -> list[dict[str, Any]]:

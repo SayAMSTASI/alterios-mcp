@@ -18,8 +18,11 @@ The same practice script now covers the sandbox UI/data chain: table view,
 view entity, view fields, add/edit/main forms, menu group, and one content row.
 The same practice script now covers comment write/readback and a visible
 `comments_list` UI block for the sandbox content row.
+The same practice script now covers file-field upload, saved manual script
+creation/execution, sandbox BPMN process/task completion, and dashboard report
+create/update/full-readback.
 Method coverage is now tracked explicitly: 23 MCP tools, 14 runtime services,
-15 live read-only route probes, 51 REST route/method patterns, and 13 operation
+15 live read-only route probes, 57 REST route/method patterns, and 13 operation
 classes.
 
 ## Completed
@@ -39,6 +42,7 @@ classes.
 | Analysis. Method coverage matrix | Added `docs/alterios-method-coverage.md` with counted MCP tools, runtime services, REST route/method patterns, operation classes, and live/cataloged/needs-HAR statuses. | `63cd9c3` | Counted from source: 22 MCP tools, 14 runtime services, 15 live readonly probes; registry now tracks 50 REST route/method patterns and 13 operation classes; explicitly marks comments/files/scripts/workflow/reports/security/destructive flows as not complete until sandbox/HAR/readback verification exists. |
 | Practice. ARTX comments sandbox write | Added typed `alterios_add_comment`, extended `scripts/artx_practice_metadata.py`, and created one idempotent sandbox comment on the existing practice content row. | `65118a4` | Profile/project check OK; dry-run planned only `POST /api/v1/comments`; execution with `ALTERIOS_MCP_ALLOW_WRITE=1` created comment `7c8d6eb2-6a0b-4029-bbd9-63322bce1294` on content `bd51e83f-201e-4d53-bdc6-c4cd16754756`; final dry-run was all `exists` with `comment_found=true`, `comment_count=1`. |
 | Practice. ARTX comments UI surface | Switched default comment scope to `entity=any`, added `comments_list` to the edit form, and verified native comments in the browser. | `167a558` | Dry-run planned edit-form update plus one `entity=any` comment; execution created comment `58988a37-8ddc-4839-83ea-c77e8f9876af`; browser card `MCP Practice. Карточка записи` showed block `Обсуждение`, author/date, and text `MCP Practice comment: comments write/readback coverage.`. |
+| Practice. ARTX file/script/BPMN/report sandbox | Extended `scripts/artx_practice_metadata.py` to cover file-field upload, manual script creation/execution, BPMN diagram/process/task side effects, and dashboard report create/update/readback. | `d6031f7` | Created file field `ea8d3e8c-b0cb-4eb8-9bb7-ad85acd8d7f2`; uploaded `mcp-practice-upload.txt` as file `c3cae956-296c-4f36-a966-cf5c0f3fc433`; created manual script `804e613a-19dd-4ea6-a0fc-a8fc118f6140` and executed it; created BPMN diagram `8ecdd2a7-23d4-40b2-b883-eb7c2ca19011`, started process `56051aa8-07a7-473d-a8ec-7c3a6beb26c0`, completed task `c989aa11-52bc-4f56-bb56-24f4a82afbf1`; created report `86ad4189-deaf-4744-96d5-6b1d22e73468` with Stimulsoft dashboard full readback; final dry-run was idempotent and browser main form showed `ФАЙЛ`, the sandbox row, and `MCP Practice sandbox report`. |
 
 ## Active Stage
 
@@ -50,9 +54,9 @@ classes.
 
 | Priority | Task | Status | Notes |
 |---:|---|---|---|
-| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | Prioritize file upload, scripts, BPMN/process/task side effects, reports, and destructive/security flows from `docs/alterios-method-coverage.md`. |
+| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; remaining capture priority is destructive/security flows and production-grade typed writes. |
 | 1 | Prepare first typed write candidate: `alterios_update_content_fields`. | Next | Use one existing scratch/test content record; require preflight read, field allowlist, dry-run diff, execution gate, and readback verification. |
-| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments are now covered; next extension points are files, scripts, diagrams/processes, and reports. |
+| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -75,14 +79,12 @@ classes.
    project.
 2. Run `alterios-ui-flow` on each capture and save sanitized JSON artifacts.
 3. Map captured UI flows to REST routes or script-service calls.
-4. Continue the cataloged entity order from the completed UI/data sandbox:
-   files, scripts, diagrams/processes, and reports.
-5. Add a typed `alterios_upsert_help` or practice-write helper based on the
+4. Add a typed `alterios_upsert_help` or practice-write helper based on the
    verified `/api/helps` flow.
-6. Design `alterios_update_content_fields` around one scratch/test content
+5. Design `alterios_update_content_fields` around one scratch/test content
    record with preflight, dry-run diff, execution gate, and readback.
-7. Keep destructive, workflow, notification, and file upload writes out of the
-   first typed write candidate.
+6. Keep destructive, workflow, notification, and file upload writes out of the
+   first production typed write candidate unless a scratch target is explicit.
 
 ## PM Update Checklist
 
