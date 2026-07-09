@@ -4,10 +4,10 @@ Last updated: 2026-07-09
 
 ## Current Summary
 
-The project has completed the foundation, read-only inventory expansion, script
-runtime catalog, controlled write gates, and the first browser/UI discovery
-tooling slice. Live browser captures are still pending before the first typed
-write candidate.
+The project has completed the foundation, multi-instance profile inventory,
+read-only inventory expansion, script runtime catalog, controlled write gates,
+and the first browser/UI discovery tooling slice. Live browser captures are
+still pending before the first typed write candidate.
 
 ## Completed
 
@@ -18,6 +18,7 @@ write candidate.
 | 3. Script runtime catalog | Expanded the 14 confirmed runtime services with risk levels, argument contracts, examples, result shapes, probe safety, docs, and false-positive scan coverage. | `7d01813` | `pytest`: 32 passed; static scan: 175 files, 143 API paths, 33 service-like names, 14 known services; `vniimt` runtime probe prepare blocked by `/api/scripts/execute-manual` endpoint config as expected; secret scan clean. |
 | 4. Controlled writes | Added dry-run-first write gates, explicit `profile`/`project_id` validation, redacted audit output, destructive-operation extra flag, manual-script UUID validation, and no-network unit coverage. | `2bc7dd2` | `pytest`: 43 passed; no-network dry-run/execution smoke covered by tests; `git diff --check` OK; secret scan clean; no live write executed. |
 | 5a. Browser/UI flow analyzer | Added HAR/JSON network-flow analyzer, route classification, stable ID placeholders, secret/content redaction, CLI entrypoint, docs, and unit coverage. | `649f2af` | `pytest`: 48 passed; `git diff --check` OK; secret scan clean; no live write executed; live UI capture artifacts still pending. |
+| Config. Multi-instance profile inventory | Added `ALTERIOS_PROFILES` support, profile auto-discovery, `alterios_list_profiles`, `alterios-discover --profiles`, profile-scoped missing keys, default-profile inventory, and safer URL redaction. | `2f8a87c` | `pytest`: 55 passed; `git diff --check` OK; secret scan clean; CLI `--profiles --profile artx --json` smoke OK; no network/write executed. |
 
 ## Active Stage
 
@@ -31,6 +32,7 @@ write candidate.
 |---:|---|---|---|
 | 1 | Capture browser/UI network-flow workflow for write-relevant actions. | In Progress | Analyzer/tooling delivered in `649f2af`; real Alterios UI captures and sanitized artifacts are still needed. |
 | 1 | Prepare first typed write candidate: `alterios_update_content_fields`. | Next | Use one existing scratch/test content record; require preflight read, field allowlist, dry-run diff, execution gate, and readback verification. |
+| 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
