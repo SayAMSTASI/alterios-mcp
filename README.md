@@ -1,61 +1,64 @@
 # alterios-mcp
 
-Production-oriented MCP server and discovery toolkit for Alterios/LIMS
-instances.
+Готовый к эксплуатации MCP-сервер и набор инструментов инвентаризации для
+экземпляров Alterios/LIMS.
 
-This repository is being shaped as a durable operational MCP, not a narrow MVP.
-The core contract is:
+Репозиторий развивается как полноценный операционный MCP, а не как узкий MVP.
+Базовый контракт:
 
-- One MCP profile represents one Alterios instance: base URL, auth method,
-  token, script endpoint template, and timeouts.
-- An Alterios instance can contain many projects.
-- Project-scoped tools accept an explicit `project_id`. The project id from
-  environment configuration is only a convenience default, not the identity of
-  the profile.
-- Instance-scoped tools, such as project inventory, must not require a project
-  id.
-- Secrets are read from environment variables or a private dotenv file and are
-  never copied into the repository or returned by tools.
+- Один MCP-профиль соответствует одному экземпляру Alterios: base URL, метод
+  авторизации, токен, шаблон endpoint для скриптов и таймауты.
+- Один экземпляр Alterios может содержать много проектов.
+- Инструменты, завязанные на проект, принимают явный `project_id`. `project_id`
+  из переменных окружения - только удобное значение по умолчанию, а не
+  идентичность профиля.
+- Инструменты уровня экземпляра, например инвентаризация проектов, не должны
+  требовать `project_id`.
+- Секреты читаются из переменных окружения или приватного dotenv-файла, не
+  коммитятся в репозиторий и не возвращаются инструментами.
 
-## Current Tools
+## Текущие Инструменты
 
-- `alterios_config` - redacted profile/config check with missing-value lists.
-- `alterios_list_projects` - instance-scoped project inventory.
-- `alterios_service_catalog` - known script-service catalog with read/write
-  labels, risk levels, argument hints, and examples.
-- `alterios_call_readonly_service` - guarded calls to known read-only script
-  services such as `getTasks`, `getContents`, and `getViewData` when an
-  external service endpoint is configured.
-- `alterios_rest_get` - safe REST reads against `/api/...` routes.
-- `alterios_list_objects` - common Alterios object inventory via validated
-  `listandcount` routes.
-- `alterios_view_data_simplified` - smoke reads for
+- `alterios_config` - проверка профиля и конфигурации с редактированием
+  секретов и списками недостающих значений.
+- `alterios_list_projects` - инвентаризация проектов на уровне экземпляра.
+- `alterios_service_catalog` - каталог известных script-service функций с
+  метками чтения/записи, уровнями риска, подсказками по аргументам и примерами.
+- `alterios_call_readonly_service` - защищенные вызовы известных
+  script-service функций только для чтения, например `getTasks`, `getContents` и `getViewData`,
+  если настроен совместимый внешний сервисный endpoint.
+- `alterios_rest_get` - безопасные REST-чтения по маршрутам `/api/...`.
+- `alterios_list_objects` - инвентаризация типовых объектов Alterios через
+  проверенные `listandcount` маршруты.
+- `alterios_view_data_simplified` - проверочное чтение
   `/api/views/v2/get-data-simplified`.
-- `alterios_report_full` - full report read through the encoded
-  `/api/reports/full/{filter}` route.
-- `alterios_get_view`, `alterios_view_entities`, and
-  `alterios_view_fields_populated` - view object, join/entity, and populated
-  field inventory.
-- `alterios_get_form` - full form read by ID.
-- `alterios_list_fields` - content type field inventory with optional
-  `content_type_id` or `field_id` filters.
-- `alterios_list_groups` - project group inventory via `/api/groups`.
-- `alterios_file_metadata` - file metadata lookup via `/api/file/list`.
-- `alterios_list_comments` - comment inventory via `/api/v1/comments`.
-- `alterios_view_data` - `/api/views/v2/get-data` reads with optional
-  `content_id`, array `data_id`, and `user_filters` context.
-- `alterios_discover_readonly` - live read-only route matrix.
-- `alterios_call_write_service` and `alterios_rest_write` - disabled unless
+- `alterios_report_full` - чтение полного отчета через кодированный маршрут
+  `/api/reports/full/{filter}`.
+- `alterios_get_view`, `alterios_view_entities` и
+  `alterios_view_fields_populated` - чтение объекта представления, его
+  join/entity-конфигурации и заполненных метаданных полей.
+- `alterios_get_form` - чтение полной формы по ID.
+- `alterios_list_fields` - инвентаризация полей типа контента с опциональными
+  фильтрами `content_type_id` или `field_id`.
+- `alterios_list_groups` - инвентаризация групп проекта через `/api/groups`.
+- `alterios_file_metadata` - чтение метаданных файлов через `/api/file/list`.
+- `alterios_list_comments` - инвентаризация комментариев через
+  `/api/v1/comments`.
+- `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
+  контекстом `content_id`, массивом `data_id` и `user_filters`.
+- `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
+- `alterios_call_write_service` и `alterios_rest_write` - отключены, пока явно
+  не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`.
+- `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
+  UUID скрипта; также отключен, пока явно не выставлен
   `ALTERIOS_MCP_ALLOW_WRITE=1`.
-- `alterios_execute_manual_script` - execute `/api/scripts/execute-manual` by
-  script UUID; disabled unless `ALTERIOS_MCP_ALLOW_WRITE=1`.
 
-Project-scoped tools should be called with `project_id` whenever the target
-project is known from a URL, UI session, or task context. The configured
-`ALTERIOS_<PROFILE>_PROJECT_ID` is only a fallback for repetitive work against a
-known default project.
+Инструменты уровня проекта следует вызывать с `project_id`, когда целевой проект
+известен из URL, UI-сессии или контекста задачи. Настроенный
+`ALTERIOS_<PROFILE>_PROJECT_ID` - только значение по умолчанию для
+повторяющейся работы с известным проектом.
 
-## Install
+## Установка
 
 ```powershell
 git clone https://github.com/SayAMSTASI/alterios-mcp.git
@@ -64,15 +67,15 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -e ".[dev]"
 ```
 
-## Configure Alterios
+## Настройка Alterios
 
-Use a private `.env` locally; do not commit it.
+Используйте локальный приватный `.env`; не коммитьте его.
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Example profile for one Alterios instance:
+Пример профиля для одного экземпляра Alterios:
 
 ```dotenv
 ALTERIOS_PROFILE=vniimt
@@ -80,7 +83,7 @@ ALTERIOS_PROFILE=vniimt
 ALTERIOS_VNIIMT_BASE_URL=http://lims.vniimt.local
 ALTERIOS_VNIIMT_API_TOKEN=put-token-here
 
-# Optional default only. Prefer explicit project_id in project-scoped tools.
+# Необязательное значение по умолчанию. Для инструментов уровня проекта лучше передавать project_id явно.
 ALTERIOS_VNIIMT_PROJECT_ID=40466687-b093-4d80-b4f2-ba0ed0245bfa
 
 ALTERIOS_VNIIMT_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
@@ -90,19 +93,19 @@ ALTERIOS_VNIIMT_AUTH_SCHEME=
 ALTERIOS_VNIIMT_TIMEOUT_SECONDS=20
 ```
 
-`BASE_URL`, `API_TOKEN`, and transport settings are profile-isolated on purpose.
-If a profile is selected, the server does not silently fall back to another
-target instance.
+`BASE_URL`, `API_TOKEN` и настройки транспорта намеренно изолированы по
+профилю. Если выбран профиль, сервер не делает скрытый переход на другой
+экземпляр.
 
-To reuse an existing private config without copying secrets into this
-repository, set `ALTERIOS_DOTENV_PATH` outside the repo:
+Чтобы использовать уже существующую приватную конфигурацию и не копировать
+секреты в этот репозиторий, задайте `ALTERIOS_DOTENV_PATH` вне репозитория:
 
 ```powershell
 $env:ALTERIOS_DOTENV_PATH = "C:\Users\admin\Documents\AlteriosCodex\.env"
 python -m alterios_mcp.discovery --profile vniimt --projects --json
 ```
 
-Codex MCP config can pass the same private dotenv path:
+В конфиг Codex MCP можно передать тот же путь к приватному dotenv:
 
 ```toml
 [mcp_servers.alterios]
@@ -115,15 +118,15 @@ tool_timeout_sec = 120
 ALTERIOS_DOTENV_PATH = "C:\\Users\\admin\\Documents\\AlteriosCodex\\.env"
 ```
 
-## Run Discovery
+## Инвентаризация
 
-List projects on the selected Alterios instance:
+Список проектов выбранного экземпляра Alterios:
 
 ```powershell
 python -m alterios_mcp.discovery --profile vniimt --projects --json
 ```
 
-Probe a specific project with an explicit project id:
+Проверка конкретного проекта с явным `project_id`:
 
 ```powershell
 python -m alterios_mcp.discovery --profile vniimt `
@@ -131,7 +134,7 @@ python -m alterios_mcp.discovery --profile vniimt `
   --json
 ```
 
-Save a reproducible inventory artifact:
+Сохранение воспроизводимого артефакта инвентаризации:
 
 ```powershell
 New-Item -ItemType Directory -Force artifacts\alterios-mcp | Out-Null
@@ -140,48 +143,49 @@ python -m alterios_mcp.discovery --profile vniimt `
   --json > artifacts\alterios-mcp\live-readonly-matrix.json
 ```
 
-Scan an existing Alterios automation repository for known API paths and script
-service candidates:
+Сканирование существующего репозитория Alterios-автоматизации на известные API
+пути и кандидаты в script-service функции:
 
 ```powershell
 python -m alterios_mcp.static_scan C:\Users\admin\Documents\AlteriosCodex `
   --json > artifacts\alterios-mcp\static-calls.json
 ```
 
-The static scanner skips generated and bulky working directories by default:
-`artifacts`, `data`, `outputs`, `site`, and `work`. Use
-`--include-generated` only when you intentionally need a full slow scan.
+Статический сканер по умолчанию пропускает сгенерированные и тяжелые рабочие
+директории: `artifacts`, `data`, `outputs`, `site` и `work`. Используйте
+`--include-generated` только когда нужно намеренное полное медленное
+сканирование.
 
-## Run MCP Server
+## Запуск MCP-Сервера
 
 ```powershell
 python -m alterios_mcp.server
 ```
 
-Enable write mode only for a verified safe target profile and project:
+Включайте режим записи только для проверенного безопасного профиля и проекта:
 
 ```powershell
 $env:ALTERIOS_MCP_ALLOW_WRITE = "1"
 ```
 
-Before write-capable calls, run `alterios_config`, verify the selected profile,
-and pass `project_id` explicitly. See [docs/roadmap.md](docs/roadmap.md) for
-the staged production plan and [docs/discovery-plan.md](docs/discovery-plan.md)
-for the inventory strategy.
+Перед вызовами, которые могут менять состояние, запустите `alterios_config`,
+проверьте выбранный профиль и передайте `project_id` явно. Поэтапный рабочий
+план описан в [docs/roadmap.md](docs/roadmap.md), стратегия
+инвентаризации - в
+[docs/discovery-plan.md](docs/discovery-plan.md).
 
-Project coordination is tracked in
-[docs/project-status.md](docs/project-status.md). Multi-agent operating rules
-and PM stage gates are documented in
-[docs/project-management.md](docs/project-management.md).
-The script runtime catalog is documented in
+Управление проектом ведется в [docs/project-status.md](docs/project-status.md).
+Правила мультиагентной работы и контрольные точки PM описаны в
+[docs/project-management.md](docs/project-management.md). Каталог runtime-сервисов
+скриптов описан в
 [docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
 
-Important: `/api/scripts/execute-manual` executes saved Alterios scripts by
-UUID. It does not call runtime service names such as `getTasks` directly. Keep
-runtime service names in the catalog until a compatible external service
-endpoint is configured and verified.
+Важно: `/api/scripts/execute-manual` выполняет сохраненные Alterios-скрипты по
+UUID. Этот endpoint не вызывает имена runtime-сервисов вроде `getTasks`.
+Имена runtime-сервисов остаются в каталоге до тех пор, пока совместимый внешний
+сервисный endpoint не будет настроен и проверен.
 
-## Validate
+## Проверка
 
 ```powershell
 python -m pytest
