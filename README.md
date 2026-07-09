@@ -259,6 +259,32 @@ write-capable tool-а нужно одновременно:
 Карта сущностей Alterios, возможных обращений, настроек и порядка write-практики
 описана в [docs/alterios-entity-surface-catalog.md](docs/alterios-entity-surface-catalog.md).
 
+## Practice-Сценарии
+
+Для тестового ART X проекта есть воспроизводимый сценарий metadata chain:
+создать или проверить sandbox content type и representative fields. По
+умолчанию команда работает как dry-run:
+
+```powershell
+$env:ALTERIOS_DOTENV_PATH = "C:\Users\admin\Documents\AlteriosCodex\.env"
+$env:PYTHONPATH = "src"
+python scripts\artx_practice_metadata.py `
+  --profile artx `
+  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
+  --json
+```
+
+Для выполнения записи нужен явный write-gate:
+
+```powershell
+$env:ALTERIOS_MCP_ALLOW_WRITE = "1"
+python scripts\artx_practice_metadata.py `
+  --profile artx `
+  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
+  --execute `
+  --json
+```
+
 Важно: `/api/scripts/execute-manual` выполняет сохраненные Alterios-скрипты по
 UUID. Этот endpoint не вызывает имена runtime-сервисов вроде `getTasks`.
 Имена runtime-сервисов остаются в каталоге до тех пор, пока совместимый внешний

@@ -6,7 +6,8 @@
 - экземпляр: `https://lims.artx.ru`;
 - проект: `4e247a6b-55ef-4665-b88c-3c156fee19ba`;
 - workspace: `https://lims.artx.ru/workspace/4e247a6b-55ef-4665-b88c-3c156fee19ba`;
-- режим анализа: live read-only API + одна уже выполненная безопасная write-практика на `/api/helps`.
+- режим анализа: live read-only API + безопасная write-практика на `/api/helps`
+  и sandbox metadata chain.
 
 Цель документа - не ограничиваться справками. Это рабочая карта всего состава
 проекта: какие сущности есть, для чего они нужны, какими endpoint-ами читаются и
@@ -17,8 +18,8 @@
 | Сущность | Количество | Что означает |
 |---|---:|---|
 | Проекты экземпляра | 35 | Доступные workspace внутри `lims.artx.ru`. |
-| Типы материалов / content types | 13 | Модель данных: какие записи существуют. |
-| Поля | 2522 | Метаданные полей всех типов материалов. |
+| Типы материалов / content types | 14 | Модель данных: какие записи существуют. |
+| Поля | 2528 | Метаданные полей всех типов материалов. |
 | Представления | 21 | Таблицы/списки/справочные выборки поверх данных. |
 | Формы | 37 | UI для списков, карточек, задач и действий. |
 | Скрипты | 11 | Manual/event/diagram scripts. |
@@ -120,7 +121,7 @@ Write:
 
 В проекте:
 
-- 13 content types;
+- 14 content types;
 - `settings.maxRefDepth` есть у всех;
 - `share=true` найден у `Сотрудники и оборудование`;
 - остальные share flags в текущей выборке в основном `false`.
@@ -131,12 +132,14 @@ Write:
 - связать поля и формы;
 - определить, как записи будут называться и доступны ли они для шаринга.
 
-Write-практика:
+Подтвержденная write-практика:
 
-1. Создать `MCP Practice. Content Type` с `fieldNamePrefix=mcp_practice`.
-2. Добавить 2-3 поля.
-3. Создать форму и представление.
-4. Создать одну запись через `/api/contents/save`.
+- создан `MCP Practice. Песочница`;
+- content type id: `572aedf5-500f-4538-82be-ae2170ff174a`;
+- endpoint: `POST /api/content-types/save`;
+- `fieldNamePrefix=mcp_practice`;
+- `contentNameTemplate={{field_test__mcp_practice_mcp_practice_title}}`;
+- воспроизводимая команда: `python scripts\artx_practice_metadata.py --profile artx --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba --execute`.
 
 ## Поля
 
@@ -147,6 +150,10 @@ Read:
 - `GET /api/fields`;
 - `GET /api/fields?contentTypeId=...`;
 - `GET /api/fields?_id=...`.
+
+Практическое ограничение: для целевых операций использовать
+`GET /api/fields?contentTypeId=...`. В ART X `GET /api/fields` без фильтра может
+возвращать поля шире текущего проекта.
 
 Write:
 
@@ -199,6 +206,21 @@ Write:
 - `comb` - комбинированное поле.
 
 Риск: средний-высокий. Ошибка в поле ломает формы, views, scripts и data entry.
+
+Подтвержденная write-практика:
+
+- создано 6 полей для `MCP Practice. Песочница`: text, list, number, date,
+  boolean, textarea text;
+- field ids: `f7919075-c7bc-40a7-8b47-df71c4193f29`,
+  `2ab58b93-d16f-4b4d-98c5-ca17dbf0e7e5`,
+  `0703344e-fec8-4c51-b2bf-38470ab83442`,
+  `c918afca-28b6-44b3-b3fd-001c9c3d6d43`,
+  `1ee217de-028e-49ca-987f-7c7a1e2d6888`,
+  `77fe3ef6-951a-4feb-8b92-51b88dafd0bc`;
+- endpoint: `POST /api/fields/save`;
+- важное правило: не вычислять итоговый `mname` вручную для последующих
+  операций; брать фактические `mname` из readback `/api/fields?contentTypeId=...`,
+  потому что Alterios расширяет имена через project/content-type префиксы.
 
 ## Контент / Contents
 
@@ -629,8 +651,8 @@ Write:
    отдельный tool с dry-run diff и readback.
 3. **Группы меню** - создать неопубликованную или sandbox-группу, проверить
    UI-навигацию, затем удалить только после отдельного destructive approval.
-4. **Content type + fields** - создать `MCP Practice` content type и несколько
-   безопасных полей: text, number, list, date.
+4. **Content type + fields** - выполнено: создан `MCP Practice. Песочница` и 6
+   безопасных полей: text, list, number, date, boolean, textarea text.
 5. **Forms** - создать простую add/edit/list форму для sandbox content type.
 6. **Views** - создать table view, проверить `get-data` и UI-list.
 7. **Contents** - создать и обновить одну sandbox-запись через
