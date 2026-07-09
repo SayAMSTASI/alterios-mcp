@@ -103,6 +103,135 @@ def alterios_view_data_simplified(
 
 
 @mcp.tool()
+def alterios_report_full(
+    report_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read a full Alterios report by ID through the encoded report filter route."""
+    return _client(profile, project_id).report_full(report_id).as_dict()
+
+
+@mcp.tool()
+def alterios_get_view(
+    view_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read a full Alterios view object by ID."""
+    return _client(profile, project_id).view_full(view_id).as_dict()
+
+
+@mcp.tool()
+def alterios_get_form(
+    form_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read a full Alterios form object by ID."""
+    return _client(profile, project_id).form_full(form_id).as_dict()
+
+
+@mcp.tool()
+def alterios_view_entities(
+    view_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read configured entities/joins for an Alterios view."""
+    return _client(profile, project_id).view_entities(view_id).as_dict()
+
+
+@mcp.tool()
+def alterios_view_fields_populated(
+    view_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read populated field metadata for an Alterios view."""
+    return _client(profile, project_id).view_fields_populated(view_id).as_dict()
+
+
+@mcp.tool()
+def alterios_list_fields(
+    content_type_id: str | None = None,
+    field_id: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios content type fields, optionally filtered by content type or field ID."""
+    return _client(profile, project_id).list_fields(
+        content_type_id=content_type_id,
+        field_id=field_id,
+        limit=limit,
+        offset=offset,
+    ).as_dict()
+
+
+@mcp.tool()
+def alterios_list_groups(
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios project groups."""
+    return _client(profile, project_id).list_groups().as_dict()
+
+
+@mcp.tool()
+def alterios_file_metadata(
+    file_ids: list[str],
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios file metadata for one or more file IDs."""
+    return _client(profile, project_id).file_metadata(file_ids).as_dict()
+
+
+@mcp.tool()
+def alterios_list_comments(
+    entity_id: str,
+    entity: str = "any",
+    limit: int = 20,
+    depth: int = 1,
+    page: int = 1,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios comments for an entity through the v1 comments API."""
+    return _client(profile, project_id).list_comments(
+        entity_id,
+        entity=entity,
+        limit=limit,
+        depth=depth,
+        page=page,
+    ).as_dict()
+
+
+@mcp.tool()
+def alterios_view_data(
+    view_id: str,
+    limit: int = 20,
+    offset: int = 0,
+    content_id: str | None = None,
+    data_id: list[str] | None = None,
+    user_filters: dict[str, Any] | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read view rows through get-data with optional content, data, and user filter context."""
+    return _client(profile, project_id).view_data(
+        view_id,
+        limit=limit,
+        offset=offset,
+        content_id=content_id,
+        data_id=data_id,
+        user_filters=user_filters,
+    ).as_dict()
+
+
+@mcp.tool()
 def alterios_discover_readonly(
     profile: str | None = None,
     project_id: str | None = None,

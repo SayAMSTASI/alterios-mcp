@@ -5,7 +5,22 @@ from alterios_mcp.discovery import OBJECT_ROUTES, response_shape
 
 
 def test_common_object_routes_are_registered() -> None:
-    for kind in ("content_types", "views", "forms", "scripts", "diagrams", "reports", "contents", "tasks"):
+    for kind in (
+        "content_types",
+        "views",
+        "forms",
+        "scripts",
+        "diagrams",
+        "fields",
+        "reports",
+        "contents",
+        "tasks",
+        "processes",
+        "user_groups",
+        "users",
+        "groups",
+        "helps",
+    ):
         assert kind in OBJECT_ROUTES
 
 
@@ -18,5 +33,5 @@ def test_response_shape_omits_payload_values() -> None:
     }
 
 
-def test_encode_filter_is_stable_base64_json() -> None:
+def test_encode_filter_is_stable_url_encoded_json() -> None:
     assert encode_filter({}) == "%7B%7D"

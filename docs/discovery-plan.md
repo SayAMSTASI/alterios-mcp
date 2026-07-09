@@ -68,7 +68,7 @@ project context used.
 |---|---|---|---|---|
 | projects | instance | GET | `/api/projects/listandcount` | `alterios_list_projects`, `alterios_discover_readonly` |
 | content_types | project | GET | `/api/content-types/listandcount` | `alterios_list_objects` |
-| fields | project | GET | `/api/fields` | `alterios_discover_readonly` |
+| fields | project | GET | `/api/fields` | `alterios_list_fields`, `alterios_discover_readonly` |
 | views | project | GET | `/api/views/listandcount` | `alterios_list_objects` |
 | forms | project | GET | `/api/forms/listandcount` | `alterios_list_objects` |
 | scripts | project | GET | `/api/scripts/listandcount` | `alterios_list_objects` |
@@ -77,7 +77,27 @@ project context used.
 | tasks | project | GET | `/api/tasks/listandcount` | `alterios_list_objects` |
 | processes | project | GET | `/api/processes/listandcount` | `alterios_discover_readonly` |
 | reports | project | GET | `/api/reports/listandcount/{encoded_filter}` | `alterios_list_objects` |
+| user_groups | project | GET | `/api/user-groups/listandcount` | `alterios_list_objects` |
+| users | project | GET | `/api/users/listandcount` | `alterios_list_objects` |
+| groups | project | GET | `/api/groups` | `alterios_list_groups`, `alterios_list_objects` |
+| helps | project | GET | `/api/helps` | `alterios_list_objects` |
 | view_data_simplified | project | POST | `/api/views/v2/get-data-simplified` | `alterios_view_data_simplified` |
+
+## Typed Read-Only Inventory Tools
+
+These tools use confirmed Alterios REST patterns but require caller-provided
+IDs, so they are not part of the route matrix probe:
+
+- `alterios_report_full` - `GET /api/reports/full/{encode_filter({"_id": id})}`.
+- `alterios_get_view` - `GET /api/views/{view_id}`.
+- `alterios_get_form` - `GET /api/forms/{form_id}`.
+- `alterios_view_entities` - `GET /api/view-entities/by-view/{view_id}`.
+- `alterios_view_fields_populated` - `GET /api/view-fields/populated/{view_id}`.
+- `alterios_file_metadata` - `GET /api/file/list?id=...`.
+- `alterios_list_comments` - `GET /api/v1/comments` with `entity`,
+  `entityId`, `limit`, `depth`, and `page`.
+- `alterios_view_data` - `POST /api/views/v2/get-data` with optional
+  `contentId`, array `dataId`, and `userFilters`.
 
 ## Current Script-Service Catalog
 

@@ -32,6 +32,10 @@ READONLY_ROUTES: tuple[ReadonlyRoute, ...] = (
     ReadonlyRoute("tasks", "GET", "/api/tasks/listandcount", {"limit": 1, "offset": 0}),
     ReadonlyRoute("processes", "GET", "/api/processes/listandcount", {"limit": 1, "offset": 0}),
     ReadonlyRoute("reports", "GET", "/api/reports/listandcount/" + encode_filter({}), {"limit": 1, "offset": 0}),
+    ReadonlyRoute("user_groups", "GET", "/api/user-groups/listandcount", {"limit": 1, "offset": 0}),
+    ReadonlyRoute("users", "GET", "/api/users/listandcount", {"limit": 1, "offset": 0}),
+    ReadonlyRoute("groups", "GET", "/api/groups", {"limit": 1, "offset": 0}),
+    ReadonlyRoute("helps", "GET", "/api/helps", {"limit": 1, "offset": 0}),
 )
 
 OBJECT_ROUTES: dict[str, ReadonlyRoute] = {route.name: route for route in READONLY_ROUTES}

@@ -31,6 +31,19 @@ The core contract is:
   `listandcount` routes.
 - `alterios_view_data_simplified` - smoke reads for
   `/api/views/v2/get-data-simplified`.
+- `alterios_report_full` - full report read through the encoded
+  `/api/reports/full/{filter}` route.
+- `alterios_get_view`, `alterios_view_entities`, and
+  `alterios_view_fields_populated` - view object, join/entity, and populated
+  field inventory.
+- `alterios_get_form` - full form read by ID.
+- `alterios_list_fields` - content type field inventory with optional
+  `content_type_id` or `field_id` filters.
+- `alterios_list_groups` - project group inventory via `/api/groups`.
+- `alterios_file_metadata` - file metadata lookup via `/api/file/list`.
+- `alterios_list_comments` - comment inventory via `/api/v1/comments`.
+- `alterios_view_data` - `/api/views/v2/get-data` reads with optional
+  `content_id`, array `data_id`, and `user_filters` context.
 - `alterios_discover_readonly` - live read-only route matrix.
 - `alterios_call_write_service` and `alterios_rest_write` - disabled unless
   `ALTERIOS_MCP_ALLOW_WRITE=1`.

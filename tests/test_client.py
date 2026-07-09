@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 import pytest
 
-from alterios_mcp.client import AlteriosClient, AlteriosConfig, AlteriosConfigError, AlteriosRequestError, build_script_body
+from alterios_mcp.client import (
+    AlteriosClient,
+    AlteriosConfig,
+    AlteriosConfigError,
+    AlteriosRequestError,
+    AlteriosResponse,
+    build_script_body,
+)
 
 
 def test_profile_does_not_fall_back_to_default_target() -> None:
@@ -110,6 +118,159 @@ def test_project_id_can_be_overridden_per_call() -> None:
     assert override.project_id == "explicit-project"
     assert override.profile == "vniimt"
     assert override.base_url == "https://alterios.example"
+
+
+def test_report_full_builds_encoded_filter_path_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        response = client.report_full("report 1")
+
+    assert response.status_code == 200
+    prepared = send.call_args.args[0]
+    assert prepared.method == "GET"
+    assert prepared.url == "https://alterios.example/api/reports/full/%7B%22_id%22%3A%22report%201%22%7D"
+    assert prepared.body is None
+    assert prepared.headers["projectid"] == "project-1"
+
+
+def test_view_data_builds_context_body_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        response = client.view_data(
+            "view-1",
+            limit=5,
+            offset=10,
+            content_id="content-1",
+            data_id=["data-1", "data-2"],
+            user_filters={"status": ["open"]},
+        )
+
+    assert response.status_code == 200
+    prepared = send.call_args.args[0]
+    assert prepared.method == "POST"
+    assert prepared.url == "https://alterios.example/api/views/v2/get-data"
+    assert prepared.body == {
+        "viewId": "view-1",
+        "limit": 5,
+        "offset": 10,
+        "contentId": "content-1",
+        "dataId": ["data-1", "data-2"],
+        "userFilters": {"status": ["open"]},
+    }
+    assert prepared.headers["projectid"] == "project-1"
+
+
+def test_view_data_omits_optional_context_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.view_data("view-1")
+
+    assert send.call_args.args[0].body == {"viewId": "view-1", "limit": 20, "offset": 0}
+
+
+def test_detailed_inventory_routes_are_built_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.view_full("view 1")
+        client.form_full("form 1")
+        client.view_entities("view 1")
+        client.view_fields_populated("view 1")
+        client.list_groups()
+
+    urls = [call.args[0].url for call in send.call_args_list]
+    assert urls == [
+        "https://alterios.example/api/views/view%201",
+        "https://alterios.example/api/forms/form%201",
+        "https://alterios.example/api/view-entities/by-view/view%201",
+        "https://alterios.example/api/view-fields/populated/view%201",
+        "https://alterios.example/api/groups",
+    ]
+
+
+def test_list_fields_builds_expected_query_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.list_fields(content_type_id="ct-1", field_id="field-1", limit=10, offset=5)
+
+    parsed = urlparse(send.call_args.args[0].url)
+    assert parsed.path == "/api/fields"
+    assert parse_qs(parsed.query) == {
+        "contentTypeId": ["ct-1"],
+        "_id": ["field-1"],
+        "limit": ["10"],
+        "offset": ["5"],
+    }
+
+
+def test_file_metadata_requires_ids_and_repeats_query_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with pytest.raises(ValueError, match="file_ids"):
+        client.file_metadata([])
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.file_metadata(["file-1", "file-2"])
+
+    parsed = urlparse(send.call_args.args[0].url)
+    assert parsed.path == "/api/file/list"
+    assert parse_qs(parsed.query) == {"id": ["file-1", "file-2"]}
+
+
+def test_list_comments_builds_v1_query_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.list_comments("entity-1", entity="content", limit=50, depth=4, page=2)
+
+    parsed = urlparse(send.call_args.args[0].url)
+    assert parsed.path == "/api/v1/comments"
+    assert parse_qs(parsed.query) == {
+        "entity": ["content"],
+        "entityId": ["entity-1"],
+        "limit": ["50"],
+        "depth": ["4"],
+        "page": ["2"],
+    }
 
 
 def test_mutating_service_requires_allow_write() -> None:

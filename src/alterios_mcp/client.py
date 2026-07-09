@@ -219,6 +219,80 @@ class AlteriosClient:
         prepared = PreparedAlteriosRequest(method=method.upper(), url=url, headers=self._headers(), body=body)
         return self._send(prepared)
 
+    def report_full(self, report_id: str) -> AlteriosResponse:
+        encoded_filter = encode_filter({"_id": report_id})
+        return self.request("GET", f"/api/reports/full/{encoded_filter}")
+
+    def view_full(self, view_id: str) -> AlteriosResponse:
+        return self.request("GET", f"/api/views/{path_segment(view_id)}")
+
+    def form_full(self, form_id: str) -> AlteriosResponse:
+        return self.request("GET", f"/api/forms/{path_segment(form_id)}")
+
+    def view_entities(self, view_id: str) -> AlteriosResponse:
+        return self.request("GET", f"/api/view-entities/by-view/{path_segment(view_id)}")
+
+    def view_fields_populated(self, view_id: str) -> AlteriosResponse:
+        return self.request("GET", f"/api/view-fields/populated/{path_segment(view_id)}")
+
+    def list_fields(
+        self,
+        *,
+        content_type_id: str | None = None,
+        field_id: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AlteriosResponse:
+        params: dict[str, Any] = {
+            "contentTypeId": content_type_id,
+            "_id": field_id,
+            "limit": limit,
+            "offset": offset,
+        }
+        return self.request("GET", "/api/fields", params=params)
+
+    def list_groups(self) -> AlteriosResponse:
+        return self.request("GET", "/api/groups")
+
+    def file_metadata(self, file_ids: list[str]) -> AlteriosResponse:
+        if not file_ids:
+            raise ValueError("file_ids must contain at least one file id")
+        return self.request("GET", "/api/file/list", params={"id": file_ids})
+
+    def list_comments(
+        self,
+        entity_id: str,
+        *,
+        entity: str = "any",
+        limit: int = 20,
+        depth: int = 1,
+        page: int = 1,
+    ) -> AlteriosResponse:
+        return self.request(
+            "GET",
+            "/api/v1/comments",
+            params={"entity": entity, "entityId": entity_id, "limit": limit, "depth": depth, "page": page},
+        )
+
+    def view_data(
+        self,
+        view_id: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        content_id: str | None = None,
+        data_id: list[str] | None = None,
+        user_filters: dict[str, Any] | None = None,
+    ) -> AlteriosResponse:
+        body: dict[str, Any] = {"viewId": view_id, "limit": limit, "offset": offset}
+        if content_id is not None:
+            body["contentId"] = content_id
+        if data_id is not None:
+            body["dataId"] = data_id
+        if user_filters is not None:
+            body["userFilters"] = user_filters
+        return self.request("POST", "/api/views/v2/get-data", body=body)
+
     def build_script_url(self, function: str) -> str:
         template = self.config.endpoint_template.strip()
         if not template:
@@ -295,6 +369,10 @@ def build_script_body(function: str, args: Any, body_style: str) -> Any:
 
 def encode_filter(value: Any) -> str:
     return quote(json.dumps(value, ensure_ascii=False, separators=(",", ":")), safe="")
+
+
+def path_segment(value: str) -> str:
+    return quote(value, safe="")
 
 
 def parse_response_body(response_body: bytes, content_type: str) -> Any:
