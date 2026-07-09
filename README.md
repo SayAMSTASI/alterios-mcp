@@ -261,9 +261,10 @@ write-capable tool-а нужно одновременно:
 
 ## Practice-Сценарии
 
-Для тестового ART X проекта есть воспроизводимый сценарий metadata chain:
-создать или проверить sandbox content type и representative fields. По
-умолчанию команда работает как dry-run:
+Для тестового ART X проекта есть воспроизводимый сценарий practice chain:
+создать или проверить sandbox content type, representative fields, table view,
+add/edit/main forms, menu group и одну sandbox-запись. По умолчанию команда
+работает как dry-run:
 
 ```powershell
 $env:ALTERIOS_DOTENV_PATH = "C:\Users\admin\Documents\AlteriosCodex\.env"

@@ -1,6 +1,6 @@
 # Alterios MCP Project Status
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Current Summary
 
@@ -14,6 +14,8 @@ The ARTX project entity surface has been cataloged across metadata, UI,
 runtime data, workflow, files, comments, users, and reports.
 The ARTX sandbox metadata chain now exists as a reproducible practice script:
 content type plus representative fields with dry-run, write gate, and readback.
+The same practice script now covers the sandbox UI/data chain: table view,
+view entity, view fields, add/edit/main forms, menu group, and one content row.
 
 ## Completed
 
@@ -28,6 +30,7 @@ content type plus representative fields with dry-run, write gate, and readback.
 | Practice. ARTX help sandbox write | Created `MCP Practice Sandbox` help entry in `artx` project `4e247a6b-55ef-4665-b88c-3c156fee19ba` through controlled generic REST write. | `bb89755` | Redacted profile check OK; readonly discovery 15/15 OK; dry-run audit OK; `POST /api/helps` executed with `ALTERIOS_MCP_ALLOW_WRITE=1`; API readback found id `2794b152-e1ca-4de2-9d3d-23b81a747d09`; browser UI showed title and body text. |
 | Analysis. ARTX entity surface catalog | Documented the full project entity surface: counts, read/write routes, observed settings, risks, and write-practice order. | `f2cd8e5` | Live read-only inventory: 13 content types, 2522 fields, 21 views, 37 forms, 11 scripts, 3 diagrams, 144 contents, 1 task, 16 processes, 10 groups, 2 helps; `/api/features` and `/api/files` generic list routes returned 404; no write executed for this analysis. |
 | Practice. ARTX metadata sandbox chain | Added reproducible `scripts/artx_practice_metadata.py`, created `MCP Practice. Песочница` content type and 6 fields through controlled REST writes. | `5d3e057` | Profile/project check OK; initial dry-run blocked fields until content type existed; `POST /api/content-types/save` created id `572aedf5-500f-4538-82be-ae2170ff174a`; `POST /api/fields/save` created 6 fields; readback confirmed actual mnames and `contentNameTemplate={{field_test__mcp_practice_mcp_practice_title}}`; final dry-run was idempotent with no planned writes. |
+| Practice. ARTX UI/data sandbox chain | Extended `scripts/artx_practice_metadata.py` to create and verify view, view entity, view fields, add/edit/main forms, menu group, and one content row for the same sandbox. | `pending` | Created view `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`, forms `281442af-bb94-43a2-bc80-f5303c05d0fc`, `15f5fb26-5db4-4153-8131-23a54411cd63`, `3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`, group `aa997c9a-d81e-4042-91c5-bafa90b32819`, content `bd51e83f-201e-4d53-bdc6-c4cd16754756`; `get-data-simplified` row_count=1; final dry-run was all `exists`; browser UI showed columns, add action, record, and date `10.07.2026`. |
 
 ## Active Stage
 
@@ -41,7 +44,7 @@ content type plus representative fields with dry-run, write gate, and readback.
 |---:|---|---|---|
 | 1 | Capture browser/UI network-flow workflow for write-relevant actions. | In Progress | Analyzer/tooling delivered in `649f2af`; real Alterios UI captures and sanitized artifacts are still needed. |
 | 1 | Prepare first typed write candidate: `alterios_update_content_fields`. | Next | Use one existing scratch/test content record; require preflight read, field allowlist, dry-run diff, execution gate, and readback verification. |
-| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | In Progress | Content type + fields completed; next are form, view, and one content record in the same sandbox. |
+| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; next extension points are comments, files, scripts, diagrams/processes, and reports. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -64,9 +67,8 @@ content type plus representative fields with dry-run, write gate, and readback.
    project.
 2. Run `alterios-ui-flow` on each capture and save sanitized JSON artifacts.
 3. Map captured UI flows to REST routes or script-service calls.
-4. Continue the cataloged entity order from the completed metadata sandbox:
-   forms, views, contents, comments, files, scripts, diagrams/processes,
-   reports.
+4. Continue the cataloged entity order from the completed UI/data sandbox:
+   comments, files, scripts, diagrams/processes, and reports.
 5. Add a typed `alterios_upsert_help` or practice-write helper based on the
    verified `/api/helps` flow.
 6. Design `alterios_update_content_fields` around one scratch/test content

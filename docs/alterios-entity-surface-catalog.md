@@ -7,7 +7,7 @@
 - проект: `4e247a6b-55ef-4665-b88c-3c156fee19ba`;
 - workspace: `https://lims.artx.ru/workspace/4e247a6b-55ef-4665-b88c-3c156fee19ba`;
 - режим анализа: live read-only API + безопасная write-практика на `/api/helps`
-  и sandbox metadata chain.
+  и sandbox practice chain.
 
 Цель документа - не ограничиваться справками. Это рабочая карта всего состава
 проекта: какие сущности есть, для чего они нужны, какими endpoint-ами читаются и
@@ -20,15 +20,15 @@
 | Проекты экземпляра | 35 | Доступные workspace внутри `lims.artx.ru`. |
 | Типы материалов / content types | 14 | Модель данных: какие записи существуют. |
 | Поля | 2528 | Метаданные полей всех типов материалов. |
-| Представления | 21 | Таблицы/списки/справочные выборки поверх данных. |
-| Формы | 37 | UI для списков, карточек, задач и действий. |
+| Представления | 22 | Таблицы/списки/справочные выборки поверх данных. |
+| Формы | 40 | UI для списков, карточек, задач и действий. |
 | Скрипты | 11 | Manual/event/diagram scripts. |
 | Диаграммы | 3 | BPMN/process definitions. |
-| Контент | 144 | Записи данных по типам материалов. |
+| Контент | 145 | Записи данных по типам материалов. |
 | Активные задачи | 1 | Текущие workflow tasks. |
 | Процессы | 16 | Запущенные/завершенные process instances. |
 | Отчеты | 0 | В этом проекте отчетов не найдено. |
-| Группы меню | 10 | Навигационные разделы workspace. |
+| Группы меню | 11 | Навигационные разделы workspace. |
 | Группы пользователей | 2 | Проектные группы доступа/назначений. |
 | Пользователи | 2 | Пользователи проекта. |
 | Справки | 2 | HTML/help entries; одна создана для MCP practice. |
@@ -247,7 +247,7 @@ Write:
 - системные `createdAt`, `lastUpdate`, `version`, `authorId` не должны
   подставляться руками без необходимости.
 
-В проекте 144 записи. В выборке:
+В проекте 145 записей. В выборке:
 
 - `Образец` - 94;
 - `Образец. Мета` - 15;
@@ -262,6 +262,18 @@ Write:
 - запускать процессы, если content type связан с диаграммой.
 
 Риск: средний для scratch-записей, высокий для бизнес-записей.
+
+Подтвержденная write-практика:
+
+- создана запись `MCP Practice. Тестовая запись`;
+- content id: `bd51e83f-201e-4d53-bdc6-c4cd16754756`;
+- endpoint create: `POST /api/contents/save`;
+- endpoint update: `PATCH /api/contents/save`;
+- readback: `/api/contents/listandcount` для этого content type возвращает
+  shape `{total, values}`, поэтому parser должен поддерживать не только
+  `[items, total]`;
+- через `POST /api/views/v2/get-data-simplified` по sandbox view возвращается
+  `row_count=1`.
 
 ## Представления / Views
 
@@ -288,7 +300,7 @@ Write:
 
 - `name`;
 - `description`;
-- `format`: в проекте `table` - 17, `reference` - 4;
+- `format`: в проекте `table` - 18, `reference` - 4;
 - `strict`;
 - `settings.engineVersion`;
 - `settings.title`;
@@ -303,6 +315,15 @@ Write:
 - задавать reference-выборки.
 
 Риск: средний. Ошибка в view обычно ломает отображение, но не меняет данные.
+
+Подтвержденная write-практика:
+
+- создано представление `MCP Practice. Список`;
+- view id: `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`;
+- view entity id: `f3e71cac-475a-479b-9242-d129b04e9746`;
+- создано 7 view fields: `_id` + 6 полей песочницы;
+- важное правило: сервер сохранил `settings.engineVersion=v2`, но отбросил
+  `settings.title`, поэтому typed diff не должен требовать `settings.title`.
 
 ## Формы / Forms
 
@@ -362,6 +383,21 @@ Write:
 Риск: высокий. Ошибка в action order может привести к неправильной записи или
 workflow side effect.
 
+Подтвержденная write-практика:
+
+- создана форма добавления `MCP Practice. Добавить запись`:
+  `281442af-bb94-43a2-bc80-f5303c05d0fc`;
+- создана форма карточки `MCP Practice. Карточка записи`:
+  `15f5fb26-5db4-4153-8131-23a54411cd63`;
+- создана основная форма `MCP Practice`:
+  `3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`;
+- основная форма использует `view_data_list`, action `Добавить` и value action
+  `Редактировать`;
+- browser readback подтвердил видимые колонки, action `Добавить`, запись и дату
+  `10.07.2026`;
+- для date-поля использовать `format=dd.MM.yyyy`; вариант `DD.MM.YYYY`
+  отрисовывался в UI как битый формат.
+
 ## Группы Меню / Groups
 
 Group - навигационный пункт workspace.
@@ -387,7 +423,7 @@ Write:
 - `formId`;
 - `iconId`.
 
-В проекте 10 групп, почти все опубликованы и привязаны к форме.
+В проекте 11 групп, почти все опубликованы и привязаны к форме.
 
 Для чего:
 
@@ -396,6 +432,14 @@ Write:
 - скрывать/публиковать рабочие разделы.
 
 Риск: средний. Обычно не портит данные, но может сломать навигацию.
+
+Подтвержденная write-практика:
+
+- создана группа меню `MCP Practice`;
+- group id: `aa997c9a-d81e-4042-91c5-bafa90b32819`;
+- `formId=3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`;
+- browser URL:
+  `https://lims.artx.ru/workspace/4e247a6b-55ef-4665-b88c-3c156fee19ba/group-viewer/aa997c9a-d81e-4042-91c5-bafa90b32819/form-viewer/3cfc70ab-3fb0-4567-8e25-7c863f0e87d0?menuAnchor=aa997c9a-d81e-4042-91c5-bafa90b32819`.
 
 ## Скрипты / Scripts
 
@@ -649,13 +693,13 @@ Write:
 1. **Справки** - уже выполнено: `MCP Practice Sandbox`.
 2. **Typed `alterios_upsert_help`** - вынести подтвержденный `/api/helps` flow в
    отдельный tool с dry-run diff и readback.
-3. **Группы меню** - создать неопубликованную или sandbox-группу, проверить
-   UI-навигацию, затем удалить только после отдельного destructive approval.
+3. **Группы меню** - выполнено: создана sandbox-группа `MCP Practice`.
 4. **Content type + fields** - выполнено: создан `MCP Practice. Песочница` и 6
    безопасных полей: text, list, number, date, boolean, textarea text.
-5. **Forms** - создать простую add/edit/list форму для sandbox content type.
-6. **Views** - создать table view, проверить `get-data` и UI-list.
-7. **Contents** - создать и обновить одну sandbox-запись через
+5. **Forms** - выполнено: созданы add/edit/main формы для sandbox content type.
+6. **Views** - выполнено: создан table view, проверены `get-data-simplified` и
+   UI-list.
+7. **Contents** - выполнено: создана одна sandbox-запись через
    `/api/contents/save`.
 8. **Comments** - добавить комментарий к sandbox-записи, проверить readback.
 9. **Files** - загрузить маленький тестовый файл в file-field после HAR capture.
