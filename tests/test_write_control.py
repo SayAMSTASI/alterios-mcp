@@ -259,7 +259,7 @@ def test_add_comment_execution_returns_created_comment_and_readback_without_real
         def add_comment(self, entity_id: str, body: str, *, entity: str, parent_id: str | None = None) -> FakeResponse:
             assert entity_id == "content-1"
             assert body == "Practice comment"
-            assert entity == "content"
+            assert entity == "any"
             assert parent_id is None
             return FakeResponse({"_id": "comment-1", "body": body})
 
@@ -273,7 +273,7 @@ def test_add_comment_execution_returns_created_comment_and_readback_without_real
             page: int = 1,
         ) -> FakeResponse:
             assert entity_id == "content-1"
-            assert entity == "content"
+            assert entity == "any"
             assert limit == 20
             assert depth == 4
             assert page == 1

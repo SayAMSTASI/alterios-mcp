@@ -32,8 +32,9 @@ CONTENT_ROW_TITLE = "MCP Practice. Тестовая запись"
 SAVE_ICON_ID = "95ec6613-fdcc-4ad5-b93f-16e871b8cbbc"
 ADD_ICON_ID = "de3b1bed-27d2-4963-8024-64e7d71d9fb2"
 EDIT_ICON_ID = "aa4c573e-104e-46a2-934f-780e105f3b1b"
-COMMENT_ENTITY = "content"
+COMMENT_ENTITY = "any"
 COMMENT_TEXT = "MCP Practice comment: comments write/readback coverage."
+COMMENTS_BLOCK_TITLE = "Обсуждение"
 
 
 @dataclass(frozen=True)
@@ -763,7 +764,7 @@ def build_edit_form(view_id: str, view_fields: dict[str, dict[str, Any]]) -> dic
     return {
         "name": EDIT_FORM_NAME,
         "pageTitle": EDIT_FORM_NAME,
-        "tabs": [{"name": None, "rows": [view_data_row(view_id, view_fields, editable=True)]}],
+        "tabs": [{"name": None, "rows": [view_data_row(view_id, view_fields, editable=True), comments_row()]}],
         "formActionContainers": [save_action_container()],
     }
 
@@ -842,6 +843,27 @@ def view_data_row(view_id: str, view_fields: dict[str, dict[str, Any]], *, edita
                 "emitting": {},
                 "reporting": {"reports": []},
                 "displaying": {"fields": view_display_fields(view_fields), "header": {}, "editForm": {}},
+                "cellActionContainers": [],
+            }
+        ],
+        "styles": row_styles(),
+        "reverse": False,
+    }
+
+
+def comments_row() -> dict[str, Any]:
+    return {
+        "cells": [
+            {
+                "name": COMMENTS_BLOCK_TITLE,
+                "type": "comments_list",
+                "adding": {},
+                "params": {"openId": True, "entity": COMMENT_ENTITY},
+                "styles": flex_styles(),
+                "editing": {},
+                "emitting": {},
+                "reporting": {},
+                "displaying": {"fields": {}, "header": {"title": COMMENTS_BLOCK_TITLE, "position": "top_left"}},
                 "cellActionContainers": [],
             }
         ],

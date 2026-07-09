@@ -286,7 +286,7 @@ def alterios_list_comments(
 def alterios_add_comment(
     entity_id: str,
     body: str,
-    entity: str = "content",
+    entity: str = "any",
     parent_id: str | None = None,
     dry_run: bool = True,
     profile: str | None = None,

@@ -290,7 +290,7 @@ class AlteriosClient:
         entity_id: str,
         body: str,
         *,
-        entity: str = "content",
+        entity: str = "any",
         parent_id: str | None = None,
     ) -> AlteriosResponse:
         if not entity_id.strip():

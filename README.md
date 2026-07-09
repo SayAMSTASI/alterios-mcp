@@ -48,7 +48,8 @@
 - `alterios_list_comments` - инвентаризация комментариев через
   `/api/v1/comments`.
 - `alterios_add_comment` - создание комментария через `/api/v1/comments` с
-  dry-run по умолчанию, write-gate и readback.
+  `entity=any` по умолчанию для совместимости с `comments_list`, dry-run,
+  write-gate и readback.
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.

@@ -42,7 +42,7 @@ browser/HAR capture и sandbox write-практику.
 | Script execution/services | Частично | `POST /api/scripts/execute-manual`, 14 service names | Cataloged; execution depends on UUID/endpoint. |
 | Workflow/process/task | Частично | `startProcess`, `reassignTask`, task complete | Cataloged; needs dedicated sandbox BPMN. |
 | Files | Частично | `GET /api/file/list`, upload file routes | Metadata read live; upload needs file-field capture. |
-| Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write live verified; `writeLog` remains cataloged as runtime service. |
+| Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Частично | report full/read/save | Read route exists; write/dashboard needs report sandbox. |
 
@@ -124,7 +124,7 @@ Statuses:
 | 20 | GET | `/api/view-fields/populated/{viewId}` | View field read | `live_read` |
 | 21 | GET | `/api/file/list?id=...` | File metadata read | `live_read` |
 | 22 | GET | `/api/v1/comments` | Comment read | `live_read` |
-| 23 | POST | `/api/v1/comments` | Comment write | `live_write` |
+| 23 | POST | `/api/v1/comments` | Comment write | `live_write`, `live_ui` |
 | 24 | POST | `/api/views/v2/get-data-simplified` | Runtime data read | `live_read`, `live_ui` |
 | 25 | POST | `/api/views/v2/get-data` | Runtime data read | `cataloged` |
 | 26 | POST | `/api/helps` | Help create/write | `live_write`, `live_ui` |
