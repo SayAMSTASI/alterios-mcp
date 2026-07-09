@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+from unittest.mock import patch
+
+import pytest
+
+from alterios_mcp import server
+from alterios_mcp.write_control import (
+    ControlledWriteError,
+    WriteOperation,
+    assert_write_allowed,
+    build_write_audit,
+    collect_target_ids,
+)
+
+
+def test_write_audit_requires_explicit_profile_and_project() -> None:
+    operation = WriteOperation(
+        name="PUT /api/reports",
+        kind="rest",
+        risk_level="write",
+        summary="Update report",
+    )
+
+    with pytest.raises(ControlledWriteError, match="explicit profile"):
+        build_write_audit(
+            profile=None,
+            project_id="project-1",
+            operation=operation,
+            dry_run=True,
+            write_enabled=False,
+        )
+
+    with pytest.raises(ControlledWriteError, match="explicit project_id"):
+        build_write_audit(
+            profile="vniimt",
+            project_id=None,
+            operation=operation,
+            dry_run=True,
+            write_enabled=False,
+        )
+
+
+def test_dry_run_audit_redacts_sensitive_request_values() -> None:
+    operation = WriteOperation(
+        name="POST /api/example",
+        kind="rest",
+        risk_level="write",
+        summary="Example write",
+        method="POST",
+        path="/api/example",
+        target_ids=("record-1",),
+        request={"body": {"token": "secret-token", "password": "secret-password", "name": "demo"}},
+    )
+
+    audit = build_write_audit(
+        profile="vniimt",
+        project_id="project-1",
+        operation=operation,
+        dry_run=True,
+        write_enabled=False,
+    ).as_dict()
+
+    assert audit["status"] == "dry_run"
+    assert audit["operation"]["request"]["body"]["token"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["password"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["name"] == "demo"
+
+
+def test_write_execution_requires_env_gate() -> None:
+    operation = WriteOperation(
+        name="PUT /api/reports",
+        kind="rest",
+        risk_level="write",
+        summary="Update report",
+    )
+
+    with pytest.raises(ControlledWriteError, match="ALTERIOS_MCP_ALLOW_WRITE"):
+        assert_write_allowed(
+            profile="vniimt",
+            project_id="project-1",
+            operation=operation,
+            write_enabled=False,
+        )
+
+
+def test_destructive_execution_requires_extra_flag() -> None:
+    operation = WriteOperation(
+        name="DELETE /api/contents",
+        kind="rest",
+        risk_level="destructive",
+        summary="Delete content",
+    )
+
+    with pytest.raises(ControlledWriteError, match="allow_destructive"):
+        assert_write_allowed(
+            profile="vniimt",
+            project_id="project-1",
+            operation=operation,
+            write_enabled=True,
+            allow_destructive=False,
+        )
+
+
+def test_collect_target_ids_finds_common_id_shapes() -> None:
+    assert collect_target_ids(
+        {
+            "_id": ["content-1", "content-2"],
+            "nested": {"taskId": "task_1", "processesIds": ["process-1"]},
+            "ignored": "value",
+        }
+    ) == ("content-1", "content-2", "task_1", "process-1")
+
+
+def test_rest_write_defaults_to_dry_run_without_network() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        result = server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1", "name": "Report"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["response"] is None
+    assert result["audit"]["write_enabled"] is False
+    assert result["audit"]["operation"]["target_ids"] == ["report-1"]
+
+
+def test_rest_write_execution_fails_without_write_env() -> None:
+    with patch.dict("os.environ", {}, clear=True), pytest.raises(ControlledWriteError, match="disabled"):
+        server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1"},
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_delete_rest_write_execution_requires_destructive_flag() -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True), pytest.raises(
+        ControlledWriteError,
+        match="allow_destructive",
+    ):
+        server.alterios_rest_write(
+            "DELETE",
+            "/api/contents",
+            {"_id": ["content-1"]},
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_write_service_rejects_readonly_service_name() -> None:
+    with pytest.raises(ValueError, match="readonly|read-only"):
+        server.alterios_call_write_service(
+            "getTasks",
+            {"query": {"limit": 1}},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_manual_script_dry_run_requires_uuid() -> None:
+    with pytest.raises(ValueError, match="script UUID"):
+        server.alterios_execute_manual_script(
+            "getTasks",
+            {"limit": 1},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_rest_write_execution_returns_audit_and_response_without_real_network() -> None:
+    class FakeResponse:
+        def as_dict(self) -> dict[str, object]:
+            return {
+                "status_code": 200,
+                "content_type": "application/json",
+                "body": {"ok": True, "token": "secret-token"},
+            }
+
+    class FakeClient:
+        def request(self, method: str, path: str, *, params: dict[str, object], body: dict[str, object]) -> FakeResponse:
+            assert method == "PUT"
+            assert path == "/api/reports"
+            assert params == {}
+            assert body == {"_id": "report-1"}
+            return FakeResponse()
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1"},
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["status"] == "ready_to_execute"
+    assert result["audit"]["write_enabled"] is True
+    assert result["response"]["body"] == {"ok": True, "token": "<redacted>"}

@@ -48,10 +48,11 @@
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
 - `alterios_call_write_service` и `alterios_rest_write` - отключены, пока явно
-  не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`.
+  не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают dry-run
+  audit и не выполняют запись.
 - `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
-  UUID скрипта; также отключен, пока явно не выставлен
-  `ALTERIOS_MCP_ALLOW_WRITE=1`.
+  UUID скрипта; также по умолчанию работает как dry-run и требует
+  `ALTERIOS_MCP_ALLOW_WRITE=1` для выполнения.
 
 Инструменты уровня проекта следует вызывать с `project_id`, когда целевой проект
 известен из URL, UI-сессии или контекста задачи. Настроенный
@@ -173,6 +174,15 @@ $env:ALTERIOS_MCP_ALLOW_WRITE = "1"
 план описан в [docs/roadmap.md](docs/roadmap.md), стратегия
 инвентаризации - в
 [docs/discovery-plan.md](docs/discovery-plan.md).
+
+Политика controlled writes описана в
+[docs/controlled-writes.md](docs/controlled-writes.md). Для реального выполнения
+write-capable tool-а нужно одновременно:
+
+- передать явные `profile` и `project_id`;
+- включить `ALTERIOS_MCP_ALLOW_WRITE=1`;
+- передать `dry_run=false`;
+- для destructive операций дополнительно передать `allow_destructive=true`.
 
 Управление проектом ведется в [docs/project-status.md](docs/project-status.md).
 Правила мультиагентной работы и контрольные точки PM описаны в

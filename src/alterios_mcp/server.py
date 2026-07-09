@@ -5,9 +5,16 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .client import AlteriosClient, AlteriosConfig
+from .client import AlteriosClient, AlteriosConfig, looks_like_uuid
 from .discovery import discover_readonly, list_objects, list_projects
-from .services import list_services, service_to_dict
+from .services import get_service, list_services, service_to_dict
+from .write_control import (
+    WriteOperation,
+    assert_write_allowed,
+    build_write_audit,
+    collect_target_ids,
+    controlled_write_result,
+)
 
 mcp = FastMCP("alterios")
 
@@ -18,6 +25,50 @@ def _client(profile: str | None = None, project_id: str | None = None) -> Alteri
 
 def _write_enabled() -> bool:
     return os.environ.get("ALTERIOS_MCP_ALLOW_WRITE") == "1"
+
+
+def _write_service_operation(function: str, args: dict[str, Any]) -> WriteOperation:
+    service = get_service(function)
+    if not service.mutates:
+        raise ValueError("Use alterios_call_readonly_service for read-only script services.")
+    return WriteOperation(
+        name=function,
+        kind="script_service",
+        risk_level=service.risk_level,
+        summary=service.description,
+        method="POST",
+        target_ids=collect_target_ids(args),
+        request={"function": function, "args": args},
+    )
+
+
+def _manual_script_operation(script_id: str, args: dict[str, Any]) -> WriteOperation:
+    if not looks_like_uuid(script_id):
+        raise ValueError("alterios_execute_manual_script requires a script UUID.")
+    return WriteOperation(
+        name="execute_manual_script",
+        kind="manual_script",
+        risk_level="manual_script",
+        summary="Execute a saved Alterios manual script by UUID.",
+        method="POST",
+        path="/api/scripts/execute-manual",
+        target_ids=collect_target_ids({"scriptId": script_id, "args": args}),
+        request={"script_id": script_id, "args": args},
+    )
+
+
+def _rest_write_operation(method: str, path: str, params: dict[str, Any], body: dict[str, Any]) -> WriteOperation:
+    risk_level = "destructive" if method == "DELETE" else "write"
+    return WriteOperation(
+        name=f"{method} {path}",
+        kind="rest",
+        risk_level=risk_level,
+        summary=f"Run {method} against an Alterios REST API path.",
+        method=method,
+        path=path,
+        target_ids=collect_target_ids({"params": params, "body": body}),
+        request={"params": params, "body": body},
+    )
 
 
 @mcp.tool()
@@ -244,31 +295,71 @@ def alterios_discover_readonly(
 def alterios_call_write_service(
     function: str,
     args: dict[str, Any],
+    dry_run: bool = True,
+    allow_destructive: bool = False,
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Call a mutating Alterios script service. Requires ALTERIOS_MCP_ALLOW_WRITE=1."""
-    if not _write_enabled():
-        raise RuntimeError("Write calls are disabled. Set ALTERIOS_MCP_ALLOW_WRITE=1 explicitly.")
-    return _client(profile, project_id).call_script_service(function, args, allow_write=True).as_dict()
+    """Plan or call a mutating Alterios script service. Execution requires explicit write gates."""
+    operation = _write_service_operation(function, args)
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    if dry_run:
+        return controlled_write_result(audit=audit)
+
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response = _client(profile, project_id).call_script_service(function, args, allow_write=True).as_dict()
+    return controlled_write_result(audit=audit, response=response)
 
 
 @mcp.tool()
 def alterios_execute_manual_script(
     script_id: str,
     args: dict[str, Any],
+    dry_run: bool = True,
+    allow_destructive: bool = False,
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a manual Alterios script by UUID. Requires ALTERIOS_MCP_ALLOW_WRITE=1."""
-    if not _write_enabled():
-        raise RuntimeError("Manual script execution is disabled. Set ALTERIOS_MCP_ALLOW_WRITE=1 explicitly.")
-    return _client(profile, project_id).call_script_service(
+    """Plan or execute a manual Alterios script by UUID. Execution requires explicit write gates."""
+    operation = _manual_script_operation(script_id, args)
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    if dry_run:
+        return controlled_write_result(audit=audit)
+
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response = _client(profile, project_id).call_script_service(
         script_id,
         args,
         body_style="manual_script",
         allow_write=True,
     ).as_dict()
+    return controlled_write_result(audit=audit, response=response)
 
 
 @mcp.tool()
@@ -277,16 +368,37 @@ def alterios_rest_write(
     path: str,
     body: dict[str, Any],
     params: dict[str, Any] | None = None,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Run a mutating REST request. Requires ALTERIOS_MCP_ALLOW_WRITE=1."""
+    """Plan or run a mutating REST request. Execution requires explicit write gates."""
     method = method.upper()
     if method not in {"POST", "PUT", "DELETE"}:
         raise ValueError("alterios_rest_write supports only POST, PUT, and DELETE")
-    if not _write_enabled():
-        raise RuntimeError("Write calls are disabled. Set ALTERIOS_MCP_ALLOW_WRITE=1 explicitly.")
-    return _client(profile, project_id).request(method, path, params=params or {}, body=body).as_dict()
+    request_params = params or {}
+    operation = _rest_write_operation(method, path, request_params, body)
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    if dry_run:
+        return controlled_write_result(audit=audit)
+
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response = _client(profile, project_id).request(method, path, params=request_params, body=body).as_dict()
+    return controlled_write_result(audit=audit, response=response)
 
 
 def main() -> None:
