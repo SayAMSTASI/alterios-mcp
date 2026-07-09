@@ -10,6 +10,8 @@ and the first browser/UI discovery tooling slice. Live browser captures are
 still pending before the first typed write candidate.
 First controlled live write practice has been completed on the `artx` test
 project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
+The ARTX project entity surface has been cataloged across metadata, UI,
+runtime data, workflow, files, comments, users, and reports.
 
 ## Completed
 
@@ -22,6 +24,7 @@ project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 | 5a. Browser/UI flow analyzer | Added HAR/JSON network-flow analyzer, route classification, stable ID placeholders, secret/content redaction, CLI entrypoint, docs, and unit coverage. | `649f2af` | `pytest`: 48 passed; `git diff --check` OK; secret scan clean; no live write executed; live UI capture artifacts still pending. |
 | Config. Multi-instance profile inventory | Added `ALTERIOS_PROFILES` support, profile auto-discovery, `alterios_list_profiles`, `alterios-discover --profiles`, profile-scoped missing keys, default-profile inventory, and safer URL redaction. | `2f8a87c` | `pytest`: 55 passed; `git diff --check` OK; secret scan clean; CLI `--profiles --profile artx --json` smoke OK; no network/write executed. |
 | Practice. ARTX help sandbox write | Created `MCP Practice Sandbox` help entry in `artx` project `4e247a6b-55ef-4665-b88c-3c156fee19ba` through controlled generic REST write. | `bb89755` | Redacted profile check OK; readonly discovery 15/15 OK; dry-run audit OK; `POST /api/helps` executed with `ALTERIOS_MCP_ALLOW_WRITE=1`; API readback found id `2794b152-e1ca-4de2-9d3d-23b81a747d09`; browser UI showed title and body text. |
+| Analysis. ARTX entity surface catalog | Documented the full project entity surface: counts, read/write routes, observed settings, risks, and write-practice order. | pending | Live read-only inventory: 13 content types, 2522 fields, 21 views, 37 forms, 11 scripts, 3 diagrams, 144 contents, 1 task, 16 processes, 10 groups, 2 helps; `/api/features` and `/api/files` generic list routes returned 404; no write executed for this analysis. |
 
 ## Active Stage
 
@@ -35,6 +38,7 @@ project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 |---:|---|---|---|
 | 1 | Capture browser/UI network-flow workflow for write-relevant actions. | In Progress | Analyzer/tooling delivered in `649f2af`; real Alterios UI captures and sanitized artifacts are still needed. |
 | 1 | Prepare first typed write candidate: `alterios_update_content_fields`. | Next | Use one existing scratch/test content record; require preflight read, field allowlist, dry-run diff, execution gate, and readback verification. |
+| 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Next | Use ARTX test project and the sequence in `docs/alterios-entity-surface-catalog.md`. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -57,11 +61,13 @@ project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
    project.
 2. Run `alterios-ui-flow` on each capture and save sanitized JSON artifacts.
 3. Map captured UI flows to REST routes or script-service calls.
-4. Add a typed `alterios_upsert_help` or practice-write helper based on the
+4. Follow the cataloged entity order: content type, fields, forms, views,
+   contents, comments, files, scripts, diagrams/processes, reports.
+5. Add a typed `alterios_upsert_help` or practice-write helper based on the
    verified `/api/helps` flow.
-5. Design `alterios_update_content_fields` around one scratch/test content
+6. Design `alterios_update_content_fields` around one scratch/test content
    record with preflight, dry-run diff, execution gate, and readback.
-6. Keep destructive, workflow, notification, and file upload writes out of the
+7. Keep destructive, workflow, notification, and file upload writes out of the
    first typed write candidate.
 
 ## PM Update Checklist

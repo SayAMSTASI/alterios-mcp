@@ -256,6 +256,8 @@ write-capable tool-а нужно одновременно:
 [docs/project-management.md](docs/project-management.md). Каталог runtime-сервисов
 скриптов описан в
 [docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
+Карта сущностей Alterios, возможных обращений, настроек и порядка write-практики
+описана в [docs/alterios-entity-surface-catalog.md](docs/alterios-entity-surface-catalog.md).
 
 Важно: `/api/scripts/execute-manual` выполняет сохраненные Alterios-скрипты по
 UUID. Этот endpoint не вызывает имена runtime-сервисов вроде `getTasks`.
