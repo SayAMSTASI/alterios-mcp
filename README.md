@@ -258,6 +258,8 @@ write-capable tool-а нужно одновременно:
 [docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
 Карта сущностей Alterios, возможных обращений, настроек и порядка write-практики
 описана в [docs/alterios-entity-surface-catalog.md](docs/alterios-entity-surface-catalog.md).
+Количество покрытых методов, route/method patterns и статусы live/cataloged
+ведутся в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ## Practice-Сценарии
 
