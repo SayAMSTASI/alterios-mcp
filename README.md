@@ -169,6 +169,11 @@ and pass `project_id` explicitly. See [docs/roadmap.md](docs/roadmap.md) for
 the staged production plan and [docs/discovery-plan.md](docs/discovery-plan.md)
 for the inventory strategy.
 
+Project coordination is tracked in
+[docs/project-status.md](docs/project-status.md). Multi-agent operating rules
+and PM stage gates are documented in
+[docs/project-management.md](docs/project-management.md).
+
 Important: `/api/scripts/execute-manual` executes saved Alterios scripts by
 UUID. It does not call runtime service names such as `getTasks` directly. Keep
 runtime service names in the catalog until a compatible external service
