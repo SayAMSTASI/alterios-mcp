@@ -8,6 +8,8 @@ The project has completed the foundation, multi-instance profile inventory,
 read-only inventory expansion, script runtime catalog, controlled write gates,
 and the first browser/UI discovery tooling slice. Live browser captures are
 still pending before the first typed write candidate.
+First controlled live write practice has been completed on the `artx` test
+project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 
 ## Completed
 
@@ -19,6 +21,7 @@ still pending before the first typed write candidate.
 | 4. Controlled writes | Added dry-run-first write gates, explicit `profile`/`project_id` validation, redacted audit output, destructive-operation extra flag, manual-script UUID validation, and no-network unit coverage. | `2bc7dd2` | `pytest`: 43 passed; no-network dry-run/execution smoke covered by tests; `git diff --check` OK; secret scan clean; no live write executed. |
 | 5a. Browser/UI flow analyzer | Added HAR/JSON network-flow analyzer, route classification, stable ID placeholders, secret/content redaction, CLI entrypoint, docs, and unit coverage. | `649f2af` | `pytest`: 48 passed; `git diff --check` OK; secret scan clean; no live write executed; live UI capture artifacts still pending. |
 | Config. Multi-instance profile inventory | Added `ALTERIOS_PROFILES` support, profile auto-discovery, `alterios_list_profiles`, `alterios-discover --profiles`, profile-scoped missing keys, default-profile inventory, and safer URL redaction. | `2f8a87c` | `pytest`: 55 passed; `git diff --check` OK; secret scan clean; CLI `--profiles --profile artx --json` smoke OK; no network/write executed. |
+| Practice. ARTX help sandbox write | Created `MCP Practice Sandbox` help entry in `artx` project `4e247a6b-55ef-4665-b88c-3c156fee19ba` through controlled generic REST write. | `22e0fc0` | Redacted profile check OK; readonly discovery 15/15 OK; dry-run audit OK; `POST /api/helps` executed with `ALTERIOS_MCP_ALLOW_WRITE=1`; API readback found id `2794b152-e1ca-4de2-9d3d-23b81a747d09`; browser UI showed title and body text. |
 
 ## Active Stage
 
@@ -45,6 +48,7 @@ still pending before the first typed write candidate.
 | Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; use typed tools with readback for production workflows. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
+| Generic REST write can create live UI objects but does not yet provide typed preflight semantics. | Use the ARTX help sandbox result to design narrow typed write tools with explicit allowed fields, dry-run diffs, and readback checks. |
 
 ## Next Concrete Actions
 
@@ -53,9 +57,11 @@ still pending before the first typed write candidate.
    project.
 2. Run `alterios-ui-flow` on each capture and save sanitized JSON artifacts.
 3. Map captured UI flows to REST routes or script-service calls.
-4. Design `alterios_update_content_fields` around one scratch/test content
+4. Add a typed `alterios_upsert_help` or practice-write helper based on the
+   verified `/api/helps` flow.
+5. Design `alterios_update_content_fields` around one scratch/test content
    record with preflight, dry-run diff, execution gate, and readback.
-5. Keep destructive, workflow, notification, and file upload writes out of the
+6. Keep destructive, workflow, notification, and file upload writes out of the
    first typed write candidate.
 
 ## PM Update Checklist
