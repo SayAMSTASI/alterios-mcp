@@ -69,7 +69,7 @@
 ## Установка
 
 ```powershell
-git clone https://github.com/SayAMSTASI/alterios-mcp.git
+git clone https://github.com/<owner>/alterios-mcp.git
 cd alterios-mcp
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -e ".[dev]"
@@ -86,34 +86,34 @@ Copy-Item .env.example .env
 Пример профиля для одного экземпляра Alterios:
 
 ```dotenv
-ALTERIOS_PROFILE=vniimt
-ALTERIOS_PROFILES=vniimt,artx
+ALTERIOS_PROFILE=primary
+ALTERIOS_PROFILES=primary,secondary
 
-ALTERIOS_VNIIMT_BASE_URL=http://lims.vniimt.local
-ALTERIOS_VNIIMT_API_TOKEN=put-token-here
+ALTERIOS_PRIMARY_BASE_URL=https://alterios.example.local
+ALTERIOS_PRIMARY_API_TOKEN=put-token-here
 
 # Необязательное значение по умолчанию. Для инструментов уровня проекта лучше передавать project_id явно.
-ALTERIOS_VNIIMT_PROJECT_ID=40466687-b093-4d80-b4f2-ba0ed0245bfa
+ALTERIOS_PRIMARY_PROJECT_ID=put-optional-default-project-id-here
 
-ALTERIOS_VNIIMT_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
-ALTERIOS_VNIIMT_BODY_STYLE=manual_script
-ALTERIOS_VNIIMT_AUTH_HEADER=x-api-key
-ALTERIOS_VNIIMT_AUTH_SCHEME=
-ALTERIOS_VNIIMT_TIMEOUT_SECONDS=20
+ALTERIOS_PRIMARY_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
+ALTERIOS_PRIMARY_BODY_STYLE=manual_script
+ALTERIOS_PRIMARY_AUTH_HEADER=x-api-key
+ALTERIOS_PRIMARY_AUTH_SCHEME=
+ALTERIOS_PRIMARY_TIMEOUT_SECONDS=20
 ```
 
 Несколько экземпляров Alterios можно держать в одном приватном dotenv-файле.
 Добавьте второй профиль с собственным префиксом:
 
 ```dotenv
-ALTERIOS_ARTX_BASE_URL=https://alterios-artx.example.local
-ALTERIOS_ARTX_API_TOKEN=put-token-here
-ALTERIOS_ARTX_PROJECT_ID=put-optional-default-project-id-here
-ALTERIOS_ARTX_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
-ALTERIOS_ARTX_BODY_STYLE=manual_script
-ALTERIOS_ARTX_AUTH_HEADER=Authorization
-ALTERIOS_ARTX_AUTH_SCHEME=Bearer
-ALTERIOS_ARTX_TIMEOUT_SECONDS=20
+ALTERIOS_SECONDARY_BASE_URL=https://alterios-secondary.example.local
+ALTERIOS_SECONDARY_API_TOKEN=put-token-here
+ALTERIOS_SECONDARY_PROJECT_ID=put-optional-default-project-id-here
+ALTERIOS_SECONDARY_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
+ALTERIOS_SECONDARY_BODY_STYLE=manual_script
+ALTERIOS_SECONDARY_AUTH_HEADER=Authorization
+ALTERIOS_SECONDARY_AUTH_SCHEME=Bearer
+ALTERIOS_SECONDARY_TIMEOUT_SECONDS=20
 ```
 
 Профили можно перечислить явно через `ALTERIOS_PROFILES` или оставить
@@ -128,7 +128,7 @@ python -m alterios_mcp.discovery --profiles --json
 dotenv, передайте профиль явно:
 
 ```powershell
-python -m alterios_mcp.discovery --profiles --profile artx --json
+python -m alterios_mcp.discovery --profiles --profile secondary --json
 ```
 
 Для конкретного экземпляра используйте `--profile` в CLI или аргумент `profile`
@@ -146,8 +146,8 @@ python -m alterios_mcp.discovery --profiles --profile artx --json
 секреты в этот репозиторий, задайте `ALTERIOS_DOTENV_PATH` вне репозитория:
 
 ```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\Users\admin\Documents\AlteriosCodex\.env"
-python -m alterios_mcp.discovery --profile vniimt --projects --json
+$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
+python -m alterios_mcp.discovery --profile primary --projects --json
 ```
 
 В конфиг Codex MCP можно передать тот же путь к приватному dotenv:
@@ -160,7 +160,7 @@ startup_timeout_sec = 60
 tool_timeout_sec = 120
 
 [mcp_servers.alterios.env]
-ALTERIOS_DOTENV_PATH = "C:\\Users\\admin\\Documents\\AlteriosCodex\\.env"
+ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 ```
 
 ## Инвентаризация
@@ -168,14 +168,14 @@ ALTERIOS_DOTENV_PATH = "C:\\Users\\admin\\Documents\\AlteriosCodex\\.env"
 Список проектов выбранного экземпляра Alterios:
 
 ```powershell
-python -m alterios_mcp.discovery --profile vniimt --projects --json
+python -m alterios_mcp.discovery --profile primary --projects --json
 ```
 
 Проверка конкретного проекта с явным `project_id`:
 
 ```powershell
-python -m alterios_mcp.discovery --profile vniimt `
-  --project-id 40466687-b093-4d80-b4f2-ba0ed0245bfa `
+python -m alterios_mcp.discovery --profile primary `
+  --project-id put-target-project-id-here `
   --json
 ```
 
@@ -183,8 +183,8 @@ python -m alterios_mcp.discovery --profile vniimt `
 
 ```powershell
 New-Item -ItemType Directory -Force artifacts\alterios-mcp | Out-Null
-python -m alterios_mcp.discovery --profile vniimt `
-  --project-id 40466687-b093-4d80-b4f2-ba0ed0245bfa `
+python -m alterios_mcp.discovery --profile primary `
+  --project-id put-target-project-id-here `
   --json > artifacts\alterios-mcp\live-readonly-matrix.json
 ```
 
@@ -192,7 +192,7 @@ python -m alterios_mcp.discovery --profile vniimt `
 пути и кандидаты в script-service функции:
 
 ```powershell
-python -m alterios_mcp.static_scan C:\Users\admin\Documents\AlteriosCodex `
+python -m alterios_mcp.static_scan C:\path\to\alterios-automation `
   --json > artifacts\alterios-mcp\static-calls.json
 ```
 
@@ -210,8 +210,8 @@ python -m alterios_mcp.static_scan C:\Users\admin\Documents\AlteriosCodex `
 
 ```powershell
 python -m alterios_mcp.ui_flow .\capture.har `
-  --profile vniimt `
-  --project-id 40466687-b093-4d80-b4f2-ba0ed0245bfa `
+  --profile primary `
+  --project-id put-target-project-id-here `
   --scenario content-form-open `
   --json > artifacts\alterios-mcp\ui-flow-content-form-open.json
 ```
@@ -267,17 +267,19 @@ write-capable tool-а нужно одновременно:
 
 ## Practice-Сценарии
 
-Для тестового ART X проекта есть воспроизводимый сценарий practice chain:
+Для тестового проекта можно держать отдельный воспроизводимый practice chain:
 создать или проверить sandbox content type, representative fields, table view,
-add/edit/main forms, menu group и одну sandbox-запись. По умолчанию команда
-работает как dry-run:
+add/edit/main forms, menu group и одну sandbox-запись. В публичном README
+используются только placeholders; конкретный локальный скрипт и проект держите
+в приватной документации или локальных runbook-файлах. По умолчанию команда
+должна работать как dry-run:
 
 ```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\Users\admin\Documents\AlteriosCodex\.env"
+$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 $env:PYTHONPATH = "src"
-python scripts\artx_practice_metadata.py `
-  --profile artx `
-  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
+python scripts\<sandbox-practice-script>.py `
+  --profile sandbox `
+  --project-id put-sandbox-project-id-here `
   --json
 ```
 
@@ -285,9 +287,9 @@ python scripts\artx_practice_metadata.py `
 
 ```powershell
 $env:ALTERIOS_MCP_ALLOW_WRITE = "1"
-python scripts\artx_practice_metadata.py `
-  --profile artx `
-  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
+python scripts\<sandbox-practice-script>.py `
+  --profile sandbox `
+  --project-id put-sandbox-project-id-here `
   --execute `
   --json
 ```
