@@ -402,7 +402,9 @@ $env:ALTERIOS_MCP_ALLOW_WRITE = "0"
 
 - `alterios_upsert_form` для полной формы;
 - `alterios_patch_form_tabs` для точечной замены вкладок;
-- `alterios_patch_form_actions` для точечной замены action containers.
+- `alterios_patch_form_actions` для точечной замены action containers;
+- `alterios_patch_form_cell_listeners` для точечной замены
+  `tabs[tab].rows[row].cells[cell].emitting.listeners`.
 
 ### 10.4. Работа со скриптами и BPMN
 
@@ -446,7 +448,35 @@ $env:ALTERIOS_MCP_ALLOW_WRITE = "0"
 Ограничение текущего этапа: статическая проверка Stimulsoft layout реализована,
 но render/PDF/image comparison пока относится к backlog.
 
-### 10.6. Установка skills
+### 10.6. Users, user groups, roles, bulk selection
+
+Для пользователей, групп пользователей и ролей используйте только typed security
+tools:
+
+- `alterios_list_users`, `alterios_get_user`, `alterios_upsert_user`,
+  `alterios_delete_user`;
+- `alterios_list_user_groups`, `alterios_get_user_group`,
+  `alterios_upsert_user_group`, `alterios_delete_user_group`;
+- `alterios_list_roles`, `alterios_get_role`, `alterios_upsert_role`,
+  `alterios_delete_role`.
+
+Эти tools считаются dangerous/security. Для live execution обязательны
+`ALTERIOS_MCP_ALLOW_WRITE=1`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`,
+`allow_destructive=true`, dry-run target review и readback. Для production
+использовать их нельзя без отдельного sandbox/UI evidence и rollback-плана.
+
+Для множественного выбора строк используйте
+`alterios_bulk_update_selected_content_fields`, если действие не destructive:
+передавайте `selected_content_ids`, `expected_count`, `expected_content_type_id`
+и `field_values`. Массовое удаление или массовый запуск script требует
+отдельного dangerous workflow.
+
+Для публикации типа материала в другие проекты используйте
+`alterios_plan_content_type_publish`. Это planner, а не запись. Native execution
+разрешается добавлять только после UI/HAR evidence маршрута, payload shape и
+readback правил по каждому target project.
+
+### 10.7. Установка skills
 
 Dry-run установки:
 
@@ -668,16 +698,20 @@ git pull --ff-only
 
 ## 16. Текущее состояние разработки
 
-На момент подготовки инструкции основной функциональный контур разработки
-закрывается для эксплуатации:
+На текущем этапе основной функциональный контур разработки закрывается для
+эксплуатации:
 
-- есть 51 MCP-инструмент;
-- есть 23 write-like инструмента;
+- есть 66 MCP-инструментов;
+- есть 31 write-like инструмент;
 - реализованы профили нескольких экземпляров Alterios;
 - реализованы read-only inventory и deep inventory;
 - реализованы controlled write gates;
 - реализованы typed write tools для metadata/data, files, forms/views,
   scripts/BPMN/tasks и reports;
+- реализованы typed security tools для users/user-groups/roles/delete с
+  dangerous gate и no-network тестами;
+- реализованы typed form listener patch и bulk selected-content update;
+- реализован planner для native content-type publish/transfer без live записи;
 - реализованы repo-owned skills и installer;
 - создан Documentation Scribe / Писарь;
 - README переведен в пользовательскую точку входа;
@@ -685,8 +719,10 @@ git pull --ff-only
 
 Оставшиеся работы не должны блокировать эксплуатацию текущего MCP:
 
-- typed destructive/security tools добавлять только после read-only UI/HAR/API
-  evidence;
+- live execution destructive/security tools разрешать только после UI/HAR/API
+  evidence, rollback-плана и sandbox readback;
+- executing native content-type publish tool добавлять только после UI/HAR
+  route и payload evidence;
 - Stimulsoft render/PDF/image comparison остается расширением validator-а;
 - release packaging и changelog process остаются отдельным release-этапом.
 

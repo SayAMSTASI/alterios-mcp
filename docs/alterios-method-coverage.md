@@ -16,11 +16,11 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 51 | Публичные callable tools в `src/alterios_mcp/server.py`. |
-| Write-like MCP tools | 23 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 66 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 31 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
-| REST route/method patterns in coverage registry | 57 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
+| REST route/method patterns in coverage registry | 76 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
 | Виды обращений | 13 | Классы операций: от config/read до workflow, files, comments, security. |
 
 Это не означает, что в Alterios больше нет скрытых внутренних endpoint-ов.
@@ -44,10 +44,10 @@ browser/HAR capture и sandbox write-практику.
 | Workflow/process/task | Да | `POST /api/diagrams`, `POST /api/processes`, `GET /api/tasks/`, `DELETE /api/tasks/complete` | Dedicated sandbox BPMN created; process started; user task completed; process readback completed. |
 | Files | Да | `POST /api/file/upload/field`, `GET /api/file/list` | File-field created; multipart upload executed; content value patched; file metadata readback verified. |
 | Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
-| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
+| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/user-groups/roles have typed security wrappers and no-network tests; live dangerous execution remains sandbox/UI evidence only. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 51
+## MCP Tools: 66
 
 | Tool | Вид |
 |---|---|
@@ -67,15 +67,29 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_list_fields` | Field metadata read |
 | `alterios_list_groups` | Group metadata read |
 | `alterios_list_content_types` | Content type metadata read |
+| `alterios_list_users` | Security user read |
+| `alterios_get_user` | Security user detail read |
+| `alterios_list_user_groups` | Security user-group read |
+| `alterios_get_user_group` | Security user-group detail read |
+| `alterios_list_roles` | Security role read |
+| `alterios_get_role` | Security role detail read |
 | `alterios_file_metadata` | File metadata read |
+| `alterios_upsert_user` | Controlled typed security user create/update |
+| `alterios_upsert_user_group` | Controlled typed security user-group create/update |
+| `alterios_upsert_role` | Controlled typed security role create/update |
+| `alterios_delete_user` | Controlled typed security user delete |
+| `alterios_delete_user_group` | Controlled typed security user-group delete |
+| `alterios_delete_role` | Controlled typed security role delete |
 | `alterios_list_comments` | Comment read |
 | `alterios_add_comment` | Controlled comment write |
 | `alterios_upsert_content_type` | Controlled typed content type create/update |
+| `alterios_plan_content_type_publish` | Content type publish/transfer planner; native write blocked until UI/HAR evidence |
 | `alterios_upsert_field` | Controlled typed field create/update |
 | `alterios_create_content` | Controlled typed content create |
 | `alterios_upsert_group` | Controlled typed menu group create/update |
 | `alterios_upsert_help` | Controlled typed help create/update |
 | `alterios_update_content_fields` | Controlled typed content field update |
+| `alterios_bulk_update_selected_content_fields` | Controlled typed bulk update for selected content rows |
 | `alterios_file_upload_to_field` | Controlled typed file-field upload and content save |
 | `alterios_upsert_view` | Controlled typed view create/update |
 | `alterios_upsert_view_entity` | Controlled typed view entity create/update |
@@ -83,6 +97,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_upsert_form` | Controlled typed form create/update |
 | `alterios_patch_form_actions` | Controlled typed form actions patch |
 | `alterios_patch_form_tabs` | Controlled typed form tabs patch |
+| `alterios_patch_form_cell_listeners` | Controlled typed form cell listener patch |
 | `alterios_analyze_form_surface` | Form UX/layout/action validation read |
 | `alterios_upsert_script` | Controlled typed script create/update |
 | `alterios_validate_script` | Script validation read |
@@ -111,11 +126,14 @@ write-like tools. The next write-first expansion added typed content-type,
 field, content-create, group, and help tools, bringing the surface to 50 tools
 and 23 write-like tools. The security/destructive gate pass added
 `alterios_write_safety_preflight`, bringing the surface to 51 tools while
-keeping write-like tools at 23.
+keeping write-like tools at 23. The security/form/bulk expansion added typed
+read and write wrappers for users, user groups, roles, delete flows, form cell
+listeners, selected-content bulk updates, and content-type publish planning,
+bringing the surface to 66 tools and 31 write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 23 tools are
+does **not** mean the MCP operator surface is complete. Today 31 tools are
 write-like, and 2 of them are still broad generic escape hatches:
 
 - `alterios_add_comment` is typed but only covers comments;
@@ -125,10 +143,17 @@ write-like, and 2 of them are still broad generic escape hatches:
   require generic REST calls;
 - `alterios_update_content_fields` and `alterios_file_upload_to_field` now cover
   the first typed content/file slice;
+- `alterios_bulk_update_selected_content_fields` covers the first typed
+  multiple-selection slice for field updates on selected content rows;
 - `alterios_upsert_view`, `alterios_upsert_view_entity`,
   `alterios_upsert_view_field`, `alterios_upsert_form`,
-  `alterios_patch_form_actions`, and `alterios_patch_form_tabs` now cover the
-  first typed view/form slice;
+  `alterios_patch_form_actions`, `alterios_patch_form_tabs`, and
+  `alterios_patch_form_cell_listeners` now cover the first typed view/form
+  slice including targeted listener patching;
+- `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`,
+  `alterios_delete_user`, `alterios_delete_user_group`, and
+  `alterios_delete_role` cover the first typed security/destructive admin
+  slice with dangerous gates and no-network tests;
 - `alterios_upsert_script` and `alterios_execute_manual_script` now cover saved
   script upsert plus manual UUID execution;
 - `alterios_upsert_bpmn_diagram`, `alterios_start_process`,
@@ -142,11 +167,11 @@ write-like, and 2 of them are still broad generic escape hatches:
 
 Next coverage work must therefore focus on the remaining non-normal surfaces:
 
-1. repo-owned agents and skills that encode the verified typed workflows;
-2. multi-instance smoke matrix across configured Alterios profiles;
-3. typed security/destructive tools only after a dedicated sandbox scenario;
-   generic dangerous REST now has preflight classification and a separate
-   dangerous environment gate.
+1. live sandbox/UI evidence for security/destructive execution, including
+   rollback and user-visible readback;
+2. native content-type publish route evidence from UI/HAR before adding an
+   executing native publish tool;
+3. rendered Stimulsoft proof for report layouts where visual acceptance matters.
 
 ## Runtime Services: 14
 
@@ -162,7 +187,7 @@ Next coverage work must therefore focus on the remaining non-normal surfaces:
 Runtime service names are not manual script UUIDs. If the configured endpoint is
 `/api/scripts/execute-manual`, only saved script UUIDs can be executed there.
 
-## REST Route/Method Registry: 57
+## REST Route/Method Registry: 76
 
 Statuses:
 
@@ -172,6 +197,10 @@ Statuses:
 - `cataloged` - known from code/docs/static scan, not yet exercised in the
   current sandbox.
 - `needs_har` - needs browser/HAR capture before typed write.
+- `typed_guarded` - has a typed tool, dry-run audit, gates, and no-network tests;
+  live execution remains sandbox-only until evidence is collected.
+- `needs_sandbox_execution` - execution is intentionally not marked live until a
+  controlled sandbox run and readback/UI proof exist.
 - `deferred` - intentionally postponed because of destructive/security risk.
 
 | # | Method | Route pattern | Вид | Status |
@@ -233,6 +262,25 @@ Statuses:
 | 55 | POST | `/api/processes` | Process start | `live_write` |
 | 56 | GET | `/api/tasks/` | Active task read | `live_read` |
 | 57 | DELETE | `/api/tasks/complete` | Task transition/complete | `live_write` |
+| 58 | GET | `/api/roles/listandcount` | Role read | `live_read` |
+| 59 | POST | `/api/users` | User create | `typed_guarded`, `needs_sandbox_execution` |
+| 60 | PATCH | `/api/users/{userId}` | User update variant | `typed_guarded`, `needs_sandbox_execution` |
+| 61 | PUT | `/api/users/{userId}` | User update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 62 | PUT | `/api/users` | User update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 63 | DELETE | `/api/users/{userId}` | User delete | `typed_guarded`, `needs_sandbox_execution` |
+| 64 | DELETE | `/api/users` | User delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 65 | POST | `/api/user-groups` | User group create | `typed_guarded`, `needs_sandbox_execution` |
+| 66 | PATCH | `/api/user-groups/{userGroupId}` | User group update variant | `typed_guarded`, `needs_sandbox_execution` |
+| 67 | PUT | `/api/user-groups/{userGroupId}` | User group update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 68 | PUT | `/api/user-groups` | User group update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 69 | DELETE | `/api/user-groups/{userGroupId}` | User group delete | `typed_guarded`, `needs_sandbox_execution` |
+| 70 | DELETE | `/api/user-groups` | User group delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 71 | POST | `/api/roles` | Role create | `typed_guarded`, `needs_sandbox_execution` |
+| 72 | PATCH | `/api/roles/{roleId}` | Role update variant | `typed_guarded`, `needs_sandbox_execution` |
+| 73 | PUT | `/api/roles/{roleId}` | Role update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 74 | PUT | `/api/roles` | Role update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 75 | DELETE | `/api/roles/{roleId}` | Role delete | `typed_guarded`, `needs_sandbox_execution` |
+| 76 | DELETE | `/api/roles` | Role delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
 
 ## What Counts As "All Types"
 
@@ -249,8 +297,9 @@ every internal route in advance. A class is considered covered only when it has:
 By that definition, all main operation classes are represented. The not-yet
 closed areas are:
 
-- users/roles/security writes;
-- destructive delete flows.
+- live execution evidence for users/user-groups/roles security writes;
+- live execution evidence for destructive delete flows;
+- native content-type publish route and payload evidence.
 
 These are deliberately not marked complete until each has a sandbox scenario,
 HAR/API evidence, execution gate, and readback/UI verification.

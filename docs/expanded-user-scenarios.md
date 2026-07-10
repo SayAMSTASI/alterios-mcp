@@ -8,12 +8,12 @@
 
 Контекст текущего покрытия:
 
-- MCP tools: 51;
-- write-like MCP tools: 23;
+- MCP tools: 66;
+- write-like MCP tools: 31;
 - project-base сценарии уже покрывают content types, fields, content, files,
   views, forms, scripts, BPMN/process/tasks, reports, groups, comments;
-- users, roles, user groups writes и destructive delete остаются security
-  backlog до отдельного evidence.
+- users, roles, user groups writes и destructive delete имеют typed security
+  wrappers, но live execution остается sandbox/UI-evidence задачей.
 
 ## 1. Статусы сценариев
 
@@ -167,7 +167,8 @@
 
 ## 5. Пользователи
 
-Статус: `Поддержано read-only`, запись `Требует evidence`.
+Статус: `Поддержано typed security tools`; live security execution требует
+отдельного sandbox/UI evidence.
 
 Известный read route:
 
@@ -197,25 +198,27 @@
 7. Назначить роль или группу.
 8. Снять роль или группу.
 
-Почему запись пока не typed:
+Почему live-запись остается dangerous:
 
 - изменение пользователя влияет на доступы;
-- нужен payload shape из UI/HAR;
 - нужен readback: пользователь, роли, проекты, группы;
 - нужен rollback/restore план;
 - нужны проверки, что оператор не отключает последнего администратора.
 
-Кандидаты typed tools после evidence:
+Инструменты:
 
 - `alterios_list_users`;
 - `alterios_get_user`;
-- `alterios_update_user_status`;
-- `alterios_assign_user_role`;
-- `alterios_assign_user_group`.
+- `alterios_upsert_user`;
+- `alterios_delete_user`.
+
+Для назначения ролей/групп текущий typed path - `alterios_upsert_user` с
+явным payload, expected email, dry-run и dangerous gate.
 
 ## 6. Группы пользователей
 
-Статус: `Поддержано read-only`, запись `Требует evidence`.
+Статус: `Поддержано typed security tools`; live membership/delete execution
+требует отдельного sandbox/UI evidence.
 
 Известный read route:
 
@@ -237,17 +240,24 @@
 5. Использовать группу как candidate group в task/BPMN.
 6. Проверить, какие формы или процессы завязаны на группу.
 
-Что нужно до typed write:
+Инструменты:
 
-- UI/HAR для создания группы;
-- UI/HAR для изменения состава;
-- readback состава группы;
+- `alterios_list_user_groups`;
+- `alterios_get_user_group`;
+- `alterios_upsert_user_group`;
+- `alterios_delete_user_group`.
+
+Что нужно до live execution:
+
+- UI/HAR для подтверждения состава и membership semantics;
+- readback состава группы, если API возвращает только summary;
 - проверка влияния на задачи и доступ к формам;
 - безопасный сценарий для удаления или отключения группы.
 
 ## 7. Роли и права
 
-Статус: `Поддержано read-only частично`, запись `Требует evidence`.
+Статус: `Поддержано typed security tools`; live permission execution требует
+отдельного sandbox/UI evidence.
 
 Известный read route:
 
@@ -274,13 +284,15 @@
 - нужен отдельный dangerous/security gate;
 - нужен UI-visible readback.
 
-Кандидаты typed tools:
+Инструменты:
 
 - `alterios_list_roles`;
 - `alterios_get_role`;
 - `alterios_upsert_role`;
-- `alterios_set_role_permissions`;
-- `alterios_assign_role_to_user`.
+- `alterios_delete_role`.
+
+Назначение роли пользователю выполняется через `alterios_upsert_user`, пока
+отдельный membership/permission tool не будет подтвержден UI/HAR evidence.
 
 ## 8. Включения и связывание объектов
 
@@ -338,10 +350,12 @@
 
 ### 8.4. Включение пользователя в группу/роль
 
-Статус: `Требует evidence`.
+Статус: `Поддержано typed security payload`; live semantics требуют evidence.
 
 Это security-сценарий, его нельзя считать обычной связью project base.
-Нужны UI/HAR, readback и dangerous/security gate.
+Текущий typed path - `alterios_upsert_user` или `alterios_upsert_user_group`
+с явным payload, expected target check и dangerous/security gate. Нужны UI/HAR,
+membership readback и rollback до live execution.
 
 ### 8.5. Включение материала в меню/группу
 
@@ -481,7 +495,8 @@
 
 ## 11. Слушатели в формах
 
-Статус: `Через form JSON`, отдельного typed listener tool нет.
+Статус: `Поддержано typed tool` для patch одной ячейки; новые listener shapes
+требуют инвентаризации перед live-записью.
 
 В observed form JSON встречается структура:
 
@@ -499,11 +514,12 @@
 2. Прочитать текущий form JSON.
 3. Найти существующий `emitting` и не затирать соседние настройки.
 4. Добавить listener в нужную ячейку или action surface.
-5. Сохранить форму через `alterios_upsert_form` или `alterios_patch_form_tabs`.
+5. Сохранить форму через `alterios_patch_form_cell_listeners`,
+   `alterios_upsert_form` или `alterios_patch_form_tabs`.
 6. Прочитать форму обратно.
 7. Проверить UI-событие или side effect.
 
-Что нужно до отдельного typed tool:
+Что нужно до расширения listener coverage:
 
 - inventory реальных listener shapes;
 - список событий;
@@ -512,12 +528,13 @@
 - readback и UI behavior;
 - связь с scripts, если listener запускает скрипт.
 
-Пока safe path: редактировать listeners только как часть целевого form JSON,
-с полным dry-run diff и readback формы.
+Safe path: редактировать listeners через `alterios_patch_form_cell_listeners`,
+если известен точный путь `tabs[row][cell]`; для неизвестных shapes сначала
+делать dry-run и readback формы.
 
 ## 12. Множественный выбор
 
-Статус: частично поддержано.
+Статус: частично `Поддержано typed tool`.
 
 Множественный выбор встречается в двух разных местах.
 
@@ -540,8 +557,11 @@
 ### 12.2. Множественный выбор строк в списке
 
 В формах наблюдаются actions `delete_contents` и сценарии массового удаления.
-Это означает, что UI может работать с выбранными строками, но destructive
-массовые действия пока не должны исполняться typed tool без evidence.
+Для безопасного non-destructive сценария добавлен
+`alterios_bulk_update_selected_content_fields`: он принимает `selected_content_ids`,
+проверяет дубли, `expected_count`, `max_count`, content type и строит per-row
+diff/readback. Destructive массовые действия пока не должны исполняться typed
+tool без evidence.
 
 Для безопасных массовых действий нужен отдельный сценарий:
 
@@ -550,6 +570,10 @@
 - какой action получает args;
 - какой script или REST route исполняется;
 - как проверяется результат.
+
+Поддержанный typed сценарий сейчас: массовое обновление одинаковых field values
+на выбранных content rows. Массовый запуск script/delete остается за отдельным
+dangerous workflow.
 
 ## 13. Отчеты
 
@@ -663,7 +687,8 @@
 ## 15. Типы материалов и публикация в другие проекты
 
 Статус: создание/обновление type fields `Поддержано typed tool`;
-native публикация type в другие проекты `Требует evidence`.
+native публикация type в другие проекты `Поддержано planner`, execution
+`Требует evidence`.
 
 Поддержанные инструменты:
 
@@ -671,7 +696,8 @@ native публикация type в другие проекты `Требует 
 - `alterios_upsert_content_type`;
 - `alterios_upsert_field`;
 - `alterios_create_content`;
-- `alterios_update_content_fields`.
+- `alterios_update_content_fields`;
+- `alterios_plan_content_type_publish`.
 
 Сценарии:
 
@@ -703,7 +729,9 @@ native публикация type в другие проекты `Требует 
 ### 15.2. Native publish в другие проекты
 
 Отдельный native endpoint для “опубликовать тип материала в другие проекты” в
-текущем MCP не подтвержден. Для его добавления нужно:
+текущем MCP не подтвержден. `alterios_plan_content_type_publish` фиксирует
+source content type, target projects и список evidence, но не выполняет
+запись. Для executing tool нужно:
 
 - найти UI-сценарий публикации content type;
 - снять sanitized HAR;
@@ -726,20 +754,20 @@ native публикация type в другие проекты `Требует 
    - roles;
    - permissions;
    - delete/delete_contents.
-2. Typed security tools после evidence:
-   - users read/update status;
-   - role read/update;
-   - assign/unassign role;
-   - user group membership.
-3. Typed form listener tool:
-   - inventory listener shapes;
-   - add/update/remove listener;
+2. Live sandbox verification for typed security tools:
+   - users update/delete;
+   - roles update/delete;
+   - user groups update/delete;
+   - assign/unassign role/group semantics.
+3. Expanded form listener coverage:
+   - inventory more listener shapes;
+   - add/update/remove listener variants;
    - script/action linkage validation.
-4. Typed bulk action tool:
+4. Expanded bulk action tool:
    - selected ids;
-   - non-destructive bulk update first;
+   - manual script bulk action;
    - destructive bulk delete only after dangerous evidence.
-5. Native content type publish/transfer tool:
+5. Native content type publish/transfer execution tool:
    - source/target project map;
    - conflict detection;
    - dry-run diff;

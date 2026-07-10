@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **51 инструмент**, из них **23 write-like инструмента**.
+Текущая поверхность MCP: **66 инструментов**, из них **31 write-like инструмент**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -72,13 +72,18 @@ MCP умеет собирать состав проекта:
 - создание и обновление представлений, view entities и view fields;
 - создание и обновление форм;
 - точечная замена `tabs` и `formActionContainers`;
+- точечная настройка `emitting.listeners` у ячейки формы;
+- массовое обновление выбранных content rows по `selected_content_ids`;
 - создание и обновление manual/event/diagram scripts;
 - запуск manual script;
 - создание и обновление BPMN-диаграмм;
 - запуск процесса, чтение задач, завершение задачи, проверка side effects;
 - создание и обновление отчетов;
 - patch Stimulsoft template;
-- создание комментариев.
+- создание комментариев;
+- security-операции users/user-groups/roles и delete через отдельные typed tools
+  с dangerous-gate, expected-проверками и readback;
+- планирование native content-type publish/transfer без записи до UI/HAR evidence.
 
 Есть generic-инструменты `alterios_rest_write` и `alterios_call_write_service`,
 но для штатной работы предпочтительны типизированные инструменты: они знают контекст,
@@ -276,9 +281,11 @@ ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 6. Проверить readback через тот же инструмент или отдельный read-only tool.
 7. Зафиксировать результат в `docs/project-status.md`, если это часть этапа работ.
 
-Для destructive/security операций сначала нужен отдельный read-only анализ route
-и `alterios_write_safety_preflight`. Типизированные destructive/security tools
-намеренно не добавляются без live UI/HAR/API evidence.
+Для destructive/security операций нужен отдельный read-only анализ target,
+dry-run typed tool или `alterios_write_safety_preflight`, затем явные gates:
+`ALTERIOS_MCP_ALLOW_WRITE=1`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`,
+`allow_destructive=true`. Native content-type publish не выполняется без
+UI/HAR/API evidence маршрута, payload shape и readback-правил.
 
 ## Основные пользовательские сценарии
 

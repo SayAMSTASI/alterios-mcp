@@ -13,6 +13,8 @@ By default, these tools return a write audit and do not send a request:
 - `alterios_call_write_service`
 - `alterios_execute_manual_script`
 - `alterios_rest_write`
+- typed metadata/data/form/report tools such as `alterios_upsert_form`
+- typed security tools such as `alterios_upsert_user` and `alterios_delete_role`
 
 To execute a write, a caller must pass `dry_run=false` and the process must have
 `ALTERIOS_MCP_ALLOW_WRITE=1`.
@@ -85,9 +87,22 @@ Before adding a typed write tool:
 Typed tools should be low-risk or explicitly classified, with a clear readback
 route and no hidden workflow, notification, permission, or delete side effects.
 
-## Security/Destructive Candidate
+## Security/Destructive Typed Tools
 
-The dangerous-flow candidate must start read-only:
+Security/destructive flows now have typed wrappers for the first admin slice:
+
+- `alterios_list_users`, `alterios_get_user`, `alterios_upsert_user`,
+  `alterios_delete_user`;
+- `alterios_list_user_groups`, `alterios_get_user_group`,
+  `alterios_upsert_user_group`, `alterios_delete_user_group`;
+- `alterios_list_roles`, `alterios_get_role`, `alterios_upsert_role`,
+  `alterios_delete_role`.
+
+These tools are still dangerous. They are typed so the caller gets target
+checks, a route-specific audit, expected-name/email checks, and readback. They
+do not remove the dangerous gate.
+
+A dangerous-flow run must start read-only:
 
 - run `alterios_write_safety_preflight` for the exact route;
 - verify the target profile and project with `alterios_config`;
@@ -96,5 +111,6 @@ The dangerous-flow candidate must start read-only:
 - record API readback and UI-visible evidence when permissions or deletes are
   user-facing.
 
-Do not use generic REST writes for production security or delete work until the
-same route has a typed tool with target checks and readback.
+Prefer typed security tools over generic REST writes for users, user groups,
+roles, and delete flows. Do not execute them in production until the dry-run
+target and rollback/readback plan are reviewed.
