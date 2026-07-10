@@ -88,8 +88,9 @@ work is to make coverage complete, safety explicit, and releases repeatable.
 ## 7. Agents And Skills
 
 - Keep agent roles as a project control layer: PM, Project Base Explorer,
-  Write Tool Engineer, Safety Verifier, Report/Dashboard Specialist, and Skill
-  Curator.
+  Data Model Engineer, View Builder, Form Surface Engineer, UI Icons & Actions
+  Reviewer, Script/BPMN Flow Integrator, Report/Stimulsoft Specialist, Write
+  Tool Engineer, Safety Verifier, and Skill Curator.
 - Store the operating contract in `docs/agents-and-skills.md`.
 - Add repo-owned skills only after the relevant workflow is implemented and
   verified through tests or live sandbox readback.
