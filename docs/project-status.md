@@ -72,12 +72,13 @@ dynamic-height risks before saving or rendering reports.
 | Research. Data-bound openId report API template | Added a separate Codex-managed report `MCP Practice. OpenId Bound Report` and wired the edit-form report tab to it. The template uses Project Database and references the source view title column for current-row output. | `0f61a68` | Live `artx` write created/updated report `49236112-3335-4ca4-9a85-7f2236f6365a`; readback confirmed dashboard page, Project Database source, title-field reference, and `edit_form_openid_report_tab=true`; `get-data` with `dataId=[openId]` still returns 1 row. Browser recheck found the embedded report viewer container empty for both static and data-bound reports, so visual proof remains open. |
 | Practice. Additional sandbox content row | Added a third idempotent practice row to the ARTX sandbox source view for list, UI, and `dataId` scoping verification. | `a179010` | Created content `9a504330-5ce4-4a76-9043-bbc2fc293e3c`; dry-run readback reports `content_count=3`; `get-data` without context returns 3 rows, `contentId=<additional>` returns 3 rows, and top-level `dataId=[additional]` returns 1 row; browser main form shows all 3 rows, score `42`, and pagination `1-3 / 3`. |
 | Build. Stimulsoft layout and analytics guardrails | Added a Russian playbook for printable forms, dashboard analytics, and Alterios Project Database rules; added `alterios_validate_stimulsoft_layout` plus `alterios-stimulsoft-layout-check`. | `80c495d` | Unit tests cover clean layout, visible overlap, page overflow, and dynamic-height risks; full `pytest`: 87 passed; `git diff --check` OK; read-only live check on reports `86ad4189-deaf-4744-96d5-6b1d22e73468` and `49236112-3335-4ca4-9a85-7f2236f6365a` returned 0 layout issues. |
+| Build. Form surface UX guardrails | Added `alterios_analyze_form_surface`, `alterios-form-surface-check`, `docs/form-surface-ux-and-icons.md`, and repo-owned skill `skills/alterios-form-view-surface`. | pending | Unit tests cover clean view row, empty slot/source errors, row action order, missing icons, roles, styles, and report source inventory. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 7. Repo agents and skills | Next | Lead Engineer + PM/Explorer/Worker/Verifier agents | Add repo-owned agent/skill scaffolding only for workflows backed by verified tools, tests, and live readback evidence. |
+| 7. Repo agents and skills | In Progress | Lead Engineer + PM/Explorer/Worker/Verifier agents | Add repo-owned agent/skill scaffolding only for workflows backed by verified tools, tests, and live readback evidence. First candidate: form/view surface skill backed by `alterios_analyze_form_surface`. |
 
 ## Backlog
 
@@ -89,6 +90,7 @@ dynamic-height risks before saving or rendering reports.
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Add repo-owned agents and skills scaffolding after typed tools land. | Next | Follow `docs/agents-and-skills.md`; do not create skills that document unverified APIs as facts. |
+| 2 | Convert verified form/view UX rules into repo-owned skill package. | Done | Added `skills/alterios-form-view-surface` with `SKILL.md`, PM/Explorer/Verifier agent roles, and reference pointer to the form-surface playbook. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |

@@ -66,6 +66,8 @@
   action containers, managed-marker guard и readback.
 - `alterios_patch_form_actions` - узкая замена `formActionContainers` формы.
 - `alterios_patch_form_tabs` - узкая замена `tabs` формы.
+- `alterios_analyze_form_surface` - read-only аудит формы по layout/F-pattern,
+  источникам данных, ролям, стилям и icon-first действиям.
 - `alterios_upsert_script` - typed create/update manual/event/diagram script
   через `/api/scripts` с preflight, managed-marker guard, dry-run diff,
   write-gate и readback.

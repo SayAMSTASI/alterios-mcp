@@ -21,6 +21,7 @@ from .client import (
     strip_alterios_metadata,
 )
 from .discovery import discover_readonly, list_objects, list_projects
+from .form_surface import analyze_form_surface
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
@@ -1381,6 +1382,33 @@ def alterios_patch_form_tabs(
         profile=profile,
         project_id=project_id,
     )
+
+
+@mcp.tool()
+def alterios_analyze_form_surface(
+    form_id: str | None = None,
+    form: dict[str, Any] | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Analyze an Alterios form for layout gaps, data sources, roles, styles, and icon-first actions."""
+    if not form_id and form is None:
+        raise ValueError("Provide form_id for live read or form JSON for offline analysis.")
+    if form_id and form is not None:
+        raise ValueError("Provide either form_id or form, not both.")
+    if form_id:
+        client = _client(profile, project_id)
+        form_body = _find_form(client, form_id=form_id)
+        if not form_body:
+            raise ValueError(f"Form {form_id!r} was not found.")
+    else:
+        form_body = form
+    if not isinstance(form_body, dict):
+        raise ValueError("Form payload must be a JSON object.")
+    return {
+        "form": _resource_summary(form_body),
+        "surface": analyze_form_surface(form_body),
+    }
 
 
 @mcp.tool()

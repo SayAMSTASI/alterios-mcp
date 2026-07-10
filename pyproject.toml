@@ -22,6 +22,7 @@ alterios-mcp = "alterios_mcp.server:main"
 alterios-discover = "alterios_mcp.discovery:main"
 alterios-static-scan = "alterios_mcp.static_scan:main"
 alterios-stimulsoft-layout-check = "alterios_mcp.stimulsoft_layout:main"
+alterios-form-surface-check = "alterios_mcp.form_surface:main"
 alterios-ui-flow = "alterios_mcp.ui_flow:main"
 
 [tool.setuptools.packages.find]

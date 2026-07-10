@@ -16,7 +16,7 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 41 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| MCP tools | 43 | Публичные callable tools в `src/alterios_mcp/server.py`. |
 | Write-like MCP tools | 18 | `alterios_add_comment`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
@@ -47,7 +47,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 41
+## MCP Tools: 43
 
 | Tool | Вид |
 |---|---|
@@ -77,6 +77,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_upsert_form` | Controlled typed form create/update |
 | `alterios_patch_form_actions` | Controlled typed form actions patch |
 | `alterios_patch_form_tabs` | Controlled typed form tabs patch |
+| `alterios_analyze_form_surface` | Form UX/layout/action validation read |
 | `alterios_upsert_script` | Controlled typed script create/update |
 | `alterios_validate_script` | Script validation read |
 | `alterios_upsert_bpmn_diagram` | Controlled typed BPMN diagram create/update |
@@ -87,6 +88,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_upsert_report` | Controlled typed report create/update |
 | `alterios_patch_report_template` | Controlled report template patch |
 | `alterios_validate_report_project_base` | Report Project Database validation read |
+| `alterios_validate_stimulsoft_layout` | Stimulsoft report layout validation read |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
 | `alterios_call_write_service` | Controlled runtime write/service call |
@@ -97,7 +99,7 @@ browser/HAR capture и sandbox write-практику.
 
 The 2026-07-10 reinventory initially found 23 MCP tools and only 4 write-like
 tools. The typed-write expansion added content/file, view/form, script,
-BPMN/process/task, and report tools, bringing the surface to 41 tools and 18
+BPMN/process/task, report tools, Stimulsoft layout validation, and form-surface validation, bringing the surface to 43 tools and 18
 write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
