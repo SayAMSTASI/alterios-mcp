@@ -17,6 +17,8 @@ Use this skill when a repeated Alterios operation should become a typed MCP tool
 6. Return redacted audit details and perform readback.
 7. Add tests for happy path, blocked write, validation errors, target mismatch, and redaction.
 
+Existing report write coverage includes `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`; use these before adding another report write tool.
+
 ## Boundaries
 
 - Do not mix destructive/security flows into normal write tools.

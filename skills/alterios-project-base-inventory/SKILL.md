@@ -21,10 +21,11 @@ Prefer existing tools and CLIs from this repo:
 
 ```powershell
 .\.venv\Scripts\alterios-discover.exe --profile artx --project-id <project_id> --json
-.\.venv\Scripts\alterios-deep-inventory.exe --profile artx --project-id <project_id> --out-dir docs
+.\.venv\Scripts\alterios-deep-inventory.exe --profile artx --project-id <project_id> --out-dir artifacts\inventories\artx\<project_id>
 ```
 
 Use MCP tools for targeted reads when available; use generic REST reads only to fill a documented route gap.
+Use `--out-dir docs` only when intentionally refreshing canonical repo matrices for the current reference project.
 
 ## Evidence Rules
 
@@ -36,3 +37,4 @@ Use MCP tools for targeted reads when available; use generic REST reads only to 
 ## References
 
 Read `references/source-map.md` first, then open only the listed project docs relevant to the current entity family.
+Use `references/inventory-pm-template.md` when the inventory result must be handed off to PM status.

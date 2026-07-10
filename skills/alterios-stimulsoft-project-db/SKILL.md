@@ -17,6 +17,9 @@ Use this skill when report output depends on Alterios project-base data or when 
 6. Run static layout checks for overlap, page overflow, and dynamic-height risk.
 7. If the user needs UI/render proof, verify in browser or exported/rendered output; do not stop at JSON readback.
 
+Prefer existing typed tools before adding anything new: `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`.
+Current known risk: embedded report viewer visual proof can remain open even when API/template/readback checks pass; keep that risk visible until UI/render/export proof exists.
+
 ## Layout Rules
 
 - Keep bands and components within page boundaries.
@@ -27,3 +30,4 @@ Use this skill when report output depends on Alterios project-base data or when 
 ## References
 
 Read `references/source-map.md`, then open the layout playbook and report-openId research for the current task.
+For report write safety, also inspect `tests/test_write_control.py`; for layout behavior inspect `tests/test_stimulsoft_layout.py`.

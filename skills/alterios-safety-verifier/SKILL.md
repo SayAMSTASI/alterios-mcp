@@ -17,6 +17,8 @@ Use this skill as an independent verification pass before marking an Alterios MC
 6. For live writes, check API readback; for user-facing surfaces, check UI or render evidence.
 7. Record residual risks rather than hiding them.
 
+For report/write changes, include targeted coverage from `tests/test_write_control.py` and `tests/test_stimulsoft_layout.py` unless a narrower command is explicitly justified.
+
 ## Secret Redaction
 
 Never print or commit tokens, cookies, auth headers, passwords, API keys, private dotenv contents, or raw request headers containing credentials.

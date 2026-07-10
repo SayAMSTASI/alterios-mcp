@@ -24,7 +24,8 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 2. Check action semantics before checking appearance.
 3. Confirm destructive actions are visually and behaviorally distinct from view/edit.
 4. Check that labels, icons, and menu placement match the user workflow.
-5. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
+5. If `iconId` is UUID-like, resolve it through the icon usage matrix or verified registry/readback before claiming it matches the semantic icon; otherwise mark it unresolved.
+6. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
 
 ## References
 

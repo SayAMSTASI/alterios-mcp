@@ -9,5 +9,6 @@ Use these repo documents as evidence sources:
 - `../../../docs/form-surface-inventory.json`: generated live form matrix.
 - `../../../docs/script-bpmn-linkage.json`: generated live script/BPMN linkage matrix.
 - `../../../docs/icon-usage-matrix.json`: generated live icon usage matrix.
+- `inventory-pm-template.md`: local template for inventory handoff/status notes.
 
 Prefer `alterios-deep-inventory` for full project matrices and `alterios-discover` for route/profile discovery.

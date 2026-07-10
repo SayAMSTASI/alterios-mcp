@@ -367,6 +367,14 @@ write-capable tool-а нужно одновременно:
 `references/source-map.md`, который указывает на проверенные документы и
 матрицы в `docs/`.
 
+Установка repo-owned skills в локальный каталог Codex:
+
+```powershell
+.\.venv\Scripts\python scripts\install_repo_skills.py --execute --json
+```
+
+Подробности: [docs/skill-installation.md](docs/skill-installation.md).
+
 ## Practice-Сценарии
 
 Для тестового проекта можно держать отдельный воспроизводимый practice chain:

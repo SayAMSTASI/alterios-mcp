@@ -16,6 +16,7 @@ Use this skill to keep multi-agent Alterios MCP work visible, scoped, and tied t
 5. Require artifacts and verification commands from every agent.
 6. Update `docs/project-status.md` after a meaningful mergeable slice.
 7. Keep roadmap changes separate from current status updates.
+8. For read-only planning or discovery that has not run yet, return a PM handoff instead of marking repo status `Done`.
 
 ## Handoff Format
 
