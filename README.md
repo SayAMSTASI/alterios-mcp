@@ -250,6 +250,23 @@ python -m alterios_mcp.static_scan C:\path\to\alterios-automation `
   --json > artifacts\alterios-mcp\static-calls.json
 ```
 
+Глубокая read-only инвентаризация форм, связей scripts/BPMN и iconId usage для
+конкретного проекта:
+
+```powershell
+$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
+alterios-deep-inventory `
+  --profile artx `
+  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
+  --out-dir docs
+```
+
+Команда записывает:
+
+- `docs/form-surface-inventory.md` и `docs/form-surface-inventory.json`;
+- `docs/script-bpmn-linkage.md` и `docs/script-bpmn-linkage.json`;
+- `docs/icon-usage-matrix.json`.
+
 Статический сканер по умолчанию пропускает сгенерированные и тяжелые рабочие
 директории: `artifacts`, `data`, `outputs`, `site` и `work`. Используйте
 `--include-generated` только когда нужно намеренное полное медленное
