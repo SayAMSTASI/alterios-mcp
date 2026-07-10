@@ -16,7 +16,7 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 50 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| MCP tools | 51 | Публичные callable tools в `src/alterios_mcp/server.py`. |
 | Write-like MCP tools | 23 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
@@ -47,7 +47,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 50
+## MCP Tools: 51
 
 | Tool | Вид |
 |---|---|
@@ -97,6 +97,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_validate_stimulsoft_layout` | Stimulsoft report layout validation read |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
+| `alterios_write_safety_preflight` | Write safety classification read |
 | `alterios_call_write_service` | Controlled runtime write/service call |
 | `alterios_execute_manual_script` | Controlled manual script execution |
 | `alterios_rest_write` | Controlled generic REST write |
@@ -108,7 +109,9 @@ tools. The typed-write expansion added content/file, view/form, script,
 BPMN/process/task, report tools, Stimulsoft layout validation, and form-surface validation, bringing the surface to 43 tools and 18
 write-like tools. The next write-first expansion added typed content-type,
 field, content-create, group, and help tools, bringing the surface to 50 tools
-and 23 write-like tools.
+and 23 write-like tools. The security/destructive gate pass added
+`alterios_write_safety_preflight`, bringing the surface to 51 tools while
+keeping write-like tools at 23.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
@@ -141,7 +144,9 @@ Next coverage work must therefore focus on the remaining non-normal surfaces:
 
 1. repo-owned agents and skills that encode the verified typed workflows;
 2. multi-instance smoke matrix across configured Alterios profiles;
-3. security/destructive flows only after a dedicated sandbox scenario.
+3. typed security/destructive tools only after a dedicated sandbox scenario;
+   generic dangerous REST now has preflight classification and a separate
+   dangerous environment gate.
 
 ## Runtime Services: 14
 

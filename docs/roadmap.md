@@ -18,7 +18,8 @@ work is to make coverage complete, safety explicit, and releases repeatable.
   without copying secrets into this repository.
 - Redact tokens, auth headers, passwords, cookies, and API keys from all tool
   responses and errors.
-- Maintain read-only defaults; keep writes behind `ALTERIOS_MCP_ALLOW_WRITE=1`.
+- Maintain read-only defaults; keep writes behind `ALTERIOS_MCP_ALLOW_WRITE=1`
+  and destructive/security writes behind `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`.
 - Add smoke checks for config loading, profile isolation, project override, and
   secret redaction.
 
@@ -51,11 +52,15 @@ work is to make coverage complete, safety explicit, and releases repeatable.
 
 - Keep generic writes disabled by default and gated by
   `ALTERIOS_MCP_ALLOW_WRITE=1`.
+- Keep destructive/security generic writes behind the additional
+  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` gate and `allow_destructive=true`.
 - Require explicit `project_id`, verified profile output, and narrow target
   arguments for write tools.
 - Prefer typed write tools with validation over broad generic write endpoints.
 - Treat generic `alterios_rest_write` as a research/emergency layer, not the
   normal operator interface.
+- Run `alterios_write_safety_preflight` before any generic REST route that is
+  not already modeled as a typed tool.
 - Expand typed writes by entity family: content/files, views/forms,
   scripts, BPMN/process/tasks, reports, then security/destructive flows.
 - Add dry-run validation where Alterios supports it, plus request summaries and

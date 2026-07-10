@@ -61,6 +61,8 @@ def test_profile_smoke_counts_projects_and_omits_names_by_default(monkeypatch) -
 
     assert matrix["summary"]["project_count_total"] == 1
     assert matrix["summary"]["default_project_discovery_ok"] == 1
+    assert matrix["write_gate_enabled"] is False
+    assert matrix["dangerous_write_gate_enabled"] is False
     assert matrix["profiles"][0]["config"]["base_url"] == "<set>"
     assert matrix["profiles"][0]["config"]["endpoint_template"] == "<set>"
     assert matrix["profiles"][0]["config"]["project_id"] == "<set>"

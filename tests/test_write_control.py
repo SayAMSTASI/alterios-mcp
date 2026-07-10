@@ -10,6 +10,7 @@ from alterios_mcp.write_control import (
     WriteOperation,
     assert_write_allowed,
     build_write_audit,
+    classify_rest_write_risk,
     collect_target_ids,
 )
 
@@ -98,8 +99,35 @@ def test_destructive_execution_requires_extra_flag() -> None:
             project_id="project-1",
             operation=operation,
             write_enabled=True,
+            dangerous_write_enabled=True,
             allow_destructive=False,
         )
+
+
+def test_dangerous_execution_requires_environment_gate() -> None:
+    operation = WriteOperation(
+        name="DELETE /api/contents",
+        kind="rest",
+        risk_level="destructive",
+        summary="Delete content",
+    )
+
+    with pytest.raises(ControlledWriteError, match="ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE"):
+        assert_write_allowed(
+            profile="vniimt",
+            project_id="project-1",
+            operation=operation,
+            write_enabled=True,
+            dangerous_write_enabled=False,
+            allow_destructive=True,
+        )
+
+
+def test_security_route_is_classified_as_dangerous() -> None:
+    assert classify_rest_write_risk("PATCH", "/api/users/user-1") == "security"
+    assert classify_rest_write_risk("POST", "/api/roles") == "security"
+    assert classify_rest_write_risk("DELETE", "/api/contents/content-1") == "destructive"
+    assert classify_rest_write_risk("PATCH", "/api/reports") == "write"
 
 
 def test_collect_target_ids_finds_common_id_shapes() -> None:
@@ -115,7 +143,7 @@ def test_collect_target_ids_finds_common_id_shapes() -> None:
 def test_rest_write_defaults_to_dry_run_without_network() -> None:
     with patch.dict("os.environ", {}, clear=True):
         result = server.alterios_rest_write(
-            "PUT",
+            "PATCH",
             "/api/reports",
             {"_id": "report-1", "name": "Report"},
             profile="vniimt",
@@ -125,6 +153,8 @@ def test_rest_write_defaults_to_dry_run_without_network() -> None:
     assert result["dry_run"] is True
     assert result["response"] is None
     assert result["audit"]["write_enabled"] is False
+    assert result["audit"]["dangerous_write_enabled"] is False
+    assert result["audit"]["operation"]["method"] == "PATCH"
     assert result["audit"]["operation"]["target_ids"] == ["report-1"]
 
 
@@ -1070,7 +1100,11 @@ def test_rest_write_execution_fails_without_write_env() -> None:
 
 
 def test_delete_rest_write_execution_requires_destructive_flag() -> None:
-    with patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True), pytest.raises(
+    with patch.dict(
+        "os.environ",
+        {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE": "1"},
+        clear=True,
+    ), pytest.raises(
         ControlledWriteError,
         match="allow_destructive",
     ):
@@ -1082,6 +1116,40 @@ def test_delete_rest_write_execution_requires_destructive_flag() -> None:
             profile="vniimt",
             project_id="project-1",
         )
+
+
+def test_delete_rest_write_execution_requires_dangerous_env() -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True), pytest.raises(
+        ControlledWriteError,
+        match="ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE",
+    ):
+        server.alterios_rest_write(
+            "DELETE",
+            "/api/contents",
+            {"_id": ["content-1"]},
+            dry_run=False,
+            allow_destructive=True,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_write_safety_preflight_classifies_security_without_network() -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True):
+        result = server.alterios_write_safety_preflight(
+            "PATCH",
+            "/api/users/user-1",
+            {"_id": "user-1", "rolesIds": ["role-1"]},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["risk_level"] == "security"
+    assert result["audit"]["write_enabled"] is True
+    assert result["audit"]["dangerous_write_enabled"] is False
+    assert result["response"]["dangerous"] is True
+    assert "ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1" in result["response"]["required_execution_gates"]
 
 
 def test_write_service_rejects_readonly_service_name() -> None:

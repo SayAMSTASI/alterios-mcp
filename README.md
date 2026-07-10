@@ -28,6 +28,9 @@
 - `alterios_profile_smoke_matrix` - read-only матрица по всем профилям:
   локальный конфиг, список проектов и проверка маршрутов проекта по default
   `project_id`, если он настроен.
+- `alterios_write_safety_preflight` - read-only классификация proposed REST
+  write/delete/security маршрута без network request; показывает risk level и
+  gates, которые понадобятся перед исполнением.
 - `alterios_service_catalog` - каталог известных script-service функций с
   метками чтения/записи, уровнями риска, подсказками по аргументам и примерами.
 - `alterios_call_readonly_service` - защищенные вызовы известных
@@ -123,6 +126,8 @@
   `alterios_rest_write` - отключены, пока
   явно не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают
   dry-run audit и не выполняют запись.
+  Для destructive/security маршрутов дополнительно нужен
+  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и `allow_destructive=true`.
 
 Инструменты уровня проекта следует вызывать с `project_id`, когда целевой проект
 известен из URL, UI-сессии или контекста задачи. Настроенный
@@ -351,6 +356,13 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 $env:ALTERIOS_MCP_ALLOW_WRITE = "1"
 ```
 
+Для destructive/security сценариев включайте отдельный gate только в выделенной
+sandbox-сессии:
+
+```powershell
+$env:ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE = "1"
+```
+
 Перед вызовами, которые могут менять состояние, запустите `alterios_config`,
 проверьте выбранный профиль и передайте `project_id` явно. Поэтапный рабочий
 план описан в [docs/roadmap.md](docs/roadmap.md), стратегия
@@ -364,7 +376,9 @@ write-capable tool-а нужно одновременно:
 - передать явные `profile` и `project_id`;
 - включить `ALTERIOS_MCP_ALLOW_WRITE=1`;
 - передать `dry_run=false`;
-- для destructive операций дополнительно передать `allow_destructive=true`.
+- для destructive/security операций дополнительно включить
+  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и передать
+  `allow_destructive=true`.
 
 Управление проектом ведется в [docs/project-status.md](docs/project-status.md).
 Правила мультиагентной работы и контрольные точки PM описаны в

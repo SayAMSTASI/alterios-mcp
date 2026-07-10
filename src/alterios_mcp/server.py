@@ -29,8 +29,10 @@ from .write_control import (
     WriteOperation,
     assert_write_allowed,
     build_write_audit,
+    classify_rest_write_risk,
     collect_target_ids,
     controlled_write_result,
+    is_dangerous_write_risk,
 )
 
 mcp = FastMCP("alterios")
@@ -42,6 +44,10 @@ def _client(profile: str | None = None, project_id: str | None = None) -> Alteri
 
 def _write_enabled() -> bool:
     return os.environ.get("ALTERIOS_MCP_ALLOW_WRITE") == "1"
+
+
+def _dangerous_write_enabled() -> bool:
+    return os.environ.get("ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE") == "1"
 
 
 def _write_service_operation(function: str, args: dict[str, Any]) -> WriteOperation:
@@ -75,7 +81,7 @@ def _manual_script_operation(script_id: str, args: dict[str, Any]) -> WriteOpera
 
 
 def _rest_write_operation(method: str, path: str, params: dict[str, Any], body: dict[str, Any]) -> WriteOperation:
-    risk_level = "destructive" if method == "DELETE" else "write"
+    risk_level = classify_rest_write_risk(method, path)
     return WriteOperation(
         name=f"{method} {path}",
         kind="rest",
@@ -2494,6 +2500,44 @@ def alterios_profile_smoke_matrix(
 
 
 @mcp.tool()
+def alterios_write_safety_preflight(
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Classify a proposed mutating REST call and return the gates required before execution."""
+    method = method.upper()
+    if method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        raise ValueError("alterios_write_safety_preflight supports only POST, PUT, PATCH, and DELETE")
+    operation = _rest_write_operation(method, path, params or {}, body or {})
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=True,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    required_execution_gates = ["dry_run=false", "ALTERIOS_MCP_ALLOW_WRITE=1"]
+    if is_dangerous_write_risk(operation.risk_level):
+        required_execution_gates.extend(["ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1", "allow_destructive=true"])
+    return controlled_write_result(
+        audit=audit,
+        response={
+            "risk_level": operation.risk_level,
+            "dangerous": is_dangerous_write_risk(operation.risk_level),
+            "required_execution_gates": required_execution_gates,
+            "will_execute": False,
+        },
+    )
+
+
+@mcp.tool()
 def alterios_call_write_service(
     function: str,
     args: dict[str, Any],
@@ -2510,6 +2554,7 @@ def alterios_call_write_service(
         operation=operation,
         dry_run=dry_run,
         write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
     if dry_run:
@@ -2520,6 +2565,7 @@ def alterios_call_write_service(
         project_id=project_id,
         operation=operation,
         write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
     response = _client(profile, project_id).call_script_service(function, args, allow_write=True).as_dict()
@@ -2594,8 +2640,8 @@ def alterios_rest_write(
 ) -> dict[str, Any]:
     """Plan or run a mutating REST request. Execution requires explicit write gates."""
     method = method.upper()
-    if method not in {"POST", "PUT", "DELETE"}:
-        raise ValueError("alterios_rest_write supports only POST, PUT, and DELETE")
+    if method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        raise ValueError("alterios_rest_write supports only POST, PUT, PATCH, and DELETE")
     request_params = params or {}
     operation = _rest_write_operation(method, path, request_params, body)
     audit = build_write_audit(
@@ -2604,6 +2650,7 @@ def alterios_rest_write(
         operation=operation,
         dry_run=dry_run,
         write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
     if dry_run:
@@ -2614,6 +2661,7 @@ def alterios_rest_write(
         project_id=project_id,
         operation=operation,
         write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
     response = _client(profile, project_id).request(method, path, params=request_params, body=body).as_dict()

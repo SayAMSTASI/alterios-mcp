@@ -11,15 +11,25 @@ class ControlledWriteError(RuntimeError):
 
 
 DESTRUCTIVE_RISK_LEVELS = frozenset({"destructive"})
+DANGEROUS_RISK_LEVELS = frozenset({"destructive", "security"})
 WRITE_RISK_LEVELS = frozenset(
     {
         "write",
         "destructive",
+        "security",
         "workflow_side_effect",
         "external_side_effect",
         "audit_side_effect",
         "manual_script",
     }
+)
+SECURITY_REST_PREFIXES = (
+    "/api/roles",
+    "/api/security",
+    "/api/permissions",
+    "/api/users",
+    "/api/user-groups",
+    "/api/usergroups",
 )
 
 TARGET_ID_KEYS = frozenset({"_id", "id", "contentId", "taskId", "scriptId", "diagramId", "fieldId", "entityId"})
@@ -67,6 +77,7 @@ class WriteAudit:
     operation: WriteOperation
     dry_run: bool
     write_enabled: bool
+    dangerous_write_enabled: bool
     allow_destructive: bool
     required_checks: tuple[str, ...]
     status: str
@@ -76,6 +87,7 @@ class WriteAudit:
             "status": self.status,
             "dry_run": self.dry_run,
             "write_enabled": self.write_enabled,
+            "dangerous_write_enabled": self.dangerous_write_enabled,
             "allow_destructive": self.allow_destructive,
             "target": self.target.as_dict(),
             "operation": self.operation.as_dict(),
@@ -102,6 +114,7 @@ def assert_write_allowed(
     project_id: str | None,
     operation: WriteOperation,
     write_enabled: bool,
+    dangerous_write_enabled: bool = False,
     allow_destructive: bool = False,
 ) -> WriteTarget:
     target = build_write_target(profile, project_id)
@@ -109,8 +122,12 @@ def assert_write_allowed(
         raise ControlledWriteError(f"Unsupported write risk level: {operation.risk_level}")
     if not write_enabled:
         raise ControlledWriteError("Write calls are disabled. Set ALTERIOS_MCP_ALLOW_WRITE=1 explicitly.")
-    if operation.risk_level in DESTRUCTIVE_RISK_LEVELS and not allow_destructive:
-        raise ControlledWriteError("Destructive writes require allow_destructive=True.")
+    if operation.risk_level in DANGEROUS_RISK_LEVELS and not dangerous_write_enabled:
+        raise ControlledWriteError(
+            "Dangerous writes require ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1 explicitly."
+        )
+    if operation.risk_level in DANGEROUS_RISK_LEVELS and not allow_destructive:
+        raise ControlledWriteError("Dangerous writes require allow_destructive=True.")
     return target
 
 
@@ -121,6 +138,7 @@ def build_write_audit(
     operation: WriteOperation,
     dry_run: bool,
     write_enabled: bool,
+    dangerous_write_enabled: bool = False,
     allow_destructive: bool = False,
 ) -> WriteAudit:
     target = build_write_target(profile, project_id)
@@ -133,14 +151,18 @@ def build_write_audit(
     ]
     if operation.requires_readback:
         required_checks.append("Verify the write through a readback route after execution.")
-    if operation.risk_level in DESTRUCTIVE_RISK_LEVELS:
+    if operation.risk_level in DANGEROUS_RISK_LEVELS:
         required_checks.append("Review every target ID and pass allow_destructive=True only after explicit approval.")
+        required_checks.append(
+            "Set ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1 only for a dedicated security/destructive sandbox run."
+        )
     status = "dry_run" if dry_run else "ready_to_execute"
     return WriteAudit(
         target=target,
         operation=operation,
         dry_run=dry_run,
         write_enabled=write_enabled,
+        dangerous_write_enabled=dangerous_write_enabled,
         allow_destructive=allow_destructive,
         required_checks=tuple(required_checks),
         status=status,
@@ -176,3 +198,27 @@ def collect_target_ids(value: Any) -> tuple[str, ...]:
 
     visit(value)
     return tuple(dict.fromkeys(found))
+
+
+def classify_rest_write_risk(method: str, path: str) -> str:
+    normalized_method = method.upper().strip()
+    normalized_path = _normalized_rest_path(path)
+    if any(
+        normalized_path == prefix or normalized_path.startswith(prefix + "/")
+        for prefix in SECURITY_REST_PREFIXES
+    ):
+        return "security"
+    if normalized_method == "DELETE":
+        return "destructive"
+    return "write"
+
+
+def is_dangerous_write_risk(risk_level: str) -> bool:
+    return risk_level in DANGEROUS_RISK_LEVELS
+
+
+def _normalized_rest_path(path: str) -> str:
+    path_only = (path or "").split("?", 1)[0].strip()
+    if not path_only.startswith("/"):
+        path_only = "/" + path_only
+    return path_only.rstrip("/") or "/"
