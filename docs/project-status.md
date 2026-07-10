@@ -77,6 +77,11 @@ the next roadmap steps without exposing sensitive project details.
 The administrator guide is now published at `docs/administrator-guide.md` and
 closes the current development/documentation stage for operational use. Further
 feature work is not active unless explicitly restarted.
+Expanded user/configurator scenarios are now documented in
+`docs/expanded-user-scenarios.md`, including diagrams, views, menu groups,
+users, user groups, roles, inclusions, files, non-basic actions, form listeners,
+multiple selection, reports, scripts, and content type transfer/publishing
+boundaries.
 
 ## Completed
 
@@ -116,6 +121,7 @@ feature work is not active unless explicitly restarted.
 | Design. Documentation Scribe agent | Added Documentation Scribe / Писарь to the multi-agent matrix and created `docs/gost-documentation-scribe-agent.md` for ГОСТ-oriented administrator/user instructions. | `6b19685` | `pytest`: 115 passed; `git diff --check` OK; changed-file secret scan clean; no live write executed. |
 | Docs. User-facing README | Reworked the root README into a clear Russian user guide covering functionality, write safety, profile setup, MCP startup, common scenarios, agents/skills, verification, and next roadmap steps. | `5dea221` | `pytest`: 115 passed; README link check OK; `git diff --check` OK; README/docs secret scan clean; no live write executed. |
 | Docs. Administrator guide and closeout | Added `docs/administrator-guide.md` as the administrator instruction for installation, profile configuration, MCP startup, safe writes, operating workflows, checks, diagnostics, update procedure, backup expectations, and current development closeout. | `b0cb63d` | `pytest`: 115 passed; README/admin-guide link check OK; `git diff --check` OK; README/admin-guide/status secret scan clean; no live write executed. |
+| Docs. Expanded user scenarios | Added `docs/expanded-user-scenarios.md` and linked it from README. The document expands scenarios for diagrams, views, groups, users, user groups, roles, inclusions, files, actions, listeners, multiple selection, reports, scripts, and content type transfer/publishing, while marking security/destructive and native publish gaps as evidence-required. | `8edd21a` | `pytest`: 115 passed; README/scenarios link check OK; `git diff --check` OK; README/scenarios secret scan clean; no live write executed. |
 
 ## Active Stage
 
@@ -140,6 +146,7 @@ feature work is not active unless explicitly restarted.
 | 2 | Add Documentation Scribe / Писарь agent for ГОСТ-oriented instructions. | Done | Added docs-only agent, local playbook, handoff format, and documentation pipeline. It reuses installed `gost-documentation-builder` instead of creating a duplicate repo-owned skill. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Deferred | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Prepare administrator instruction. | Done | Published `docs/administrator-guide.md` and linked it from README. User instruction is not produced in this closeout because the current request asked for administrator instruction only. |
+| 2 | Expand user/configurator scenarios. | Done | Published `docs/expanded-user-scenarios.md`. It is documentation-only and does not add typed users/roles/delete or native content-type publish tools. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Done | `alterios-profile-smoke` and `alterios_profile_smoke_matrix` record sanitized profile/project coverage; live 2026-07-10 run covered `artx` and `vniimt` with 15/15 default-project route smoke each. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -167,9 +174,14 @@ Deferred candidates:
 1. Capture read-only UI/HAR/API evidence for users/roles/delete routes and run
    `alterios_write_safety_preflight` for each candidate before any typed tool is
    added.
-2. Expand Stimulsoft validator with rendered PDF/image comparison once export
+2. Capture UI/HAR/API evidence for native content type publish/transfer if the
+   Alterios UI exposes such a flow; until then use controlled source-to-target
+   reproduction across explicit projects.
+3. Add a typed form-listener tool only after listener event shapes and payloads
+   are inventoried from live forms.
+4. Expand Stimulsoft validator with rendered PDF/image comparison once export
    or render tooling is available.
-3. Start release packaging and changelog process if the repository is prepared
+5. Start release packaging and changelog process if the repository is prepared
    for a tagged release.
 
 ## PM Update Checklist
