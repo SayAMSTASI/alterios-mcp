@@ -82,6 +82,9 @@
   `alterios_validate_report_project_base` - typed report/dashboard surface с
   `/api/reports`, `/api/reports/full/{filter}`, Project Database validation и
   контрольным `get-data-simplified` по source view.
+- `alterios_validate_stimulsoft_layout` - read-only проверка Stimulsoft
+  template/report geometry: пересечения, выход за границы страницы,
+  zero-size components и риски `CanGrow`/`CanShrink` без `ShiftMode`.
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.

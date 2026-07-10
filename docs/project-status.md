@@ -41,6 +41,9 @@ static report.
 The sandbox source view now has a third idempotent practice row so list views
 and current-record scoping can be rechecked with more than the original two
 rows.
+Stimulsoft report work now has a dedicated layout/analytics playbook plus a
+read-only geometry validator for template overlaps, page overflow, and
+dynamic-height risks before saving or rendering reports.
 
 ## Completed
 
@@ -68,6 +71,7 @@ rows.
 | Research. Report tab openId UI rules | Updated the sandbox edit form with a named report tab and `params.openId=true`; added a second sandbox content row to prove context scoping. Documented the rules in `docs/report-tab-openid-ui-research-2026-07-10.md`. | `8af5aaf` | Live `artx` update: edit form `15f5fb26-5db4-4153-8131-23a54411cd63` has `Отчет openId`; control row `b69e914d-9250-4672-ac81-047fdce887f8` created; no-context view data returned 2 rows, `contentId` returned 2 rows, `dataId=[openId]` returned 1 row; browser UI showed the tab and rendered `MCP Practice sandbox report`. |
 | Research. Data-bound openId report API template | Added a separate Codex-managed report `MCP Practice. OpenId Bound Report` and wired the edit-form report tab to it. The template uses Project Database and references the source view title column for current-row output. | `0f61a68` | Live `artx` write created/updated report `49236112-3335-4ca4-9a85-7f2236f6365a`; readback confirmed dashboard page, Project Database source, title-field reference, and `edit_form_openid_report_tab=true`; `get-data` with `dataId=[openId]` still returns 1 row. Browser recheck found the embedded report viewer container empty for both static and data-bound reports, so visual proof remains open. |
 | Practice. Additional sandbox content row | Added a third idempotent practice row to the ARTX sandbox source view for list, UI, and `dataId` scoping verification. | `a179010` | Created content `9a504330-5ce4-4a76-9043-bbc2fc293e3c`; dry-run readback reports `content_count=3`; `get-data` without context returns 3 rows, `contentId=<additional>` returns 3 rows, and top-level `dataId=[additional]` returns 1 row; browser main form shows all 3 rows, score `42`, and pagination `1-3 / 3`. |
+| Build. Stimulsoft layout and analytics guardrails | Added a Russian playbook for printable forms, dashboard analytics, and Alterios Project Database rules; added `alterios_validate_stimulsoft_layout` plus `alterios-stimulsoft-layout-check`. | `TBD-STIMULSOFT-LAYOUT-COMMIT` | Unit tests cover clean layout, visible overlap, page overflow, and dynamic-height risks; full `pytest`: 87 passed; `git diff --check` OK; read-only live check on reports `86ad4189-deaf-4744-96d5-6b1d22e73468` and `49236112-3335-4ca4-9a85-7f2236f6365a` returned 0 layout issues. |
 
 ## Active Stage
 
@@ -85,6 +89,7 @@ rows.
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Add repo-owned agents and skills scaffolding after typed tools land. | Next | Follow `docs/agents-and-skills.md`; do not create skills that document unverified APIs as facts. |
+| 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |

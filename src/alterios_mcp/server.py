@@ -22,6 +22,7 @@ from .client import (
 )
 from .discovery import discover_readonly, list_objects, list_projects
 from .services import get_service, list_services, service_to_dict
+from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
     WriteOperation,
     assert_write_allowed,
@@ -1865,6 +1866,28 @@ def alterios_validate_report_project_base(
         validation["view_readback_ok"] = view_readback.get("status_code") in {200, 201}
         validation["view_row_count"] = len(rows) if isinstance(rows, list) else None
     return {"report": _resource_summary(report), "validation": validation, "view_readback": view_readback}
+
+
+@mcp.tool()
+def alterios_validate_stimulsoft_layout(
+    report_id: str | None = None,
+    template: str | dict[str, Any] | None = None,
+    overlap_tolerance: float = 0.05,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate Stimulsoft template geometry for overlaps, page overflow, and dynamic-height risks."""
+    if not report_id and template is None:
+        raise ValueError("Pass report_id or template.")
+    report = None
+    source: Any = template
+    if report_id:
+        report = _client(profile, project_id).report_by_id(report_id).body
+        source = report
+    return {
+        "report": _resource_summary(report) if isinstance(report, dict) else None,
+        "layout": analyze_stimulsoft_layout(source, overlap_tolerance=overlap_tolerance),
+    }
 
 
 @mcp.tool()
