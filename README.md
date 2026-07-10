@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **72 инструмента**, из них **34 write-like инструмента**.
+Текущая поверхность MCP: **73 инструмента**, из них **35 write-like инструментов**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -74,6 +74,8 @@ MCP умеет собирать состав проекта:
   add/edit/list формы и группа меню через `alterios_create_material_module`;
 - сценарное создание вкладки отчета: source view, Project Database report,
   form tab, `openId` и `dataId`-проверка через `alterios_create_report_tab`;
+- сценарное создание процесса: task-form, script refs, BPMN XML, `camunda:formKey`,
+  start-process smoke и optional task complete через `alterios_create_process_flow`;
 - создание и обновление типов материалов;
 - создание и обновление полей;
 - создание контента;
@@ -108,7 +110,7 @@ MCP умеет собирать состав проекта:
 Dry-run write tools сохраняют проверяемый `plan_id` в `artifacts/write-plans`,
 а execution events пишутся в `artifacts/write-journal`; generic
 `alterios_rest_write`, `alterios_create_material_module` и
-`alterios_create_report_tab` при
+`alterios_create_report_tab`, `alterios_create_process_flow` при
 `dry_run=false` требуют совпадающий `plan_id`.
 
 ### Формы и пользовательский UI
@@ -138,6 +140,10 @@ MCP умеет связывать:
 - BPMN `scriptTask`, service/listener refs и `userTask`;
 - `camunda:formKey` и task forms;
 - процессы, задачи и side effects по данным.
+
+Для сборки процесса как одного сценария используйте `alterios_create_process_flow`: dry-run валидирует
+task-form, script refs, BPMN/formKey и сохраняет `plan_id`; apply по этому плану сохраняет форму и
+диаграмму, а при переданном `content_id` выполняет process smoke с чтением активной задачи.
 
 Связующая карта лежит в [docs/script-bpmn-linkage.md](docs/script-bpmn-linkage.md).
 

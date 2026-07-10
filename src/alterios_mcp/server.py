@@ -6,6 +6,7 @@ import json
 import os
 import time
 from typing import Any
+from xml.sax.saxutils import escape as _xml_escape
 
 from mcp.server.fastmcp import FastMCP
 
@@ -1667,6 +1668,270 @@ def _find_report_tab_cell(
                     if isinstance(params, dict) and params.get("reportId") == report_id:
                         return cell
     return None
+
+
+def _process_flow_operation(
+    *,
+    task_form_name: str,
+    task_form_id: str | None,
+    diagram_name: str,
+    diagram_id: str | None,
+    content_type_id: str,
+    script_refs: list[dict[str, Any]],
+    bpmn_xml: str,
+    content_id: str | None,
+    start_process_smoke: bool,
+    complete_task: bool,
+    expected_user_task_name: str,
+    expected_task_form_id: str | None,
+    allow_unmanaged_update: bool,
+) -> WriteOperation:
+    request = {
+        "taskFormName": task_form_name,
+        "taskFormId": task_form_id,
+        "diagramName": diagram_name,
+        "diagramId": diagram_id,
+        "contentTypeId": content_type_id,
+        "scriptRefs": script_refs,
+        "bpmnXml": bpmn_xml,
+        "contentId": content_id,
+        "startProcessSmoke": start_process_smoke,
+        "completeTask": complete_task,
+        "expectedUserTaskName": expected_user_task_name,
+        "expectedTaskFormId": expected_task_form_id,
+        "allowUnmanagedUpdate": allow_unmanaged_update,
+    }
+    return _resource_operation(
+        name="SCENARIO create_process_flow",
+        kind="scenario_process_flow",
+        risk_level="workflow_side_effect" if (content_id and start_process_smoke) or complete_task else "write",
+        method="POST",
+        path="scenario://process-flow",
+        summary=(
+            "Create or update a task form, validate script references, save BPMN, "
+            "and optionally smoke-test process start/task flow."
+        ),
+        request={key: value for key, value in request.items() if value is not None},
+    )
+
+
+def _normalize_process_script_refs(script_refs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if script_refs is None:
+        return []
+    if not isinstance(script_refs, list):
+        raise ValueError("script_refs must be a list.")
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(script_refs):
+        if not isinstance(raw, dict):
+            raise ValueError("Each script ref must be a JSON object.")
+        script_id = str(raw.get("script_id") or raw.get("scriptId") or raw.get("_id") or "").strip()
+        name = str(raw.get("name") or "").strip() or None
+        script_type = str(raw.get("type") or raw.get("script_type") or "diagram").strip()
+        expected_body_contains = raw.get("expected_body_contains") or raw.get("expectedBodyContains") or []
+        if isinstance(expected_body_contains, str):
+            expected_body_contains = [expected_body_contains]
+        if not script_id and not name:
+            raise ValueError(f"script_refs[{index}] requires script_id or name.")
+        if script_type not in {"manual", "event", "diagram"}:
+            raise ValueError("script_refs[].type must be one of: manual, event, diagram.")
+        key = script_id or name or str(index)
+        if key in seen:
+            raise ValueError(f"Duplicate script ref {key!r}.")
+        seen.add(key)
+        normalized.append(
+            {
+                "script_id": script_id or None,
+                "name": name,
+                "type": script_type,
+                "expected_body_contains": [str(item) for item in expected_body_contains],
+            }
+        )
+    return normalized
+
+
+def _safe_bpmn_id(value: str) -> str:
+    normalized = "".join(ch if ch.isalnum() else "_" for ch in value.strip())
+    normalized = "_".join(part for part in normalized.split("_") if part)
+    return normalized or "process"
+
+
+def _xml_attr(value: Any) -> str:
+    return _xml_escape(str(value), {'"': "&quot;"})
+
+
+def _build_simple_user_task_bpmn(
+    *,
+    process_id: str,
+    process_name: str,
+    task_id: str,
+    task_name: str,
+    task_form_id: str,
+    start_form_id: str | None = None,
+    next_flow_id: str = "Flow_to_end",
+    next_flow_name: str = "Complete",
+) -> str:
+    safe_process_id = _safe_bpmn_id(process_id)
+    safe_task_id = _safe_bpmn_id(task_id)
+    safe_next_flow_id = _safe_bpmn_id(next_flow_id)
+    safe_start_id = f"StartEvent_{safe_process_id}"
+    safe_end_id = f"EndEvent_{safe_process_id}"
+    safe_start_to_task_flow_id = f"Flow_{safe_process_id}_start_to_task"
+    effective_start_form_id = start_form_id or task_form_id
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" '
+        'xmlns:camunda="http://camunda.org/schema/1.0/bpmn" '
+        'id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">\n'
+        f'  <bpmn:process id="{_xml_attr(safe_process_id)}" name="{_xml_attr(process_name)}" isExecutable="true">\n'
+        f'    <bpmn:startEvent id="{_xml_attr(safe_start_id)}" name="Start" camunda:formKey="{_xml_attr(effective_start_form_id)}">\n'
+        f'      <bpmn:outgoing>{_xml_attr(safe_start_to_task_flow_id)}</bpmn:outgoing>\n'
+        "    </bpmn:startEvent>\n"
+        f'    <bpmn:sequenceFlow id="{_xml_attr(safe_start_to_task_flow_id)}" '
+        f'sourceRef="{_xml_attr(safe_start_id)}" targetRef="{_xml_attr(safe_task_id)}" />\n'
+        f'    <bpmn:userTask id="{_xml_attr(safe_task_id)}" name="{_xml_attr(task_name)}" '
+        f'camunda:formKey="{_xml_attr(task_form_id)}" camunda:savable="true">\n'
+        f'      <bpmn:incoming>{_xml_attr(safe_start_to_task_flow_id)}</bpmn:incoming>\n'
+        f'      <bpmn:outgoing>{_xml_attr(safe_next_flow_id)}</bpmn:outgoing>\n'
+        "    </bpmn:userTask>\n"
+        f'    <bpmn:sequenceFlow id="{_xml_attr(safe_next_flow_id)}" name="{_xml_attr(next_flow_name)}" '
+        f'sourceRef="{_xml_attr(safe_task_id)}" targetRef="{_xml_attr(safe_end_id)}" />\n'
+        f'    <bpmn:endEvent id="{_xml_attr(safe_end_id)}" name="End">\n'
+        f'      <bpmn:incoming>{_xml_attr(safe_next_flow_id)}</bpmn:incoming>\n'
+        "    </bpmn:endEvent>\n"
+        "  </bpmn:process>\n"
+        "</bpmn:definitions>"
+    )
+
+
+def _bpmn_xml_contains_form_key(bpmn_xml: str, form_id: str) -> bool:
+    return f'formKey="{form_id}"' in bpmn_xml or f"formKey='{form_id}'" in bpmn_xml
+
+
+def _bpmn_xml_script_refs(bpmn_xml: str) -> list[str]:
+    refs: list[str] = []
+    for marker in ("scriptId", "scriptRef", "script"):
+        pattern = f"{marker}="
+        start = 0
+        while True:
+            found = bpmn_xml.find(pattern, start)
+            if found < 0:
+                break
+            quote_index = found + len(pattern)
+            if quote_index >= len(bpmn_xml):
+                break
+            quote = bpmn_xml[quote_index]
+            if quote not in {"'", '"'}:
+                start = quote_index + 1
+                continue
+            end = bpmn_xml.find(quote, quote_index + 1)
+            if end < 0:
+                break
+            value = bpmn_xml[quote_index + 1 : end].strip()
+            if value:
+                refs.append(value)
+            start = end + 1
+    return list(dict.fromkeys(refs))
+
+
+def _process_flow_validate_scripts(
+    client: AlteriosClient,
+    script_refs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    validated: list[dict[str, Any]] = []
+    for ref in script_refs:
+        script = _find_script(client, script_id=ref.get("script_id"), name=ref.get("name"))
+        if not script:
+            label = ref.get("script_id") or ref.get("name")
+            raise ValueError(f"Script {label!r} was not found.")
+        expected_type = ref.get("type")
+        actual_type = script.get("type")
+        if expected_type and actual_type and actual_type != expected_type:
+            raise ValueError(
+                f"Script {script.get('_id')!r} type mismatch: expected {expected_type!r}, got {actual_type!r}."
+            )
+        body = str(script.get("body") or "")
+        missing = [needle for needle in ref.get("expected_body_contains") or [] if needle not in body]
+        if missing:
+            raise ValueError(f"Script {script.get('_id')!r} body is missing required fragments: {missing!r}.")
+        validated.append(
+            {
+                "_id": script.get("_id"),
+                "name": script.get("name"),
+                "type": actual_type,
+                "active": script.get("active"),
+                "expected_body_contains": ref.get("expected_body_contains") or [],
+            }
+        )
+    return validated
+
+
+def _process_task_form_tabs(title: str, body: str | None = None) -> list[dict[str, Any]]:
+    html = body or f"<div><strong>{_xml_attr(title)}</strong></div>"
+    return [
+        {
+            "name": None,
+            "rows": [
+                {
+                    "cells": [
+                        {
+                            "name": title,
+                            "type": "html",
+                            "adding": {},
+                            "params": {"html": html},
+                            "styles": _material_flex_styles(),
+                            "editing": {},
+                            "emitting": {"listeners": []},
+                            "reporting": {"reports": []},
+                            "displaying": {"fields": {}, "header": {"title": title, "position": "top_left"}},
+                            "cellActionContainers": [],
+                        }
+                    ],
+                    "styles": _material_row_styles(),
+                    "reverse": False,
+                }
+            ],
+        }
+    ]
+
+
+def _process_flow_preflight(
+    client: AlteriosClient,
+    *,
+    task_form_id: str | None,
+    task_form_name: str,
+    diagram_id: str | None,
+    diagram_name: str,
+    script_refs: list[dict[str, Any]],
+    allow_unmanaged_update: bool,
+) -> dict[str, Any]:
+    task_form = _find_form(client, form_id=task_form_id, name=task_form_name)
+    if task_form:
+        _assert_managed_or_allowed(task_form, kind="Task form", allow_unmanaged_update=allow_unmanaged_update)
+    diagram = _find_diagram(client, diagram_id=diagram_id, name=diagram_name)
+    if diagram:
+        _assert_managed_or_allowed(diagram, kind="Diagram", allow_unmanaged_update=allow_unmanaged_update)
+    scripts = _process_flow_validate_scripts(client, script_refs)
+    return {
+        "task_form": task_form,
+        "diagram": diagram,
+        "scripts": scripts,
+    }
+
+
+def _process_task_from_tasks(
+    tasks: list[dict[str, Any]],
+    *,
+    expected_form_id: str | None,
+    expected_name: str | None,
+) -> dict[str, Any] | None:
+    for task in tasks:
+        if expected_form_id and task.get("formId") not in {expected_form_id, None}:
+            continue
+        if expected_name and task.get("name") and task.get("name") != expected_name:
+            continue
+        return task
+    return tasks[0] if tasks else None
 
 
 @mcp.tool()
@@ -4332,6 +4597,314 @@ def alterios_validate_process_result(
         "stages": selected.get("stages") if selected else None,
     }
     return {"process": selected, "process_count": len(processes), "validation": validation}
+
+
+@mcp.tool()
+def alterios_create_process_flow(
+    diagram_name: str,
+    task_form_name: str,
+    content_type_id: str | None = None,
+    task_form_id: str | None = None,
+    diagram_id: str | None = None,
+    task_form_tabs: list[dict[str, Any]] | None = None,
+    task_form_action_containers: list[dict[str, Any]] | None = None,
+    task_form_page_title: str | None = None,
+    task_form_description: str | None = None,
+    task_title: str | None = None,
+    task_body_html: str | None = None,
+    bpmn_xml: str | None = None,
+    user_task_id: str | None = None,
+    user_task_name: str = "Task",
+    next_flow_id: str = "Flow_to_end",
+    next_flow_name: str = "Complete",
+    script_refs: list[dict[str, Any]] | None = None,
+    content_id: str | None = None,
+    process_params: dict[str, Any] | None = None,
+    process_name: str | None = None,
+    start_process_smoke: bool = True,
+    complete_task: bool = False,
+    expected_task_count_min: int | None = 1,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or apply a BPMN process scenario: task form, diagram, script refs, and optional process smoke."""
+    normalized_diagram_name = diagram_name.strip()
+    normalized_task_form_name = task_form_name.strip()
+    normalized_user_task_name = user_task_name.strip()
+    normalized_next_flow_id = next_flow_id.strip()
+    normalized_next_flow_name = next_flow_name.strip()
+    if not normalized_diagram_name:
+        raise ValueError("diagram_name must not be empty.")
+    if not normalized_task_form_name:
+        raise ValueError("task_form_name must not be empty.")
+    if not normalized_user_task_name:
+        raise ValueError("user_task_name must not be empty.")
+    if not normalized_next_flow_id:
+        raise ValueError("next_flow_id must not be empty.")
+    if expected_task_count_min is not None and expected_task_count_min < 0:
+        raise ValueError("expected_task_count_min must be non-negative or null.")
+    if complete_task and (not content_id or not start_process_smoke):
+        raise ValueError("complete_task requires content_id and start_process_smoke=true.")
+
+    normalized_script_refs = _normalize_process_script_refs(script_refs)
+    client = _client(profile, project_id)
+    preflight = _process_flow_preflight(
+        client,
+        task_form_id=task_form_id,
+        task_form_name=normalized_task_form_name,
+        diagram_id=diagram_id,
+        diagram_name=normalized_diagram_name,
+        script_refs=normalized_script_refs,
+        allow_unmanaged_update=allow_unmanaged_update,
+    )
+
+    existing_diagram = preflight["diagram"]
+    resolved_content_type_id = (content_type_id or (existing_diagram or {}).get("contentTypeId") or "").strip()
+    if not resolved_content_type_id:
+        raise ValueError("content_type_id is required when creating a new BPMN diagram.")
+
+    content_preflight = None
+    if content_id:
+        content_preflight = client.content_by_id(content_id).body
+        if not isinstance(content_preflight, dict):
+            raise ValueError("Content preflight returned unexpected payload.")
+        _assert_expected_content(content_preflight, expected_content_type_id=resolved_content_type_id)
+
+    existing_task_form = preflight["task_form"]
+    planned_task_form_id = task_form_id or (existing_task_form or {}).get("_id") or "$task_form_id"
+    planned_tabs = task_form_tabs or _process_task_form_tabs(
+        task_title or normalized_task_form_name,
+        body=task_body_html,
+    )
+    planned_actions = (
+        task_form_action_containers
+        if task_form_action_containers is not None
+        else [_material_save_action_container("save")]
+    )
+    planned_form = {
+        "_id": planned_task_form_id,
+        "name": normalized_task_form_name,
+        "pageTitle": task_form_page_title or normalized_task_form_name,
+        "tabs": planned_tabs,
+        "formActionContainers": planned_actions,
+    }
+    form_surface = analyze_form_surface(planned_form)
+
+    process_seed = diagram_id or normalized_diagram_name
+    generated_task_id = user_task_id or f"Activity_{_safe_bpmn_id(normalized_user_task_name)}"
+    planned_bpmn_xml = bpmn_xml or _build_simple_user_task_bpmn(
+        process_id=process_seed,
+        process_name=normalized_diagram_name,
+        task_id=generated_task_id,
+        task_name=normalized_user_task_name,
+        task_form_id=planned_task_form_id,
+        start_form_id=planned_task_form_id,
+        next_flow_id=normalized_next_flow_id,
+        next_flow_name=normalized_next_flow_name,
+    )
+    if bpmn_xml and "$task_form_id" not in planned_bpmn_xml and not _bpmn_xml_contains_form_key(
+        planned_bpmn_xml,
+        planned_task_form_id,
+    ):
+        raise ValueError("bpmn_xml must contain the resolved task form id or the $task_form_id placeholder.")
+
+    bpmn_refs = _bpmn_xml_script_refs(planned_bpmn_xml)
+    known_script_ids = {str(item.get("_id")) for item in preflight["scripts"] if item.get("_id")}
+    unmatched_bpmn_script_refs = [ref for ref in bpmn_refs if ref not in known_script_ids]
+    process_smoke_planned = {
+        "enabled": bool(content_id and start_process_smoke),
+        "content_id": content_id,
+        "process_name": process_name,
+        "complete_task": complete_task,
+        "expected_task_count_min": expected_task_count_min,
+    }
+    operation = _process_flow_operation(
+        task_form_name=normalized_task_form_name,
+        task_form_id=task_form_id or (existing_task_form or {}).get("_id"),
+        diagram_name=normalized_diagram_name,
+        diagram_id=diagram_id or (existing_diagram or {}).get("_id"),
+        content_type_id=resolved_content_type_id,
+        script_refs=normalized_script_refs,
+        bpmn_xml=planned_bpmn_xml,
+        content_id=content_id,
+        start_process_smoke=start_process_smoke,
+        complete_task=complete_task,
+        expected_user_task_name=normalized_user_task_name,
+        expected_task_form_id=planned_task_form_id,
+        allow_unmanaged_update=allow_unmanaged_update,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": {
+            "task_form": _resource_summary(existing_task_form),
+            "diagram": _resource_summary(existing_diagram),
+            "scripts": preflight["scripts"],
+            "content": _content_summary(content_preflight) if isinstance(content_preflight, dict) else None,
+        },
+        "planned": {
+            "steps": [
+                "upsert_task_form",
+                "validate_script_refs",
+                "upsert_bpmn_diagram",
+                "readback_form_key",
+                "optional_start_process_smoke",
+                "optional_complete_task",
+            ],
+            "task_form": {
+                "form_id": planned_task_form_id,
+                "name": normalized_task_form_name,
+                "page_title": task_form_page_title or normalized_task_form_name,
+                "tabs": planned_tabs,
+                "formActionContainers": planned_actions,
+                "surface": form_surface,
+            },
+            "diagram": {
+                "diagram_id": diagram_id or (existing_diagram or {}).get("_id"),
+                "name": normalized_diagram_name,
+                "content_type_id": resolved_content_type_id,
+                "bpmn_xml": planned_bpmn_xml,
+                "bpmn_script_refs": bpmn_refs,
+                "unmatched_bpmn_script_refs": unmatched_bpmn_script_refs,
+            },
+            "process_smoke": process_smoke_planned,
+        },
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_create_process_flow.")
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+
+    form_result = alterios_upsert_form(
+        normalized_task_form_name,
+        form_id=task_form_id,
+        page_title=task_form_page_title or normalized_task_form_name,
+        tabs=planned_tabs,
+        form_action_containers=planned_actions,
+        description=task_form_description or f"{MANAGED_MARKER}: alterios-mcp process task form.",
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    form_readback = _response_body((form_result.get("response") or {}).get("readback"))
+    resolved_task_form_id = _extract_response_id(form_readback) or task_form_id
+    if not resolved_task_form_id:
+        raise ValueError("Task form id was not resolved after save.")
+
+    actual_bpmn_xml = planned_bpmn_xml.replace("$task_form_id", resolved_task_form_id)
+    if not _bpmn_xml_contains_form_key(actual_bpmn_xml, resolved_task_form_id):
+        raise ValueError("Saved BPMN XML does not contain the resolved task form key.")
+
+    diagram_result = alterios_upsert_bpmn_diagram(
+        normalized_diagram_name,
+        diagram_id=diagram_id,
+        value=actual_bpmn_xml,
+        content_type_id=resolved_content_type_id,
+        description=f"{MANAGED_MARKER}: alterios-mcp process flow.",
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    diagram_readback = _response_body((diagram_result.get("response") or {}).get("readback"))
+    resolved_diagram_id = _extract_response_id(diagram_readback) or diagram_id
+    if not resolved_diagram_id:
+        raise ValueError("Diagram id was not resolved after save.")
+    if not isinstance(diagram_readback, dict) or not _bpmn_xml_contains_form_key(
+        str(diagram_readback.get("value") or ""),
+        resolved_task_form_id,
+    ):
+        raise ValueError("Diagram readback does not contain the resolved task form key.")
+
+    process_smoke: dict[str, Any] = {"status": "skipped", "reason": "content_id was not provided or smoke is disabled."}
+    if content_id and start_process_smoke:
+        start_result = alterios_start_process(
+            resolved_diagram_id,
+            content_id=content_id,
+            params=process_params,
+            name=process_name,
+            dry_run=False,
+            profile=profile,
+            project_id=project_id,
+        )
+        start_response = start_result.get("response") or {}
+        process_id = start_response.get("process_id")
+        readback_tasks = start_response.get("readback_tasks") or []
+        if expected_task_count_min is not None and len(readback_tasks) < expected_task_count_min:
+            raise ValueError(
+                f"Process smoke expected at least {expected_task_count_min} task(s), got {len(readback_tasks)}."
+            )
+        task = _process_task_from_tasks(
+            [item for item in readback_tasks if isinstance(item, dict)],
+            expected_form_id=resolved_task_form_id,
+            expected_name=normalized_user_task_name,
+        )
+        task_form_value = None
+        if isinstance(task, dict):
+            task_form_value = task.get("formId") or task.get("formKey") or task.get("form")
+        task_form_matches = task is not None and (task_form_value in {None, resolved_task_form_id})
+        process_smoke = {
+            "status": "started",
+            "start": start_result,
+            "process_id": process_id,
+            "task": task,
+            "task_count": len(readback_tasks),
+            "validation": {
+                "task_count_matches": expected_task_count_min is None or len(readback_tasks) >= expected_task_count_min,
+                "task_form_value": task_form_value,
+                "task_form_matches": task_form_matches,
+            },
+        }
+        if not task_form_matches:
+            raise ValueError(
+                f"Started task form mismatch: expected {resolved_task_form_id!r}, got {task_form_value!r}."
+            )
+        if complete_task:
+            if not isinstance(task, dict) or not task.get("_id"):
+                raise ValueError("Process smoke cannot complete task because active task id was not found.")
+            complete_result = alterios_complete_task(
+                str(task["_id"]),
+                next_flow_id=normalized_next_flow_id,
+                expected_process_id=str(process_id) if process_id else None,
+                expected_content_id=content_id,
+                expected_diagram_id=resolved_diagram_id,
+                dry_run=False,
+                profile=profile,
+                project_id=project_id,
+            )
+            process_smoke["completed"] = complete_result
+
+    response_payload.update(
+        {
+            "ids": {
+                "task_form_id": resolved_task_form_id,
+                "diagram_id": resolved_diagram_id,
+                "content_type_id": resolved_content_type_id,
+                "content_id": content_id,
+            },
+            "form_write": form_result,
+            "diagram_write": diagram_result,
+            "readback": {
+                "task_form": _resource_summary(form_readback if isinstance(form_readback, dict) else None),
+                "diagram": _resource_summary(diagram_readback if isinstance(diagram_readback, dict) else None),
+                "diagram_form_key_found": True,
+            },
+            "process_smoke": process_smoke,
+        }
+    )
+    return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
 
 @mcp.tool()

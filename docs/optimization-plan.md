@@ -82,6 +82,9 @@
 
 ### `alterios_create_process_flow`
 
+Статус: реализован на уровне typed API/readback и no-network tests. UI-проверка
+открытия task-form остается частью этапа 17, если нужна browser evidence.
+
 Сценарий:
 
 1. task form;
@@ -135,6 +138,6 @@
 1. Закрыть этап 15 как базу для apply-by-plan. Готово.
 2. Сделать `alterios_create_material_module`. Готово.
 3. Сделать `alterios_create_report_tab`. Готово.
-4. Сделать `alterios_create_process_flow`.
-5. После сценарных tools перейти к render validation.
+4. Сделать `alterios_create_process_flow`. Готово.
+5. После сценарных tools перейти к render validation. Следующий шаг.
 6. После render validation перейти к inventory cache/diff health.

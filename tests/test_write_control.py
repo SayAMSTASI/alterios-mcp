@@ -2234,3 +2234,277 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     assert validation["context"]["data_id_row_count"] == 1
     assert validation["render_evidence"]["status"] == "not_collected"
     assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_create_process_flow_dry_run_stores_plan_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_diagrams(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def script_by_id(self, script_id: str) -> FakeResponse:
+            return FakeResponse(
+                {
+                    "_id": script_id,
+                    "name": "РџСЂРѕРІРµСЂРєР° Р·Р°РґР°С‡Рё",
+                    "type": "diagram",
+                    "active": True,
+                    "body": "writeLog({ message: 'ok' })",
+                    "description": "Codex-managed",
+                }
+            )
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_create_process_flow(
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
+            content_type_id="ct-1",
+            script_refs=[
+                {
+                    "script_id": "script-1",
+                    "type": "diagram",
+                    "expected_body_contains": "writeLog",
+                }
+            ],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "scenario_process_flow"
+    assert result["audit"]["operation"]["path"] == "scenario://process-flow"
+    assert result["response"]["planned"]["steps"] == [
+        "upsert_task_form",
+        "validate_script_refs",
+        "upsert_bpmn_diagram",
+        "readback_form_key",
+        "optional_start_process_smoke",
+        "optional_complete_task",
+    ]
+    assert "$task_form_id" in result["response"]["planned"]["diagram"]["bpmn_xml"]
+    assert result["response"]["planned"]["task_form"]["surface"]["ok"] is True
+    assert result["response"]["preflight"]["scripts"][0]["_id"] == "script-1"
+    assert result["plan"]["plan_id"].startswith("wp_")
+    assert (tmp_path / result["plan"]["path"]).exists()
+
+
+def test_create_process_flow_execution_rejects_changed_plan_options_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_diagrams(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        dry_run = server.alterios_create_process_flow(
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
+            content_type_id="ct-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="operation does not match"),
+    ):
+        server.alterios_create_process_flow(
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
+            content_type_id="ct-1",
+            user_task_name="Changed task",
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_create_process_flow_execution_creates_form_diagram_and_starts_process_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeProcessFlowClient:
+        def __init__(self) -> None:
+            self.forms: dict[str, dict[str, object]] = {}
+            self.diagrams: dict[str, dict[str, object]] = {}
+            self.processes: dict[str, dict[str, object]] = {}
+            self.tasks: dict[str, dict[str, object]] = {}
+            self.content = {"content-1": {"_id": "content-1", "name": "Row", "contentTypeId": "ct-1", "fields": {}}}
+
+        def _listandcount(self, items: list[dict[str, object]]) -> FakeResponse:
+            return FakeResponse([items, len(items)])
+
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return self._listandcount(list(self.forms.values()))
+
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse(self.forms[form_id])
+
+        def save_form(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", "form-1")
+            self.forms[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def list_diagrams(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return self._listandcount(list(self.diagrams.values()))
+
+        def diagram_by_id(self, diagram_id: str) -> FakeResponse:
+            return FakeResponse(self.diagrams[diagram_id])
+
+        def save_diagram(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", "diagram-1")
+            self.diagrams[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            return FakeResponse(self.content[content_id])
+
+        def list_processes(
+            self,
+            *,
+            diagram_id: str | None = None,
+            content_id: str | None = None,
+            process_id: str | None = None,
+            limit: int = 20,
+            offset: int = 0,
+        ) -> FakeResponse:
+            items = list(self.processes.values())
+            if process_id:
+                items = [item for item in items if item.get("_id") == process_id]
+            if diagram_id:
+                items = [item for item in items if item.get("diagramId") == diagram_id]
+            if content_id:
+                items = [item for item in items if item.get("contentId") == content_id]
+            return self._listandcount(items)
+
+        def list_tasks(
+            self,
+            *,
+            diagram_id: str | None = None,
+            content_id: str | None = None,
+            process_id: str | None = None,
+            task_id: str | None = None,
+        ) -> FakeResponse:
+            items = list(self.tasks.values())
+            if task_id:
+                items = [item for item in items if item.get("_id") == task_id]
+            if process_id:
+                items = [item for item in items if item.get("processId") == process_id]
+            if diagram_id:
+                items = [item for item in items if item.get("diagramId") == diagram_id]
+            if content_id:
+                items = [item for item in items if item.get("contentId") == content_id]
+            return FakeResponse(items)
+
+        def start_process(
+            self,
+            diagram_id: str,
+            *,
+            content_id: str | None = None,
+            params: dict[str, object] | None = None,
+            name: str | None = None,
+            start_message_id: str | None = None,
+            response_message_id: str | None = None,
+            contents: list[dict[str, object]] | None = None,
+        ) -> FakeResponse:
+            self.processes["process-1"] = {
+                "_id": "process-1",
+                "diagramId": diagram_id,
+                "contentId": content_id,
+                "completed": False,
+            }
+            self.tasks["task-1"] = {
+                "_id": "task-1",
+                "name": "Review",
+                "processId": "process-1",
+                "diagramId": diagram_id,
+                "contentId": content_id,
+                "formId": "form-1",
+            }
+            return FakeResponse({"processId": "process-1"})
+
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run_client = FakeProcessFlowClient()
+        with patch.object(server, "_client", return_value=dry_run_client):
+            dry_run = server.alterios_create_process_flow(
+                "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
+                "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
+                content_type_id="ct-1",
+                user_task_name="Review",
+                content_id="content-1",
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+    apply_client = FakeProcessFlowClient()
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=apply_client),
+    ):
+        result = server.alterios_create_process_flow(
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
+            "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
+            content_type_id="ct-1",
+            user_task_name="Review",
+            content_id="content-1",
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["kind"] == "scenario_process_flow"
+    assert result["audit"]["operation"]["risk_level"] == "workflow_side_effect"
+    assert result["response"]["ids"] == {
+        "task_form_id": "form-1",
+        "diagram_id": "diagram-1",
+        "content_type_id": "ct-1",
+        "content_id": "content-1",
+    }
+    assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "html"
+    assert 'formKey="form-1"' in str(apply_client.diagrams["diagram-1"]["value"])
+    assert result["response"]["process_smoke"]["status"] == "started"
+    assert result["response"]["process_smoke"]["process_id"] == "process-1"
+    assert result["response"]["process_smoke"]["validation"]["task_count_matches"] is True
+    assert result["response"]["process_smoke"]["validation"]["task_form_matches"] is True
+    assert result["journal"]["event_id"].startswith("wj_")
