@@ -16,8 +16,8 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 43 | Публичные callable tools в `src/alterios_mcp/server.py`. |
-| Write-like MCP tools | 18 | `alterios_add_comment`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 50 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 23 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 57 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
@@ -47,7 +47,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 43
+## MCP Tools: 50
 
 | Tool | Вид |
 |---|---|
@@ -66,9 +66,15 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_view_fields_populated` | View field config read |
 | `alterios_list_fields` | Field metadata read |
 | `alterios_list_groups` | Group metadata read |
+| `alterios_list_content_types` | Content type metadata read |
 | `alterios_file_metadata` | File metadata read |
 | `alterios_list_comments` | Comment read |
 | `alterios_add_comment` | Controlled comment write |
+| `alterios_upsert_content_type` | Controlled typed content type create/update |
+| `alterios_upsert_field` | Controlled typed field create/update |
+| `alterios_create_content` | Controlled typed content create |
+| `alterios_upsert_group` | Controlled typed menu group create/update |
+| `alterios_upsert_help` | Controlled typed help create/update |
 | `alterios_update_content_fields` | Controlled typed content field update |
 | `alterios_file_upload_to_field` | Controlled typed file-field upload and content save |
 | `alterios_upsert_view` | Controlled typed view create/update |
@@ -100,14 +106,20 @@ browser/HAR capture и sandbox write-практику.
 The 2026-07-10 reinventory initially found 23 MCP tools and only 4 write-like
 tools. The typed-write expansion added content/file, view/form, script,
 BPMN/process/task, report tools, Stimulsoft layout validation, and form-surface validation, bringing the surface to 43 tools and 18
-write-like tools.
+write-like tools. The next write-first expansion added typed content-type,
+field, content-create, group, and help tools, bringing the surface to 50 tools
+and 23 write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 18 tools are
+does **not** mean the MCP operator surface is complete. Today 23 tools are
 write-like, and 2 of them are still broad generic escape hatches:
 
 - `alterios_add_comment` is typed but only covers comments;
+- `alterios_upsert_content_type`, `alterios_upsert_field`,
+  `alterios_create_content`, `alterios_upsert_group`, and
+  `alterios_upsert_help` now cover the metadata/data create layer that used to
+  require generic REST calls;
 - `alterios_update_content_fields` and `alterios_file_upload_to_field` now cover
   the first typed content/file slice;
 - `alterios_upsert_view`, `alterios_upsert_view_entity`,

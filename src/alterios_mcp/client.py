@@ -271,8 +271,22 @@ class AlteriosClient:
     def list_reports(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
         return self.request("GET", f"/api/reports/listandcount/{encode_filter({})}", params={"limit": limit, "offset": offset})
 
+    def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/content-types/listandcount", params={"limit": limit, "offset": offset})
+
     def view_by_id(self, view_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/views/listandcount", view_id, "View")
+
+    def content_type_by_id(self, content_type_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/content-types/listandcount", content_type_id, "Content type")
+
+    def field_by_id(self, field_id: str) -> AlteriosResponse:
+        response = self.list_fields(field_id=field_id, limit=1, offset=0)
+        body = response.body
+        items = [item for item in body if isinstance(item, dict)] if isinstance(body, list) else listandcount_items(body)
+        if not items:
+            raise AlteriosRequestError(f"Field {field_id!r} was not found.")
+        return AlteriosResponse(response.status_code, response.content_type, items[0])
 
     def form_by_id(self, form_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/forms/listandcount", form_id, "Form")
@@ -321,6 +335,51 @@ class AlteriosClient:
         if body.get("_id"):
             return self.request("PUT", "/api/reports", body=body)
         return self.request("POST", "/api/reports", body=body)
+
+    def save_content_type(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.request("POST", "/api/content-types/save", body=strip_alterios_metadata(payload))
+
+    def save_field(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.request("POST", "/api/fields/save", body=strip_alterios_metadata(payload))
+
+    def create_content(
+        self,
+        content_type_id: str,
+        field_values: dict[str, Any],
+        *,
+        groups_ids: list[str] | None = None,
+        name: str | None = None,
+    ) -> AlteriosResponse:
+        if not content_type_id.strip():
+            raise ValueError("content_type_id must not be empty")
+        if not field_values:
+            raise ValueError("field_values must contain at least one field")
+        payload: dict[str, Any] = {
+            "contentTypeId": content_type_id,
+            "fields": {str(key): normalize_content_field_value(value) for key, value in field_values.items()},
+        }
+        if groups_ids is not None:
+            payload["groupsIds"] = groups_ids
+        if name is not None:
+            payload["name"] = name
+        return self.request("POST", "/api/contents/save", body=payload)
+
+    def save_group(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("groups", payload)
+
+    def list_helps(self) -> AlteriosResponse:
+        return self.request("GET", "/api/helps")
+
+    def help_by_id(self, help_id: str) -> AlteriosResponse:
+        response = self.list_helps()
+        items = listandcount_items(response.body)
+        for item in items:
+            if item.get("_id") == help_id:
+                return AlteriosResponse(response.status_code, response.content_type, item)
+        raise AlteriosRequestError(f"Help {help_id!r} was not found.")
+
+    def save_help(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("helps", payload)
 
     def add_view_entity_field(
         self,

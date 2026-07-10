@@ -46,6 +46,8 @@
 - `alterios_get_form` - чтение полной формы по ID.
 - `alterios_list_fields` - инвентаризация полей типа контента с опциональными
   фильтрами `content_type_id` или `field_id`.
+- `alterios_list_content_types` - типизированная инвентаризация типов материалов
+  через `/api/content-types/listandcount`.
 - `alterios_list_groups` - инвентаризация групп проекта через `/api/groups`.
 - `alterios_file_metadata` - чтение метаданных файлов через `/api/file/list`.
 - `alterios_list_comments` - инвентаризация комментариев через
@@ -53,6 +55,20 @@
 - `alterios_add_comment` - создание комментария через `/api/v1/comments` с
   `entity=any` по умолчанию для совместимости с `comments_list`, dry-run,
   write-gate и readback.
+- `alterios_upsert_content_type` - typed create/update типа материала через
+  `/api/content-types/save` с managed-marker guard, dry-run diff, write-gate и
+  readback.
+- `alterios_upsert_field` - typed create/update поля типа материала через
+  `/api/fields/save` с проверкой родительского content type, managed-marker
+  guard, dry-run diff, write-gate и readback фактического `mname`.
+- `alterios_create_content` - typed create `/api/contents/save` для новой
+  content-записи: preflight content type, нормализация field values в массивы,
+  dry-run, write-gate и readback, когда API возвращает id.
+- `alterios_upsert_group` - typed create/update пункта меню через `/api/groups`
+  с root/parent preflight, form binding, iconId, managed-marker guard,
+  dry-run diff, write-gate и readback.
+- `alterios_upsert_help` - typed create/update справки через `/api/helps` с
+  managed-marker guard, dry-run diff, write-gate и readback.
 - `alterios_update_content_fields` - typed PATCH `/api/contents/save` для
   существующей content-записи: preflight, expected content type/name, dry-run
   diff, write-gate и readback.
@@ -93,8 +109,11 @@
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
-- `alterios_add_comment`, `alterios_update_content_fields`,
-  `alterios_file_upload_to_field`, `alterios_upsert_view`,
+- `alterios_add_comment`, `alterios_upsert_content_type`,
+  `alterios_upsert_field`, `alterios_create_content`,
+  `alterios_upsert_group`, `alterios_upsert_help`,
+  `alterios_update_content_fields`, `alterios_file_upload_to_field`,
+  `alterios_upsert_view`,
   `alterios_upsert_view_entity`, `alterios_upsert_view_field`,
   `alterios_upsert_form`, `alterios_patch_form_actions`,
   `alterios_patch_form_tabs`, `alterios_upsert_script`,

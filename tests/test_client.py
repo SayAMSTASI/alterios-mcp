@@ -425,6 +425,42 @@ def test_script_diagram_report_process_and_task_write_routes_without_network() -
     assert requests[5].body == {"_id": "task-1", "nextFlowId": "Flow_to_end", "contents": []}
 
 
+def test_content_type_field_content_group_and_help_write_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {"_id": "saved"})) as send:
+        client.save_content_type({"_id": "ct-1", "name": "Type", "author": "ignored"})
+        client.save_field({"_id": "field-1", "name": "Title", "token": "ignored"})
+        client.create_content("ct-1", {"field_title": "Row"}, groups_ids=["group-1"], name="Row")
+        client.save_group({"_id": "group-1", "name": "Group"})
+        client.save_help({"_id": "help-1", "name": "Help", "value": "Body"})
+
+    requests = [call.args[0] for call in send.call_args_list]
+    assert requests[0].method == "POST"
+    assert requests[0].url == "https://alterios.example/api/content-types/save"
+    assert requests[0].body == {"_id": "ct-1", "name": "Type"}
+    assert requests[1].method == "POST"
+    assert requests[1].url == "https://alterios.example/api/fields/save"
+    assert requests[1].body == {"_id": "field-1", "name": "Title"}
+    assert requests[2].method == "POST"
+    assert requests[2].url == "https://alterios.example/api/contents/save"
+    assert requests[2].body == {
+        "contentTypeId": "ct-1",
+        "fields": {"field_title": ["Row"]},
+        "groupsIds": ["group-1"],
+        "name": "Row",
+    }
+    assert requests[3].method == "PATCH"
+    assert requests[3].url == "https://alterios.example/api/groups/group-1"
+    assert requests[4].method == "PATCH"
+    assert requests[4].url == "https://alterios.example/api/helps/help-1"
+
+
 def test_list_fields_builds_expected_query_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

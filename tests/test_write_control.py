@@ -335,6 +335,284 @@ def test_file_upload_to_field_execution_uploads_saves_and_reads_back_without_rea
     assert result["response"]["readback"]["body"]["fields"]["field_file"][0]["id"] == "file-1"
 
 
+def test_upsert_content_type_dry_run_returns_diff_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse(
+                [
+                    [
+                        {
+                            "_id": "ct-1",
+                            "name": "Type",
+                            "description": "Codex-managed: existing",
+                            "settings": {"maxRefDepth": 0},
+                            "share": False,
+                        }
+                    ],
+                    1,
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_content_type(
+            "Type",
+            settings={"maxRefDepth": 1},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "content_type"
+    assert result["audit"]["operation"]["path"] == "/api/content-types/save"
+    assert {"field": "settings", "before": {"maxRefDepth": 0}, "after": {"maxRefDepth": 1}, "changed": True} in result["response"]["diff"]
+
+
+def test_upsert_field_execution_saves_and_reads_back_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.saved = False
+
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            assert content_type_id == "ct-1"
+            return FakeResponse({"_id": "ct-1", "name": "Type"})
+
+        def list_fields(self, *, content_type_id: str, field_id: str | None = None, limit: int | None = None, offset: int | None = None) -> FakeResponse:
+            assert content_type_id == "ct-1"
+            return FakeResponse([])
+
+        def save_field(self, payload: dict[str, object]) -> FakeResponse:
+            assert payload["contentTypeId"] == "ct-1"
+            assert payload["mname"] == "field_title"
+            self.saved = True
+            return FakeResponse({"_id": "field-1", "saved": True})
+
+        def field_by_id(self, field_id: str) -> FakeResponse:
+            assert self.saved is True
+            assert field_id == "field-1"
+            return FakeResponse({"_id": "field-1", "name": "Title", "mname": "field_title", "type": "text"})
+
+    fake_client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=fake_client),
+    ):
+        result = server.alterios_upsert_field(
+            "ct-1",
+            "Title",
+            "text",
+            mname="field_title",
+            settings={"widget": "text"},
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["saved"]["body"] == {"_id": "field-1", "saved": True}
+    assert result["response"]["readback"]["body"]["mname"] == "field_title"
+
+
+def test_upsert_field_execution_requires_write_gate_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            return FakeResponse({"_id": content_type_id, "name": "Type"})
+
+        def list_fields(self, *, content_type_id: str, field_id: str | None = None, limit: int | None = None, offset: int | None = None) -> FakeResponse:
+            return FakeResponse([])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ControlledWriteError, match="disabled"),
+    ):
+        server.alterios_upsert_field(
+            "ct-1",
+            "Title",
+            "text",
+            mname="field_title",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_upsert_field_rejects_mismatched_content_type_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            return FakeResponse({"_id": content_type_id, "name": "Type"})
+
+        def field_by_id(self, field_id: str) -> FakeResponse:
+            return FakeResponse(
+                {
+                    "_id": field_id,
+                    "name": "Title",
+                    "mname": "field_title",
+                    "contentTypeId": "ct-2",
+                    "description": "Codex-managed: existing",
+                }
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="belongs to content type"),
+    ):
+        server.alterios_upsert_field(
+            "ct-1",
+            "Title",
+            "text",
+            field_id="field-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_create_content_execution_saves_and_reads_back_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            return FakeResponse({"_id": content_type_id, "name": "Type"})
+
+        def create_content(
+            self,
+            content_type_id: str,
+            field_values: dict[str, object],
+            *,
+            groups_ids: list[str] | None = None,
+            name: str | None = None,
+        ) -> FakeResponse:
+            assert content_type_id == "ct-1"
+            assert field_values == {"field_title": "Row"}
+            assert groups_ids == ["group-1"]
+            assert name == "Row"
+            return FakeResponse({"_id": "content-1"})
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            assert content_id == "content-1"
+            return FakeResponse({"_id": content_id, "contentTypeId": "ct-1", "name": "Row", "fields": {"field_title": ["Row"]}})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_create_content(
+            "ct-1",
+            {"field_title": "Row"},
+            groups_ids=["group-1"],
+            name="Row",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["kind"] == "content_create"
+    assert result["response"]["content_id"] == "content-1"
+    assert result["response"]["readback"]["body"]["fields"]["field_title"] == ["Row"]
+
+
+def test_upsert_group_and_help_dry_run_use_managed_guards_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {"_id": "root", "name": "root", "root": True},
+                    {"_id": "group-1", "name": "Group", "description": "Codex-managed: existing", "formId": "old-form"},
+                ]
+            )
+
+        def list_helps(self) -> FakeResponse:
+            return FakeResponse([{"_id": "help-1", "name": "Help", "description": "manual", "value": "old"}])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        group_result = server.alterios_upsert_group(
+            "Group",
+            form_id="form-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+        with pytest.raises(ValueError, match="not marked"):
+            server.alterios_upsert_help(
+                "Help",
+                "new",
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+    assert group_result["dry_run"] is True
+    assert group_result["audit"]["operation"]["kind"] == "group"
+    assert {"field": "formId", "before": "old-form", "after": "form-1", "changed": True} in group_result["response"]["diff"]
+
+
+def test_upsert_group_rejects_missing_explicit_targets_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {"_id": "root", "name": "root", "root": True},
+                    {"_id": "group-1", "name": "Group", "description": "Codex-managed: existing"},
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        with pytest.raises(ValueError, match="Group 'missing' was not found"):
+            server.alterios_upsert_group(
+                "Group",
+                group_id="missing",
+                profile="vniimt",
+                project_id="project-1",
+            )
+        with pytest.raises(ValueError, match="Parent group 'missing-parent' was not found"):
+            server.alterios_upsert_group(
+                "New Group",
+                parent_group_id="missing-parent",
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+
 def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:

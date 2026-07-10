@@ -323,6 +323,117 @@ def _find_named_resource(items: Any, name: str) -> dict[str, Any] | None:
     return None
 
 
+def _extract_response_id(value: Any) -> str | None:
+    if isinstance(value, dict):
+        for key in ("_id", "id", "contentId", "uuid"):
+            if value.get(key):
+                return str(value[key])
+        for key in ("body", "data", "result", "value"):
+            found = _extract_response_id(value.get(key))
+            if found:
+                return found
+    if isinstance(value, list):
+        for item in value:
+            found = _extract_response_id(item)
+            if found:
+                return found
+    return None
+
+
+def _find_content_type(
+    client: AlteriosClient,
+    *,
+    content_type_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if content_type_id:
+        body = client.content_type_by_id(content_type_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Content type readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_content_types(limit=5000).body, name)
+    return None
+
+
+def _find_field(
+    client: AlteriosClient,
+    *,
+    content_type_id: str,
+    field_id: str | None = None,
+    mname: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if field_id:
+        body = client.field_by_id(field_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Field readback returned unexpected payload.")
+        return body
+    body = client.list_fields(content_type_id=content_type_id).body
+    if not isinstance(body, list):
+        raise ValueError("Field inventory returned unexpected payload.")
+    for field in body:
+        if not isinstance(field, dict):
+            continue
+        if mname and field.get("mname") == mname:
+            return field
+        if name and field.get("name") == name:
+            return field
+    return None
+
+
+def _find_group(
+    client: AlteriosClient,
+    *,
+    group_id: str | None = None,
+    name: str | None = None,
+    include_root: bool = False,
+) -> dict[str, Any] | None:
+    groups = _response_items(client.list_groups().body)
+    if group_id:
+        for group in groups:
+            if group.get("_id") == group_id:
+                return group
+        return None
+    for group in groups:
+        if name and group.get("name") == name and (include_root or not group.get("root")):
+            return group
+    return None
+
+
+def _find_root_group(client: AlteriosClient) -> dict[str, Any] | None:
+    for group in _response_items(client.list_groups().body):
+        if group.get("root") or group.get("name") == "root":
+            return group
+    return None
+
+
+def _find_help(
+    client: AlteriosClient,
+    *,
+    help_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if help_id:
+        body = client.help_by_id(help_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Help readback returned unexpected payload.")
+        return body
+    if name:
+        for item in _response_items(client.list_helps().body):
+            if item.get("name") == name:
+                return item
+    return None
+
+
+def _assert_help_managed_or_allowed(resource: dict[str, Any], *, allow_unmanaged_update: bool) -> None:
+    if allow_unmanaged_update:
+        return
+    if MANAGED_MARKER in str(resource.get("description") or "") or MANAGED_MARKER in str(resource.get("value") or ""):
+        return
+    raise ValueError(f"Help {resource.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
+
+
 def _find_view(
     client: AlteriosClient,
     *,
@@ -798,6 +909,17 @@ def alterios_list_groups(
 
 
 @mcp.tool()
+def alterios_list_content_types(
+    limit: int = 1000,
+    offset: int = 0,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios content types through the typed listandcount route."""
+    return _client(profile, project_id).list_content_types(limit=limit, offset=offset).as_dict()
+
+
+@mcp.tool()
 def alterios_file_metadata(
     file_ids: list[str],
     profile: str | None = None,
@@ -859,6 +981,431 @@ def alterios_add_comment(
     created = client.add_comment(entity_id, body, entity=entity, parent_id=parent_id).as_dict()
     readback = client.list_comments(entity_id, entity=entity, limit=20, depth=4, page=1).as_dict()
     return controlled_write_result(audit=audit, response={"created": created, "readback": readback})
+
+
+@mcp.tool()
+def alterios_upsert_content_type(
+    name: str,
+    content_type_id: str | None = None,
+    field_name_prefix: str | None = None,
+    content_name_template: str | None = None,
+    settings: dict[str, Any] | None = None,
+    description: str | None = None,
+    share: bool | None = None,
+    share_creating: bool | None = None,
+    share_editing: bool | None = None,
+    share_deleting: bool | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios content type. Execution requires explicit write gates."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_content_type(client, content_type_id=content_type_id, name=name)
+    if existing:
+        _assert_managed_or_allowed(existing, kind="Content type", allow_unmanaged_update=allow_unmanaged_update)
+    elif not field_name_prefix:
+        raise ValueError("field_name_prefix is required when creating a new content type.")
+
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description
+        if description is not None
+        else (existing or {}).get("description")
+        or f"{MANAGED_MARKER}: alterios-mcp content type.",
+        "settings": settings if settings is not None else (existing or {}).get("settings") or {"maxRefDepth": 0},
+        "share": share if share is not None else (existing or {}).get("share") or False,
+        "shareCreating": share_creating if share_creating is not None else (existing or {}).get("shareCreating") or False,
+        "shareEditing": share_editing if share_editing is not None else (existing or {}).get("shareEditing") or False,
+        "shareDeleting": share_deleting if share_deleting is not None else (existing or {}).get("shareDeleting") or False,
+    }
+    if field_name_prefix is not None:
+        payload["fieldNamePrefix"] = field_name_prefix
+    elif existing and existing.get("fieldNamePrefix") is not None:
+        payload["fieldNamePrefix"] = existing.get("fieldNamePrefix")
+    if content_name_template is not None:
+        payload["contentNameTemplate"] = content_name_template
+    elif existing and existing.get("contentNameTemplate") is not None:
+        payload["contentNameTemplate"] = existing.get("contentNameTemplate")
+
+    operation = _resource_operation(
+        name="POST /api/content-types/save",
+        kind="content_type",
+        method="POST",
+        path="/api/content-types/save",
+        summary="Create or update an Alterios content type with preflight and readback.",
+        request={"_id": payload.get("_id"), "name": name, "fieldNamePrefix": payload.get("fieldNamePrefix")},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(
+            existing,
+            payload,
+            (
+                "name",
+                "description",
+                "fieldNamePrefix",
+                "contentNameTemplate",
+                "settings",
+                "share",
+                "shareCreating",
+                "shareEditing",
+                "shareDeleting",
+            ),
+        ),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_content_type(payload).as_dict()
+    saved_id = _extract_response_id(saved) or payload.get("_id")
+    readback = client.content_type_by_id(saved_id).as_dict() if saved_id else {"body": _find_content_type(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_field(
+    content_type_id: str,
+    name: str,
+    field_type: str,
+    field_id: str | None = None,
+    mname: str | None = None,
+    description: str | None = None,
+    help: str | None = None,
+    tooltip: str | None = None,
+    order: int | None = None,
+    required: bool | None = None,
+    default_value: Any | None = None,
+    form_display: dict[str, Any] | None = None,
+    settings: dict[str, Any] | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios content type field. Execution requires explicit write gates."""
+    if not content_type_id.strip():
+        raise ValueError("content_type_id must not be empty.")
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    if not field_type.strip():
+        raise ValueError("field_type must not be empty.")
+    client = _client(profile, project_id)
+    parent = _find_content_type(client, content_type_id=content_type_id)
+    if not parent:
+        raise ValueError(f"Content type {content_type_id!r} was not found.")
+    existing = _find_field(client, content_type_id=content_type_id, field_id=field_id, mname=mname, name=name)
+    if existing:
+        existing_content_type_id = existing.get("contentTypeId") or existing.get("content_type_id")
+        if existing_content_type_id and existing_content_type_id != content_type_id:
+            raise ValueError(
+                f"Field {existing.get('_id')!r} belongs to content type {existing_content_type_id!r}, not {content_type_id!r}."
+            )
+        _assert_managed_or_allowed(existing, kind="Field", allow_unmanaged_update=allow_unmanaged_update)
+    elif not mname:
+        raise ValueError("mname is required when creating a new field.")
+
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "type": field_type,
+        "contentTypeId": content_type_id,
+        "description": description
+        if description is not None
+        else (existing or {}).get("description")
+        or f"{MANAGED_MARKER}: alterios-mcp field.",
+        "settings": settings if settings is not None else (existing or {}).get("settings") or {},
+        "formDisplay": form_display if form_display is not None else (existing or {}).get("formDisplay") or {},
+    }
+    if mname is not None:
+        payload["mname"] = mname
+    elif existing and existing.get("mname") is not None:
+        payload["mname"] = existing.get("mname")
+    if help is not None:
+        payload["help"] = help
+    elif existing and existing.get("help") is not None:
+        payload["help"] = existing.get("help")
+    if tooltip is not None:
+        payload["tooltip"] = tooltip
+    elif existing and existing.get("tooltip") is not None:
+        payload["tooltip"] = existing.get("tooltip")
+    if order is not None:
+        payload["order"] = order
+    elif existing and existing.get("order") is not None:
+        payload["order"] = existing.get("order")
+    if required is not None:
+        payload["required"] = required
+    elif existing and existing.get("required") is not None:
+        payload["required"] = existing.get("required")
+    if default_value is not None:
+        payload["defaultValue"] = default_value
+    elif existing and existing.get("defaultValue") is not None:
+        payload["defaultValue"] = existing.get("defaultValue")
+
+    operation = _resource_operation(
+        name="POST /api/fields/save",
+        kind="field",
+        method="POST",
+        path="/api/fields/save",
+        summary="Create or update an Alterios content type field with preflight and readback.",
+        request={"_id": payload.get("_id"), "name": name, "mname": payload.get("mname"), "contentTypeId": content_type_id},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "content_type": _resource_summary(parent),
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(
+            existing,
+            payload,
+            ("name", "mname", "type", "description", "help", "tooltip", "order", "required", "defaultValue", "formDisplay", "settings"),
+        ),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_field(payload).as_dict()
+    saved_id = _extract_response_id(saved) or payload.get("_id")
+    if saved_id:
+        readback = client.field_by_id(saved_id).as_dict()
+    else:
+        readback = {"body": _find_field(client, content_type_id=content_type_id, mname=payload.get("mname"), name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_create_content(
+    content_type_id: str,
+    field_values: dict[str, Any],
+    expected_content_type_name: str | None = None,
+    groups_ids: list[str] | None = None,
+    name: str | None = None,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create an Alterios content row. Execution requires explicit write gates."""
+    if not content_type_id.strip():
+        raise ValueError("content_type_id must not be empty.")
+    if not field_values:
+        raise ValueError("field_values must contain at least one field.")
+    client = _client(profile, project_id)
+    content_type = _find_content_type(client, content_type_id=content_type_id)
+    if not content_type:
+        raise ValueError(f"Content type {content_type_id!r} was not found.")
+    if expected_content_type_name and content_type.get("name") != expected_content_type_name:
+        raise ValueError(
+            f"Content type name mismatch: expected {expected_content_type_name!r}, got {content_type.get('name')!r}."
+        )
+    normalized_fields = {str(key): normalize_content_field_value(value) for key, value in field_values.items()}
+    planned_payload: dict[str, Any] = {"contentTypeId": content_type_id, "fields": normalized_fields}
+    if groups_ids is not None:
+        planned_payload["groupsIds"] = groups_ids
+    if name is not None:
+        planned_payload["name"] = name
+    operation = _resource_operation(
+        name="POST /api/contents/save",
+        kind="content_create",
+        method="POST",
+        path="/api/contents/save",
+        summary="Create an Alterios content row with preflight and readback when the API returns an id.",
+        request=planned_payload,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "content_type": _resource_summary(content_type),
+        "planned_payload": planned_payload,
+        "field_keys": sorted(normalized_fields),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    created = client.create_content(content_type_id, field_values, groups_ids=groups_ids, name=name).as_dict()
+    created_id = _extract_response_id(created)
+    readback = client.content_by_id(created_id).as_dict() if created_id else None
+    response_payload.update({"created": created, "content_id": created_id, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_group(
+    name: str,
+    group_id: str | None = None,
+    form_id: str | None = None,
+    parent_group_id: str | None = None,
+    description: str | None = None,
+    publish: bool | None = None,
+    root: bool = False,
+    children: list[dict[str, Any]] | None = None,
+    order: int | None = None,
+    icon_id: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios menu group. Execution requires explicit write gates."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_group(client, group_id=group_id, name=name, include_root=root)
+    if group_id and not existing:
+        raise ValueError(f"Group {group_id!r} was not found.")
+    if existing:
+        _assert_managed_or_allowed(existing, kind="Group", allow_unmanaged_update=allow_unmanaged_update)
+    parent = _find_group(client, group_id=parent_group_id, include_root=True) if parent_group_id else _find_root_group(client)
+    if parent_group_id and not parent:
+        raise ValueError(f"Parent group {parent_group_id!r} was not found.")
+    if not existing and not root and not parent:
+        raise ValueError("parent_group_id was not passed and root group was not found.")
+    payload_root = root
+    if existing and existing.get("root") and not root:
+        payload_root = True
+    payload_publish = publish if publish is not None else (((existing or {}).get("publish")) if existing else True)
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description
+        if description is not None
+        else (existing or {}).get("description")
+        or f"{MANAGED_MARKER}: alterios-mcp group.",
+        "root": payload_root,
+        "children": children if children is not None else (existing or {}).get("children") or [],
+        "publish": payload_publish,
+    }
+    if parent_group_id is not None:
+        payload["parentGroupId"] = parent_group_id
+    elif existing and existing.get("parentGroupId") is not None:
+        payload["parentGroupId"] = existing.get("parentGroupId")
+    elif parent:
+        payload["parentGroupId"] = parent.get("_id")
+    if form_id is not None:
+        payload["formId"] = form_id
+    elif existing and existing.get("formId") is not None:
+        payload["formId"] = existing.get("formId")
+    if order is not None:
+        payload["order"] = order
+    elif existing and existing.get("order") is not None:
+        payload["order"] = existing.get("order")
+    if icon_id is not None:
+        payload["iconId"] = icon_id
+    elif existing and existing.get("iconId") is not None:
+        payload["iconId"] = existing.get("iconId")
+
+    operation = _resource_operation(
+        name=("PATCH /api/groups/{id}" if existing else "POST /api/groups"),
+        kind="group",
+        method="PATCH" if existing else "POST",
+        path=f"/api/groups/{existing.get('_id')}" if existing else "/api/groups",
+        summary="Create or update an Alterios menu group with preflight and readback.",
+        request={"_id": payload.get("_id"), "name": name, "formId": payload.get("formId"), "parentGroupId": payload.get("parentGroupId")},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "parent": _resource_summary(parent),
+        "diff": _resource_diff(existing, payload, ("name", "description", "root", "children", "publish", "parentGroupId", "formId", "order", "iconId")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_group(payload).as_dict()
+    saved_id = _extract_response_id(saved) or payload.get("_id")
+    readback = {"body": _find_group(client, group_id=saved_id, name=name, include_root=root)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_help(
+    name: str,
+    value: str,
+    help_id: str | None = None,
+    description: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios help entry. Execution requires explicit write gates."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    if not value.strip():
+        raise ValueError("value must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_help(client, help_id=help_id, name=name)
+    if existing:
+        _assert_help_managed_or_allowed(existing, allow_unmanaged_update=allow_unmanaged_update)
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "value": value,
+        "description": description
+        if description is not None
+        else (existing or {}).get("description")
+        or f"{MANAGED_MARKER}: alterios-mcp help.",
+    }
+    operation = _resource_operation(
+        name=("PATCH /api/helps/{id}" if existing else "POST /api/helps"),
+        kind="help",
+        method="PATCH" if existing else "POST",
+        path=f"/api/helps/{existing.get('_id')}" if existing else "/api/helps",
+        summary="Create or update an Alterios help entry with preflight and readback.",
+        request={"_id": payload.get("_id"), "name": name},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(existing, payload, ("name", "value", "description")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_help(payload).as_dict()
+    saved_id = _extract_response_id(saved) or payload.get("_id")
+    readback = {"body": _find_help(client, help_id=saved_id, name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
 
 
 @mcp.tool()
