@@ -1993,3 +1993,244 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     assert list_cell["valueActionContainers"][0]["iconId"] == "edit"
     assert apply_client.groups["group-1"]["formId"] == "form-3"
     assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_create_report_tab_dry_run_stores_plan_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse({"_id": view_id, "name": "Материалы. Список", "description": "Codex-managed"})
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            return FakeResponse([{"_id": "vf-1", "mname": "name", "alias": "Наименование", "order": 1, "type": "text"}])
+
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse({"_id": form_id, "name": "Материалы. Карточка", "description": "Codex-managed", "tabs": []})
+
+        def list_reports(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def view_data_simplified(self, view_id: str, *, limit: int = 20, offset: int = 0) -> FakeResponse:
+            return FakeResponse({"rows": [{"_id": "content-1", "name": "A"}]})
+
+        def view_data(
+            self,
+            view_id: str,
+            *,
+            limit: int = 20,
+            offset: int = 0,
+            content_id: str | None = None,
+            data_id: list[str] | None = None,
+            user_filters: dict[str, object] | None = None,
+        ) -> FakeResponse:
+            rows = [{"_id": data_id[0] if data_id else content_id}] if data_id else [{"_id": "content-1"}, {"_id": "content-2"}]
+            return FakeResponse({"rows": rows})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_create_report_tab(
+            "view-1",
+            "form-1",
+            "Материалы. Отчет",
+            tab_name="Отчет",
+            context_content_id="content-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
+    database = result["response"]["planned"]["report"]["template"]["Dictionary"]["Databases"]["0"]
+    assert database["ServiceName"] == "Project Database"
+    assert result["response"]["context_readback"]["validation"]["data_id_matches_expected"] is True
+    assert result["response"]["planned"]["form_tabs"][0]["rows"][0]["cells"][0]["params"]["openId"] is True
+    assert result["plan"]["plan_id"].startswith("wp_")
+    assert (tmp_path / result["plan"]["path"]).exists()
+
+
+def test_create_report_tab_execution_rejects_changed_plan_options_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse({"_id": view_id, "name": "Материалы. Список", "description": "Codex-managed"})
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            return FakeResponse([{"_id": "vf-1", "mname": "name", "alias": "Наименование", "order": 1}])
+
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse({"_id": form_id, "name": "Материалы. Карточка", "description": "Codex-managed", "tabs": []})
+
+        def list_reports(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def view_data_simplified(self, view_id: str, *, limit: int = 20, offset: int = 0) -> FakeResponse:
+            return FakeResponse({"rows": [{"_id": "content-1"}]})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        dry_run = server.alterios_create_report_tab(
+            "view-1",
+            "form-1",
+            "Материалы. Отчет",
+            tab_name="Отчет",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="operation does not match"),
+    ):
+        server.alterios_create_report_tab(
+            "view-1",
+            "form-1",
+            "Материалы. Отчет",
+            tab_name="Другой отчет",
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_create_report_tab_execution_creates_report_and_form_tab_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeReportTabClient:
+        def __init__(self) -> None:
+            self.views = {"view-1": {"_id": "view-1", "name": "Материалы. Список", "description": "Codex-managed"}}
+            self.view_fields = [
+                {"_id": "vf-1", "mname": "_id", "alias": "ID", "order": 0, "attribute": "_id"},
+                {"_id": "vf-2", "mname": "name", "alias": "Наименование", "order": 1, "type": "text"},
+                {"_id": "vf-3", "mname": "count", "alias": "Количество", "order": 2, "type": "number"},
+            ]
+            self.forms = {
+                "form-1": {
+                    "_id": "form-1",
+                    "name": "Материалы. Карточка",
+                    "description": "Codex-managed",
+                    "tabs": [{"name": None, "rows": []}],
+                    "formActionContainers": [],
+                }
+            }
+            self.reports: dict[str, dict[str, object]] = {}
+
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse(self.views[view_id])
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            return FakeResponse(self.view_fields)
+
+        def view_data_simplified(self, view_id: str, *, limit: int = 20, offset: int = 0) -> FakeResponse:
+            return FakeResponse({"rows": [{"_id": "content-1", "name": "A"}, {"_id": "content-2", "name": "B"}]})
+
+        def view_data(
+            self,
+            view_id: str,
+            *,
+            limit: int = 20,
+            offset: int = 0,
+            content_id: str | None = None,
+            data_id: list[str] | None = None,
+            user_filters: dict[str, object] | None = None,
+        ) -> FakeResponse:
+            if data_id:
+                return FakeResponse({"rows": [{"_id": data_id[0], "name": "A"}]})
+            return FakeResponse({"rows": [{"_id": "content-1"}, {"_id": "content-2"}]})
+
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse(self.forms[form_id])
+
+        def save_form(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            self.forms[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def list_reports(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([list(self.reports.values()), len(self.reports)])
+
+        def report_by_id(self, report_id: str) -> FakeResponse:
+            return FakeResponse(self.reports[report_id])
+
+        def save_report(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", "report-1")
+            self.reports[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run_client = FakeReportTabClient()
+        with patch.object(server, "_client", return_value=dry_run_client):
+            dry_run = server.alterios_create_report_tab(
+                "view-1",
+                "form-1",
+                "Материалы. Отчет",
+                tab_name="Отчет",
+                context_content_id="content-1",
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+    apply_client = FakeReportTabClient()
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=apply_client),
+    ):
+        result = server.alterios_create_report_tab(
+            "view-1",
+            "form-1",
+            "Материалы. Отчет",
+            tab_name="Отчет",
+            context_content_id="content-1",
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
+    assert result["response"]["ids"] == {"report_id": "report-1", "form_id": "form-1", "source_view_id": "view-1"}
+    assert apply_client.reports["report-1"]["template"]["Dictionary"]["DataSources"]["0"]["NameInSource"] == "Материалы. Список"
+    tab = apply_client.forms["form-1"]["tabs"][1]
+    assert tab["name"] == "Отчет"
+    cell = tab["rows"][0]["cells"][0]
+    assert cell["type"] == "report"
+    assert cell["params"] == {"reportId": "report-1", "fullscreenMode": False, "openId": True}
+    validation = result["response"]["readback"]["validation"]
+    assert validation["report_project_database"]["has_project_database"] is True
+    assert validation["report_project_database"]["view_name_matches"] is True
+    assert validation["form_tab_open_id"] is True
+    assert validation["context"]["data_id_row_count"] == 1
+    assert validation["render_evidence"]["status"] == "not_collected"
+    assert result["journal"]["event_id"].startswith("wj_")

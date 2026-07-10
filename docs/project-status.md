@@ -15,13 +15,13 @@ workflow, files, comments, users и reports. Sandbox practice script
 а также comments, file-field upload, saved manual script, BPMN process/task и
 dashboard report create/update/full-readback.
 
-Покрытие методов ведется явно: 71 MCP tools, 14 runtime services, 15 live
+Покрытие методов ведется явно: 72 MCP tools, 14 runtime services, 15 live
 read-only route probes, 78 REST route/method patterns и 13 классов операций.
 После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
-текущая write-поверхность составляет 33 write-like tools. Последний
-scenario-tool pass добавил `alterios_create_material_module`. Этап оптимизации
-добавил read-only tools для write plans и write journal, а сценарный
-material-module apply теперь требует проверенный `plan_id`.
+текущая write-поверхность составляет 34 write-like tools. Последний
+scenario-tool pass добавил `alterios_create_report_tab`. Этап оптимизации
+добавил read-only tools для write plans и write journal, а сценарные
+material-module/report-tab apply теперь требуют проверенный `plan_id`.
 
 По script/diagram/report research зафиксированы все наблюдаемые типы scripts,
 все BPMN task-like nodes проекта ART X и правила Project Database source
@@ -102,7 +102,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 
 | Этап | Статус | Ответственный | Критерии приемки |
 |---|---|---|---|
-| 16. Scenario tools | In progress | Lead Engineer + Write Tools + Form/View + Script/BPMN + Report | `alterios_create_material_module` implemented; next are `alterios_create_report_tab` and `alterios_create_process_flow` on top of saved `plan_id` workflow. |
+| 16. Scenario tools | In progress | Lead Engineer + Write Tools + Form/View + Script/BPMN + Report | `alterios_create_material_module` and `alterios_create_report_tab` implemented; next is `alterios_create_process_flow` on top of saved `plan_id` workflow. |
 
 ## Бэклог
 
@@ -132,7 +132,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
 | 1 | Add write `plan_id`, write journal, and replay/smoke foundation. | Partial | Foundation is done: dry-run plans, plan/journal readers, and `plan_id` enforcement for generic REST write. Replay/smoke command remains next. |
 | 1 | Add scenario tool `alterios_create_material_module`. | Done | Composes content type, fields, view, view entity, view fields, add/edit/list forms, group, metadata/form/group readback, and view-data smoke using saved `plan_id`. |
-| 1 | Add scenario tool `alterios_create_report_tab`. | Next | Should compose source view, report template, form tab, `openId`, `dataId` check, layout validation, and render evidence. |
+| 1 | Add scenario tool `alterios_create_report_tab`. | Done | Composes source view, Project Database report template, form tab, `openId`, `dataId` check, static layout validation, readback, and saved `plan_id`; browser render evidence remains stage 17. |
 | 1 | Add scenario tool `alterios_create_process_flow`. | Next | Should compose task form, script refs, BPMN XML, process start/task readback, and side-effect validation. |
 
 ## Текущие риски

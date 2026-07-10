@@ -60,6 +60,9 @@
 
 ### `alterios_create_report_tab`
 
+Статус: реализован на уровне API/readback; browser render evidence остается в
+этапе 17.
+
 Сценарий:
 
 1. source view;
@@ -74,7 +77,8 @@
 - report full/readback подтвержден;
 - source view возвращает данные;
 - form tab привязан к нужному report;
-- current-record scope проверен через `dataId`.
+- current-record scope проверен через `dataId`;
+- static layout validation выполняется по Stimulsoft template.
 
 ### `alterios_create_process_flow`
 
@@ -130,7 +134,7 @@
 
 1. Закрыть этап 15 как базу для apply-by-plan. Готово.
 2. Сделать `alterios_create_material_module`. Готово.
-3. Сделать `alterios_create_report_tab`.
+3. Сделать `alterios_create_report_tab`. Готово.
 4. Сделать `alterios_create_process_flow`.
 5. После сценарных tools перейти к render validation.
 6. После render validation перейти к inventory cache/diff health.

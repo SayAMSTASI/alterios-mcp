@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **71 инструмент**, из них **33 write-like инструмента**.
+Текущая поверхность MCP: **72 инструмента**, из них **34 write-like инструмента**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -72,6 +72,8 @@ MCP умеет собирать состав проекта:
 
 - сценарное создание модуля материала: тип материала, поля, представление,
   add/edit/list формы и группа меню через `alterios_create_material_module`;
+- сценарное создание вкладки отчета: source view, Project Database report,
+  form tab, `openId` и `dataId`-проверка через `alterios_create_report_tab`;
 - создание и обновление типов материалов;
 - создание и обновление полей;
 - создание контента;
@@ -105,7 +107,8 @@ MCP умеет собирать состав проекта:
 проверяют цель, формируют dry-run audit и делают readback там, где API это позволяет.
 Dry-run write tools сохраняют проверяемый `plan_id` в `artifacts/write-plans`,
 а execution events пишутся в `artifacts/write-journal`; generic
-`alterios_rest_write` и сценарный `alterios_create_material_module` при
+`alterios_rest_write`, `alterios_create_material_module` и
+`alterios_create_report_tab` при
 `dry_run=false` требуют совпадающий `plan_id`.
 
 ### Формы и пользовательский UI

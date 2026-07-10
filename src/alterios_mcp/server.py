@@ -1427,6 +1427,248 @@ def _material_module_plan_preview(
     }
 
 
+def _report_tab_operation(
+    *,
+    source_view_id: str,
+    target_form_id: str,
+    report_name: str,
+    report_id: str | None,
+    report_type: str,
+    tab_name: str,
+    cell_name: str,
+    template: str | dict[str, Any],
+    marker: str,
+    context_content_id: str | None,
+    expected_context_row_count: int | None,
+    open_id: bool,
+    fullscreen_mode: bool,
+    replace_existing_tab: bool,
+    allow_unmanaged_update: bool,
+) -> WriteOperation:
+    request = {
+        "sourceViewId": source_view_id,
+        "targetFormId": target_form_id,
+        "reportName": report_name,
+        "reportId": report_id,
+        "reportType": report_type,
+        "tabName": tab_name,
+        "cellName": cell_name,
+        "template": template,
+        "marker": marker,
+        "contextContentId": context_content_id,
+        "expectedContextRowCount": expected_context_row_count,
+        "openId": open_id,
+        "fullscreenMode": fullscreen_mode,
+        "replaceExistingTab": replace_existing_tab,
+        "allowUnmanagedUpdate": allow_unmanaged_update,
+    }
+    return _resource_operation(
+        name="SCENARIO create_report_tab",
+        kind="scenario_report_tab",
+        risk_level="write",
+        method="POST",
+        path="scenario://report-tab",
+        summary=(
+            "Create or update an Alterios report, attach it as an openId form tab, "
+            "and verify Project Database source/context readback."
+        ),
+        request={key: value for key, value in request.items() if value is not None},
+    )
+
+
+def _view_rows_from_response(value: Any) -> list[dict[str, Any]] | None:
+    body = value.get("body") if isinstance(value, dict) and "body" in value else value
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if isinstance(body, dict):
+        for key in ("rows", "items", "data", "results", "values"):
+            rows = body.get(key)
+            if isinstance(rows, list):
+                return [item for item in rows if isinstance(item, dict)]
+    return None
+
+
+def _view_row_count(value: Any) -> int | None:
+    rows = _view_rows_from_response(value)
+    return len(rows) if rows is not None else None
+
+
+def _report_column_type(field: dict[str, Any]) -> str:
+    source = field.get("contentTypeField") if isinstance(field.get("contentTypeField"), dict) else field
+    raw_type = str(source.get("type") or "").lower()
+    if raw_type in {"number", "integer", "float", "decimal"}:
+        return "System.Decimal"
+    if raw_type in {"boolean", "bool", "checkbox"}:
+        return "System.Boolean"
+    if raw_type in {"date", "datetime", "time"}:
+        return "System.DateTime"
+    return "System.String"
+
+
+def _project_database_columns(view_fields: list[dict[str, Any]]) -> list[dict[str, str]]:
+    columns: list[dict[str, str]] = [{"name": "_id", "alias": "ID", "type": "System.String"}]
+    seen = {"_id"}
+    ordered = sorted(view_fields, key=lambda item: (int(item.get("order") or 0), str(item.get("mname") or "")))
+    for field in ordered:
+        mname = str(field.get("mname") or field.get("attribute") or "").strip()
+        if not mname or mname in seen:
+            continue
+        seen.add(mname)
+        columns.append(
+            {
+                "name": mname,
+                "alias": str(field.get("alias") or field.get("name") or mname),
+                "type": _report_column_type(field),
+            }
+        )
+    return columns
+
+
+def _project_database_dashboard_template(
+    *,
+    report_name: str,
+    marker: str,
+    source_view_id: str,
+    source_view_name: str,
+    columns: list[dict[str, str]],
+) -> dict[str, Any]:
+    column_items = {
+        str(index): {"Name": column["name"], "Alias": column["alias"], "Type": column["type"]}
+        for index, column in enumerate(columns)
+    }
+    connection = json.dumps(
+        {"type": "view-data-v2", "filter": {"viewId": source_view_id}},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return {
+        "CodexMarker": marker,
+        "ReportName": report_name,
+        "Alterios": {
+            "sourceViewId": source_view_id,
+            "sourceViewName": source_view_name,
+            "templateKind": "report_tab_project_database",
+        },
+        "Dictionary": {
+            "Databases": {
+                "0": {
+                    "Ident": "StiDatabase",
+                    "Name": "Project Database",
+                    "Alias": "Project Database",
+                    "ServiceName": "Project Database",
+                    "ConnectionString": connection,
+                }
+            },
+            "DataSources": {
+                "0": {
+                    "Ident": "StiDataTableSource",
+                    "Name": source_view_name,
+                    "Alias": source_view_name,
+                    "NameInSource": source_view_name,
+                    "ServiceName": "Project Database",
+                    "Columns": column_items,
+                }
+            },
+        },
+        "Pages": {
+            "0": {
+                "Ident": "StiDashboard",
+                "Name": "ReportTabDashboard",
+                "Width": 10,
+                "Height": 7,
+                "Components": {
+                    "0": {
+                        "Ident": "StiTextElement",
+                        "Name": "ReportTitle",
+                        "ClientRectangle": "0.2,0.2,9.4,0.5",
+                        "Text": report_name,
+                    },
+                    "1": {
+                        "Ident": "StiTableElement",
+                        "Name": "SourceRows",
+                        "ClientRectangle": "0.2,0.9,9.4,5.8",
+                        "DataSourceName": source_view_name,
+                    },
+                },
+            }
+        },
+    }
+
+
+def _report_tab_row(*, report_id: str, cell_name: str, open_id: bool, fullscreen_mode: bool) -> dict[str, Any]:
+    params: dict[str, Any] = {"reportId": report_id, "fullscreenMode": fullscreen_mode}
+    if open_id:
+        params["openId"] = True
+    return {
+        "cells": [
+            {
+                "name": cell_name,
+                "type": "report",
+                "adding": {},
+                "params": params,
+                "styles": _material_flex_styles(),
+                "editing": {},
+                "emitting": {},
+                "reporting": {"reports": []},
+                "displaying": {"fields": {}, "header": {}},
+                "cellActionContainers": [],
+            }
+        ],
+        "styles": _material_row_styles(),
+        "reverse": False,
+    }
+
+
+def _tabs_with_report_tab(
+    form: dict[str, Any],
+    *,
+    tab_name: str,
+    report_id: str,
+    cell_name: str,
+    open_id: bool,
+    fullscreen_mode: bool,
+    replace_existing_tab: bool,
+) -> list[dict[str, Any]]:
+    tabs = json.loads(json.dumps(form.get("tabs") or [], ensure_ascii=False))
+    if not isinstance(tabs, list):
+        raise ValueError("Form tabs must be a list.")
+    target_row = _report_tab_row(
+        report_id=report_id,
+        cell_name=cell_name,
+        open_id=open_id,
+        fullscreen_mode=fullscreen_mode,
+    )
+    for tab in tabs:
+        if isinstance(tab, dict) and tab.get("name") == tab_name:
+            if not replace_existing_tab:
+                raise ValueError(f"Report tab {tab_name!r} already exists; pass replace_existing_tab=True.")
+            tab["rows"] = [target_row]
+            return tabs
+    tabs.append({"name": tab_name, "rows": [target_row]})
+    return tabs
+
+
+def _find_report_tab_cell(
+    form: dict[str, Any],
+    *,
+    tab_name: str,
+    report_id: str,
+) -> dict[str, Any] | None:
+    tabs = form.get("tabs") or []
+    if not isinstance(tabs, list):
+        return None
+    for tab in tabs:
+        if not isinstance(tab, dict) or tab.get("name") != tab_name:
+            continue
+        for row in tab.get("rows") or []:
+            for cell in (row or {}).get("cells") or []:
+                if isinstance(cell, dict) and cell.get("type") == "report":
+                    params = cell.get("params") or {}
+                    if isinstance(params, dict) and params.get("reportId") == report_id:
+                        return cell
+    return None
+
+
 @mcp.tool()
 def alterios_config(profile: str | None = None) -> dict[str, Any]:
     """Return redacted Alterios configuration and missing required values."""
@@ -4238,6 +4480,243 @@ def alterios_validate_stimulsoft_layout(
         "report": _resource_summary(report) if isinstance(report, dict) else None,
         "layout": analyze_stimulsoft_layout(source, overlap_tolerance=overlap_tolerance),
     }
+
+
+@mcp.tool()
+def alterios_create_report_tab(
+    source_view_id: str,
+    target_form_id: str,
+    report_name: str,
+    report_id: str | None = None,
+    tab_name: str = "Отчет",
+    cell_name: str | None = None,
+    report_type: str = "dashboard",
+    template: str | dict[str, Any] | None = None,
+    marker: str | None = None,
+    expected_source_view_name: str | None = None,
+    context_content_id: str | None = None,
+    expected_context_row_count: int | None = 1,
+    open_id: bool = True,
+    fullscreen_mode: bool = False,
+    replace_existing_tab: bool = True,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or apply a report plus openId form tab scenario backed by a Project Database source view."""
+    normalized_view_id = source_view_id.strip()
+    normalized_form_id = target_form_id.strip()
+    normalized_report_name = report_name.strip()
+    normalized_tab_name = tab_name.strip()
+    normalized_cell_name = (cell_name or tab_name).strip()
+    normalized_report_type = report_type.strip() or "dashboard"
+    if not normalized_view_id:
+        raise ValueError("source_view_id must not be empty.")
+    if not normalized_form_id:
+        raise ValueError("target_form_id must not be empty.")
+    if not normalized_report_name:
+        raise ValueError("report_name must not be empty.")
+    if not normalized_tab_name:
+        raise ValueError("tab_name must not be empty.")
+    if not normalized_cell_name:
+        raise ValueError("cell_name must not be empty.")
+    if expected_context_row_count is not None and expected_context_row_count < 0:
+        raise ValueError("expected_context_row_count must be non-negative or null.")
+
+    client = _client(profile, project_id)
+    source_view = _find_view(client, view_id=normalized_view_id)
+    if not source_view:
+        raise ValueError(f"Source view {normalized_view_id!r} was not found.")
+    source_view_name = str(source_view.get("name") or "")
+    if expected_source_view_name and source_view_name != expected_source_view_name:
+        raise ValueError(
+            f"Source view name mismatch: expected {expected_source_view_name!r}, got {source_view_name!r}."
+        )
+
+    target_form = _find_form(client, form_id=normalized_form_id)
+    if not target_form:
+        raise ValueError(f"Target form {normalized_form_id!r} was not found.")
+    _assert_managed_or_allowed(target_form, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+
+    existing_report = _find_report(client, report_id=report_id, name=normalized_report_name)
+    existing_report_full = (
+        client.report_by_id(existing_report["_id"]).body
+        if existing_report and existing_report.get("_id")
+        else None
+    )
+    if existing_report and not allow_unmanaged_update and not _report_is_manageable(existing_report, existing_report_full):
+        raise ValueError(
+            f"Report {existing_report.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True."
+        )
+
+    view_fields = _view_fields_body(client, normalized_view_id)
+    resolved_marker = marker or f"{MANAGED_MARKER}: alterios-mcp report tab {normalized_report_name}."
+    template_payload: str | dict[str, Any] = template if template is not None else _project_database_dashboard_template(
+        report_name=normalized_report_name,
+        marker=resolved_marker,
+        source_view_id=normalized_view_id,
+        source_view_name=source_view_name,
+        columns=_project_database_columns(view_fields),
+    )
+
+    operation = _report_tab_operation(
+        source_view_id=normalized_view_id,
+        target_form_id=normalized_form_id,
+        report_name=normalized_report_name,
+        report_id=report_id or (existing_report or {}).get("_id"),
+        report_type=normalized_report_type,
+        tab_name=normalized_tab_name,
+        cell_name=normalized_cell_name,
+        template=template_payload,
+        marker=resolved_marker,
+        context_content_id=context_content_id,
+        expected_context_row_count=expected_context_row_count,
+        open_id=open_id,
+        fullscreen_mode=fullscreen_mode,
+        replace_existing_tab=replace_existing_tab,
+        allow_unmanaged_update=allow_unmanaged_update,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+
+    source_readback = client.view_data_simplified(normalized_view_id, limit=5, offset=0).as_dict()
+    data_id_readback = None
+    content_id_readback = None
+    if context_content_id:
+        data_id_readback = client.view_data(normalized_view_id, limit=5, offset=0, data_id=[context_content_id]).as_dict()
+        content_id_readback = client.view_data(normalized_view_id, limit=5, offset=0, content_id=context_content_id).as_dict()
+    planned_tabs = _tabs_with_report_tab(
+        target_form,
+        tab_name=normalized_tab_name,
+        report_id=report_id or (existing_report or {}).get("_id") or "$report_id",
+        cell_name=normalized_cell_name,
+        open_id=open_id,
+        fullscreen_mode=fullscreen_mode,
+        replace_existing_tab=replace_existing_tab,
+    )
+    context_validation = {
+        "checked": bool(context_content_id),
+        "context_content_id": context_content_id,
+        "source_row_count": _view_row_count(source_readback),
+        "data_id_row_count": _view_row_count(data_id_readback) if data_id_readback else None,
+        "content_id_row_count": _view_row_count(content_id_readback) if content_id_readback else None,
+        "expected_context_row_count": expected_context_row_count,
+    }
+    context_validation["data_id_matches_expected"] = (
+        not context_content_id
+        or expected_context_row_count is None
+        or context_validation["data_id_row_count"] == expected_context_row_count
+    )
+    response_payload: dict[str, Any] = {
+        "source_view": _resource_summary(source_view),
+        "target_form": _resource_summary(target_form),
+        "report": _resource_summary(existing_report),
+        "view_field_count": len(view_fields),
+        "source_readback": source_readback,
+        "context_readback": {
+            "data_id": data_id_readback,
+            "content_id": content_id_readback,
+            "validation": context_validation,
+        },
+        "planned": {
+            "report": {
+                "_id": report_id or (existing_report or {}).get("_id"),
+                "name": normalized_report_name,
+                "type": normalized_report_type,
+                "marker": resolved_marker,
+                "template": template_payload,
+            },
+            "form_tabs": planned_tabs,
+            "layout": analyze_stimulsoft_layout(template_payload),
+        },
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_create_report_tab.")
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+
+    report_result = alterios_upsert_report(
+        normalized_report_name,
+        report_id=report_id,
+        report_type=normalized_report_type,
+        template=template_payload,
+        description=resolved_marker,
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    report_body = _response_body((report_result.get("response") or {}).get("readback"))
+    resolved_report_id = _extract_response_id(report_body) or _extract_response_id(report_result) or report_id
+    if not resolved_report_id:
+        raise ValueError("Report id was not resolved after save.")
+
+    next_tabs = _tabs_with_report_tab(
+        target_form,
+        tab_name=normalized_tab_name,
+        report_id=resolved_report_id,
+        cell_name=normalized_cell_name,
+        open_id=open_id,
+        fullscreen_mode=fullscreen_mode,
+        replace_existing_tab=replace_existing_tab,
+    )
+    form_result = alterios_patch_form_tabs(
+        normalized_form_id,
+        next_tabs,
+        expected_name=str(target_form.get("name") or "") or None,
+        allow_unmanaged_update=True,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+
+    report_readback = client.report_by_id(resolved_report_id).body
+    form_readback = client.form_by_id(normalized_form_id).body
+    report_validation = _report_project_base_validation(
+        report_readback,
+        expected_view_name=source_view_name,
+        expected_marker=resolved_marker,
+    )
+    report_tab_cell = _find_report_tab_cell(form_readback, tab_name=normalized_tab_name, report_id=resolved_report_id)
+    if not report_tab_cell:
+        raise ValueError("Report tab cell was not visible on form readback.")
+    params = report_tab_cell.get("params") if isinstance(report_tab_cell, dict) else {}
+    readback_validation = {
+        "report_project_database": report_validation,
+        "layout": analyze_stimulsoft_layout(report_readback),
+        "form_tab_found": report_tab_cell is not None,
+        "form_tab_open_id": isinstance(params, dict) and params.get("openId") is True,
+        "form_tab_report_id": params.get("reportId") if isinstance(params, dict) else None,
+        "context": context_validation,
+        "render_evidence": {
+            "status": "not_collected",
+            "note": "API/readback validation completed; browser Stimulsoft viewer render remains a separate UI evidence step.",
+        },
+    }
+    response_payload.update(
+        {
+            "ids": {"report_id": resolved_report_id, "form_id": normalized_form_id, "source_view_id": normalized_view_id},
+            "report_write": report_result,
+            "form_write": form_result,
+            "readback": {
+                "report": _resource_summary(report_readback),
+                "form": _resource_summary(form_readback),
+                "report_tab_cell": report_tab_cell,
+                "validation": readback_validation,
+            },
+        }
+    )
+    return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
 
 @mcp.tool()
