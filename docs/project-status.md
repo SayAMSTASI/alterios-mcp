@@ -48,6 +48,10 @@ Deep inventory now has reproducible scanners and live ART X matrices for
 forms, form actions, scripts, BPMN links, process/task readback counts, and
 iconId usage. Repo-owned skills are intentionally deferred until these matrices
 are used as their evidence base.
+The multi-agent operating contract now has a detailed task matrix for PM,
+project-base inventory, material/data modeling, view building, form surfaces,
+UI icons/actions, script/BPMN flows, Stimulsoft reports, write tools, safety
+verification, and skill curation.
 
 ## Completed
 
@@ -78,12 +82,13 @@ are used as their evidence base.
 | Build. Stimulsoft layout and analytics guardrails | Added a Russian playbook for printable forms, dashboard analytics, and Alterios Project Database rules; added `alterios_validate_stimulsoft_layout` plus `alterios-stimulsoft-layout-check`. | `80c495d` | Unit tests cover clean layout, visible overlap, page overflow, and dynamic-height risks; full `pytest`: 87 passed; `git diff --check` OK; read-only live check on reports `86ad4189-deaf-4744-96d5-6b1d22e73468` and `49236112-3335-4ca4-9a85-7f2236f6365a` returned 0 layout issues. |
 | Build. Form surface UX guardrails | Added `alterios_analyze_form_surface`, `alterios-form-surface-check`, and `docs/form-surface-ux-and-icons.md`. The premature repo-owned skill was removed until deep inventory evidence is complete. | `cd09639` | Unit tests cover clean view row, empty slot/source errors, row action order, missing icons, roles, styles, and report source inventory. |
 | Research. Form + Script/BPMN + Icons deep inventory | Added `alterios-deep-inventory`, live ART X form matrix, script/BPMN linkage matrix, icon usage matrix, and UTF-8 icon standard copy. | `fb98c14` | Live read-only run on `artx` project found 40 forms, 47 cells, 74 actions, 12 scripts, 4 diagrams, 8 BPMN form links, 7 form-script links, and 121 icon usages; read errors: 0. |
+| Design. Agent task matrix | Expanded `docs/agents-and-skills.md` into a concrete multi-agent task contract and synced `docs/roadmap.md` with the expanded role set. | `703e593` | `pytest`: 95 passed; `git diff --check` OK; docs secret scan found only public write-gate variable names. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 7. Deep inventory before repo skills | In Progress | Lead Engineer + PM/Explorer/Verifier agents | Finish form, script/BPMN, and icon matrices first; create repo-owned skills only after the matrices and scanners are verified. |
+| 7. Repo-owned skills from verified matrices | In Progress | Lead Engineer + PM/Explorer/Verifier agents | Use the expanded agent task matrix; create the first 8 repo-owned skills only from verified scanners, matrices, tools, and live sandbox evidence. |
 
 ## Backlog
 
