@@ -61,6 +61,8 @@ BPMN_DIAGRAM_NAME = "MCP Practice. BPMN Sandbox"
 BPMN_DIAGRAM_MARKER = "Codex-managed: alterios-mcp BPMN/process/task sandbox."
 REPORT_NAME = "MCP Practice. Report Sandbox"
 REPORT_MARKER = "Codex-managed: alterios-mcp report sandbox."
+OPENID_BOUND_REPORT_NAME = "MCP Practice. OpenId Bound Report"
+OPENID_BOUND_REPORT_MARKER = "Codex-managed: alterios-mcp openId data-bound report sandbox."
 OPENID_REPORT_TAB_NAME = "\u041e\u0442\u0447\u0435\u0442 openId"
 OPENID_REPORT_CELL_NAME = "\u041e\u0442\u0447\u0435\u0442 openId"
 
@@ -255,6 +257,7 @@ def setup_metadata(
 
     view_fields = ensure_view_fields(client, results, view["_id"], entity["_id"], fields, profile=profile, project_id=project_id, execute=execute)
     report = ensure_report(client, results, view["_id"], view_fields, profile=profile, project_id=project_id, execute=execute)
+    openid_report = ensure_openid_bound_report(client, results, view["_id"], view_fields, profile=profile, project_id=project_id, execute=execute)
     add_form = ensure_form(
         client,
         results,
@@ -268,7 +271,7 @@ def setup_metadata(
         client,
         results,
         EDIT_FORM_NAME,
-        build_edit_form(view["_id"], view_fields, report_id=report.get("_id") if report else None),
+        build_edit_form(view["_id"], view_fields, report_id=(openid_report or report or {}).get("_id")),
         profile=profile,
         project_id=project_id,
         execute=execute,
@@ -1175,40 +1178,90 @@ def ensure_report(
     execute: bool,
 ) -> dict[str, Any] | None:
     template = build_dashboard_template(client.config.base_url, view_id, view_fields)
-    payload = {"name": REPORT_NAME, "description": REPORT_MARKER, "type": "dashboard", "template": template}
-    existing = find_named(list_reports(client), REPORT_NAME)
+    return ensure_dashboard_report(
+        client,
+        results,
+        name=REPORT_NAME,
+        marker=REPORT_MARKER,
+        template=template,
+        profile=profile,
+        project_id=project_id,
+        execute=execute,
+    )
+
+
+def ensure_openid_bound_report(
+    client: AlteriosClient,
+    results: list[Result],
+    view_id: str,
+    view_fields: dict[str, dict[str, Any]],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    title_column = dashboard_column_name(view_fields, "title")
+    template = build_openid_bound_dashboard_template(client.config.base_url, view_id, view_fields)
+    return ensure_dashboard_report(
+        client,
+        results,
+        name=OPENID_BOUND_REPORT_NAME,
+        marker=OPENID_BOUND_REPORT_MARKER,
+        template=template,
+        required_texts=(title_column, "OpenIdCurrentRowTitle"),
+        profile=profile,
+        project_id=project_id,
+        execute=execute,
+    )
+
+
+def ensure_dashboard_report(
+    client: AlteriosClient,
+    results: list[Result],
+    *,
+    name: str,
+    marker: str,
+    template: str,
+    profile: str,
+    project_id: str,
+    execute: bool,
+    required_texts: tuple[str, ...] = (),
+) -> dict[str, Any] | None:
+    payload = {"name": name, "description": marker, "type": "dashboard", "template": template}
+    existing = find_named(list_reports(client), name)
     if existing:
         full = report_full_payload(client, existing["_id"])
-        if not report_is_manageable(existing, full):
-            raise RuntimeError(f"Report {REPORT_NAME!r} exists but is not Codex-managed; refusing to update it.")
+        if not report_is_manageable(existing, full, name=name, marker=marker):
+            raise RuntimeError(f"Report {name!r} exists but is not Codex-managed; refusing to update it.")
         full_type = (full or {}).get("type") if isinstance(full, dict) else None
         needs_update = (
             (existing.get("type") or full_type) != payload["type"]
             or not report_has_dashboard_page(full)
-            or not report_template_has_marker(full)
+            or not report_template_has_marker(full, marker)
+            or any(not report_template_contains_text(full, required_text) for required_text in required_texts)
         )
         if not needs_update:
-            results.append(Result("exists", "report", REPORT_NAME, existing["_id"]))
+            results.append(Result("exists", "report", name, existing["_id"]))
             return existing
         updated = strip_metadata({**existing, **payload})
         saved = write_rest(client, "PUT", "/api/reports", updated, profile=profile, project_id=project_id, execute=execute)
         if not execute:
-            results.append(Result("planned", "report", REPORT_NAME, existing["_id"]))
+            results.append(Result("planned", "report", name, existing["_id"]))
             return existing
-        results.append(Result("updated", "report", REPORT_NAME, existing["_id"]))
+        results.append(Result("updated", "report", name, existing["_id"]))
         return saved if isinstance(saved, dict) else updated
 
     write_rest(client, "POST", "/api/reports", payload, profile=profile, project_id=project_id, execute=execute)
     if not execute:
-        results.append(Result("planned", "report", REPORT_NAME))
+        results.append(Result("planned", "report", name))
         return None
-    refreshed = find_named(list_reports(client), REPORT_NAME)
+    refreshed = find_named(list_reports(client), name)
     if not refreshed or not refreshed.get("_id"):
-        raise RuntimeError(f"Create report {REPORT_NAME!r} was not visible on readback.")
+        raise RuntimeError(f"Create report {name!r} was not visible on readback.")
     full = report_full_payload(client, refreshed["_id"])
     if not full:
-        raise RuntimeError(f"Create report {REPORT_NAME!r} was not visible through /api/reports/full.")
-    results.append(Result("created", "report", REPORT_NAME, refreshed["_id"], {"full_readback": True}))
+        raise RuntimeError(f"Create report {name!r} was not visible through /api/reports/full.")
+    results.append(Result("created", "report", name, refreshed["_id"], {"full_readback": True}))
     return refreshed
 
 
@@ -1657,17 +1710,51 @@ def response_shape(value: Any) -> str:
 
 
 def build_dashboard_template(base_url: str, view_id: str, view_fields: dict[str, dict[str, Any]]) -> str:
+    return build_stimulsoft_dashboard_template(
+        base_url,
+        view_id,
+        view_fields,
+        report_name=REPORT_NAME,
+        marker=REPORT_MARKER,
+        template_kind="static",
+    )
+
+
+def build_openid_bound_dashboard_template(base_url: str, view_id: str, view_fields: dict[str, dict[str, Any]]) -> str:
+    return build_stimulsoft_dashboard_template(
+        base_url,
+        view_id,
+        view_fields,
+        report_name=OPENID_BOUND_REPORT_NAME,
+        marker=OPENID_BOUND_REPORT_MARKER,
+        template_kind="openid_bound",
+        title_column=dashboard_column_name(view_fields, "title"),
+    )
+
+
+def build_stimulsoft_dashboard_template(
+    base_url: str,
+    view_id: str,
+    view_fields: dict[str, dict[str, Any]],
+    *,
+    report_name: str,
+    marker: str,
+    template_kind: str,
+    title_column: str | None = None,
+) -> str:
     node_path = find_node()
     scripts_dir = ensure_stimulsoft_assets(base_url)
     helper_path = Path(tempfile.gettempdir()) / "alterios-stimulsoft" / "build_mcp_practice_dashboard.js"
     helper_path.write_text(STIMULSOFT_TEMPLATE_HELPER, encoding="utf-8")
     payload = {
         "scriptsDir": str(scripts_dir),
-        "reportName": REPORT_NAME,
-        "marker": REPORT_MARKER,
+        "reportName": report_name,
+        "marker": marker,
+        "templateKind": template_kind,
         "viewName": VIEW_NAME,
         "viewId": view_id,
         "columns": dashboard_columns(view_fields),
+        "titleColumn": title_column,
     }
     completed = subprocess.run(
         [str(node_path), str(helper_path)],
@@ -1702,6 +1789,14 @@ def dashboard_columns(view_fields: dict[str, dict[str, Any]]) -> list[dict[str, 
             column_type = "System.DateTime"
         columns.append({"name": mname, "alias": field.name, "type": column_type})
     return columns
+
+
+def dashboard_column_name(view_fields: dict[str, dict[str, Any]], suffix: str) -> str:
+    view_field = next((item for key, item in view_fields.items() if key.endswith(f"_{suffix}")), None)
+    mname = (view_field or {}).get("mname")
+    if not mname:
+        raise RuntimeError(f"View field mname for suffix {suffix!r} was not found.")
+    return str(mname)
 
 
 def find_node() -> Path:
@@ -1752,9 +1847,42 @@ function guid() {
   return 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
 }
 
-function makeTemplate() {
-  const report = S.Report.StiReport.createNewDashboard();
-  const json = JSON.parse(report.saveToJsonString());
+function addProjectDatabase(report) {
+  const connection = JSON.stringify({ type: 'view-data-v2', filter: { viewId: input.viewId } });
+  const database = new S.Report.Dictionary.StiCustomDatabase(input.viewName, PROJECT_DATABASE_SERVICE, connection);
+  database.serviceName = PROJECT_DATABASE_SERVICE;
+  database.castToColumnType = 'CastToColumnType';
+  report.dictionary.databases.add(database);
+
+  const dataSource = new S.Report.Dictionary.StiCustomSource(input.viewName, 'data', input.viewName);
+  dataSource.serviceName = PROJECT_DATABASE_SERVICE;
+  dataSource.sqlCommand = 'data';
+  for (const column of input.columns) {
+    let type = S.System.String;
+    if (column.type === 'System.DateTime') type = S.System.DateTime;
+    if (column.type === 'System.Decimal') type = S.System.Decimal;
+    if (column.type === 'System.Boolean') type = S.System.Boolean;
+    dataSource.columns.add(new S.Report.Dictionary.StiDataColumn(column.name, column.name, column.alias, type));
+  }
+  report.dictionary.dataSources.add(dataSource);
+}
+
+function finalize(report) {
+  addProjectDatabase(report);
+  const saved = JSON.parse(report.saveToJsonString());
+  saved.CodexMarker = input.marker;
+  const connection = JSON.stringify({ type: 'view-data-v2', filter: { viewId: input.viewId } });
+  for (const key of Object.keys(saved.Dictionary?.Databases || {})) {
+    saved.Dictionary.Databases[key].CastToColumnType = 'CastToColumnType';
+    saved.Dictionary.Databases[key].ConnectionString = connection;
+    delete saved.Dictionary.Databases[key].ConnectionStringEncrypted;
+  }
+  return JSON.stringify(saved);
+}
+
+function makeStaticTemplate() {
+  const source = S.Report.StiReport.createNewDashboard();
+  const json = JSON.parse(source.saveToJsonString());
   json.ReportName = input.reportName;
   json.ReportAlias = input.reportName;
   json.Pages['0'].Name = 'McpPracticeDashboard';
@@ -1780,31 +1908,72 @@ function makeTemplate() {
   loaded.load(JSON.stringify(json));
   loaded.reportName = input.reportName;
   loaded.reportAlias = input.reportName;
+  return finalize(loaded);
+}
 
-  const connection = JSON.stringify({ type: 'view-data-v2', filter: { viewId: input.viewId } });
-  const database = new S.Report.Dictionary.StiCustomDatabase(input.viewName, PROJECT_DATABASE_SERVICE, connection);
-  database.serviceName = PROJECT_DATABASE_SERVICE;
-  database.castToColumnType = 'CastToColumnType';
-  loaded.dictionary.databases.add(database);
-
-  const dataSource = new S.Report.Dictionary.StiCustomSource(input.viewName, 'data', input.viewName);
-  dataSource.serviceName = PROJECT_DATABASE_SERVICE;
-  dataSource.sqlCommand = 'data';
-  for (const column of input.columns) {
-    let type = S.System.String;
-    if (column.type === 'System.DateTime') type = S.System.DateTime;
-    if (column.type === 'System.Decimal') type = S.System.Decimal;
-    if (column.type === 'System.Boolean') type = S.System.Boolean;
-    dataSource.columns.add(new S.Report.Dictionary.StiDataColumn(column.name, column.name, column.alias, type));
+function makeOpenIdBoundTemplate() {
+  if (!input.titleColumn) {
+    throw new Error('titleColumn is required for openid_bound dashboard template');
   }
-  loaded.dictionary.dataSources.add(dataSource);
+  const source = S.Report.StiReport.createNewDashboard();
+  const json = JSON.parse(source.saveToJsonString());
+  json.ReportName = input.reportName;
+  json.ReportAlias = input.reportName;
+  json.Pages['0'].Name = 'McpPracticeOpenIdDashboard';
+  json.Pages['0'].Width = 1280;
+  json.Pages['0'].Height = 720;
+  json.Pages['0'].Components = {
+    '0': {
+      Ident: 'StiTextElement',
+      Name: 'OpenIdReportTitle',
+      Guid: guid(),
+      ClientRectangle: '24,24,900,56',
+      Border: ';;;;',
+      Text: 'MCP Practice openId current row',
+      ForeColor: '30,41,59',
+      SizeMode: 'Fit',
+      VertAlignment: 'Center',
+      CornerRadius: '0,0,0,0',
+      Shadow: ';;;'
+    },
+    '1': {
+      Ident: 'StiTextElement',
+      Name: 'OpenIdCurrentRowTitle',
+      Guid: guid(),
+      ClientRectangle: '24,104,1100,72',
+      Border: ';;;;',
+      Text: `{data.${input.titleColumn}}`,
+      ForeColor: '15,23,42',
+      SizeMode: 'Fit',
+      VertAlignment: 'Center',
+      Measures: {
+        '0': {
+          Ident: 'TextMeter',
+          Key: `data.${input.titleColumn}`,
+          Expression: `data.${input.titleColumn}`,
+          Label: 'Current row title'
+        }
+      },
+      CornerRadius: '0,0,0,0',
+      Shadow: ';;;'
+    }
+  };
 
-  const saved = JSON.parse(loaded.saveToJsonString());
-  saved.CodexMarker = input.marker;
-  for (const key of Object.keys(saved.Dictionary?.Databases || {})) {
-    saved.Dictionary.Databases[key].CastToColumnType = 'CastToColumnType';
+  const loaded = new S.Report.StiReport();
+  loaded.load(JSON.stringify(json));
+  loaded.reportName = input.reportName;
+  loaded.reportAlias = input.reportName;
+  return finalize(loaded);
+}
+
+function makeTemplate() {
+  if (input.templateKind === 'static') {
+    return makeStaticTemplate();
   }
-  return JSON.stringify(saved);
+  if (input.templateKind === 'openid_bound') {
+    return makeOpenIdBoundTemplate();
+  }
+  throw new Error(`Unknown templateKind: ${input.templateKind}`);
 }
 
 process.stdout.write(makeTemplate());
@@ -1968,10 +2137,15 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
     file_metadata = list_file_metadata(client, file_ids) if file_ids else []
     manual_script = find_named(list_scripts(client), MANUAL_SCRIPT_NAME)
     diagram = find_named(list_diagrams(client), BPMN_DIAGRAM_NAME)
-    report = find_named(list_reports(client), REPORT_NAME)
+    reports = list_reports(client)
+    report = find_named(reports, REPORT_NAME)
+    openid_bound_report = find_named(reports, OPENID_BOUND_REPORT_NAME)
     processes = list_processes(client, diagram_id=diagram["_id"], content_id=content["_id"]) if diagram and content else []
     tasks = active_tasks_for_processes(client, processes, diagram_id=diagram["_id"], content_id=content["_id"]) if diagram and content else []
     full_report = report_full_payload(client, report["_id"]) if report and report.get("_id") else None
+    full_openid_bound_report = (
+        report_full_payload(client, openid_bound_report["_id"]) if openid_bound_report and openid_bound_report.get("_id") else None
+    )
     view_probe = view_data_probe(client, view.get("_id") if view else None)
     return {
         "content_type_found": bool(content_type),
@@ -1983,7 +2157,10 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "view_id": view.get("_id") if view else None,
         "view_field_count": len(list_view_fields(client, view["_id"])) if view else 0,
         "forms": {name: form.get("_id") if form else None for name, form in forms.items()},
-        "edit_form_openid_report_tab": form_has_openid_report_tab(forms.get(EDIT_FORM_NAME), report.get("_id") if report else None),
+        "edit_form_openid_report_tab": form_has_openid_report_tab(
+            forms.get(EDIT_FORM_NAME),
+            (openid_bound_report or report or {}).get("_id"),
+        ),
         "group_id": group.get("_id") if group else None,
         "group_form_id": group.get("formId") if group else None,
         "content_id": content.get("_id") if content else None,
@@ -2010,6 +2187,11 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "report_id": report.get("_id") if report else None,
         "report_full_readback": bool(full_report),
         "report_has_dashboard_page": report_has_dashboard_page(full_report),
+        "openid_bound_report_id": openid_bound_report.get("_id") if openid_bound_report else None,
+        "openid_bound_report_full_readback": bool(full_openid_bound_report),
+        "openid_bound_report_has_dashboard_page": report_has_dashboard_page(full_openid_bound_report),
+        "openid_bound_report_has_project_database": report_has_project_database(full_openid_bound_report),
+        "openid_bound_report_has_title_column": report_template_contains_text(full_openid_bound_report, "mcp_practice_title"),
         "view_data_probe": view_probe,
     }
 
@@ -2202,17 +2384,45 @@ def report_has_dashboard_page(report: Any) -> bool:
     return isinstance(page, dict) and page.get("Ident") == "StiDashboard"
 
 
-def report_template_has_marker(report: Any) -> bool:
+def report_template_has_marker(report: Any, marker: str) -> bool:
     template = report_template_payload(report)
-    return isinstance(template, dict) and template.get("CodexMarker") == REPORT_MARKER
+    return isinstance(template, dict) and template.get("CodexMarker") == marker
 
 
-def report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
-    if REPORT_MARKER in str(existing.get("description") or "") or REPORT_MARKER in str((full or {}).get("description") if isinstance(full, dict) else ""):
+def report_is_manageable(existing: dict[str, Any], full: Any, *, name: str, marker: str) -> bool:
+    if marker in str(existing.get("description") or "") or marker in str((full or {}).get("description") if isinstance(full, dict) else ""):
         return True
-    if report_template_has_marker(full):
+    if report_template_has_marker(full, marker):
         return True
-    return existing.get("name") == REPORT_NAME and report_has_dashboard_page(full)
+    return existing.get("name") == name and report_has_dashboard_page(full)
+
+
+def report_template_contains_text(report: Any, expected: str) -> bool:
+    if not expected:
+        return True
+    template = report_template_payload(report)
+    return any(expected in item for item in walk_values(template) if isinstance(item, str))
+
+
+def report_has_project_database(report: Any) -> bool:
+    template = report_template_payload(report)
+    for value in walk_values(template):
+        if isinstance(value, dict) and value.get("ServiceName") == "Project Database":
+            return True
+        if isinstance(value, str) and value == "Project Database":
+            return True
+    return False
+
+
+def walk_values(value: Any) -> list[Any]:
+    values = [value]
+    if isinstance(value, dict):
+        for child in value.values():
+            values.extend(walk_values(child))
+    elif isinstance(value, list):
+        for child in value:
+            values.extend(walk_values(child))
+    return values
 
 
 def form_has_openid_report_tab(form: dict[str, Any] | None, report_id: str | None) -> bool:

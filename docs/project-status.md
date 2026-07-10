@@ -6,8 +6,7 @@ Last updated: 2026-07-10
 
 The project has completed the foundation, multi-instance profile inventory,
 read-only inventory expansion, script runtime catalog, controlled write gates,
-and the first browser/UI discovery tooling slice. Live browser captures are
-still pending before the first typed write candidate.
+and the first browser/UI discovery tooling slice.
 First controlled live write practice has been completed on the `artx` test
 project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 The ARTX project entity surface has been cataloged across metadata, UI,
@@ -33,9 +32,12 @@ repo-owned agents/skills and remaining high-risk security/destructive flows.
 The 2026-07-10 script/diagram/report research now records all observed script
 types, all BPMN task-like nodes in the ART X project, and a second sandbox
 dashboard report that proves Project Database source binding rules.
-The report-in-tab UI experiment now embeds the sandbox report in the edit form
-as a named tab with `params.openId=true` and proves that view/report context
-should be verified as `dataId: [openId]`, not `contentId` alone.
+The report-in-tab UI experiment now embeds a data-bound sandbox report in the
+edit form as a named tab with `params.openId=true`; API checks prove that
+current-record view/report context should be verified as `dataId: [openId]`,
+not `contentId` alone. The embedded viewer render itself remains open because
+the in-app browser currently shows an empty `viewer_*` container even for the
+static report.
 
 ## Completed
 
@@ -61,6 +63,7 @@ should be verified as `dataId: [openId]`, not `contentId` alone.
 | Build. Typed script/BPMN/report tools | Added `alterios_upsert_script`, `alterios_validate_script`, stronger `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_list_process_tasks`, `alterios_complete_task`, `alterios_validate_process_result`, `alterios_upsert_report`, `alterios_patch_report_template`, and `alterios_validate_report_project_base`. | `d54e1d1` | Unit/full tests passed; `artx` profile check OK; live `dry_run=false` verified script upsert, manual script execution, BPMN diagram upsert, process start, task completion, report upsert/template patch, and Project Database validation. Final live process start returned task and completion status 200; process validation returned `completed_matches=true`; report validation returned dashboard page, Project Database, marker match, view name match, and `view_row_count=1`; practice dry-run remained consistent with `process_count=3`, active `task_count=0`, report full readback, and view data row_count 1. |
 | Research. Scripts, BPMN tasks, and report source rules | Added `docs/script-diagram-report-research-2026-07-10.md` with live script type inventory, every parsed BPMN task node, and rules for connecting Stimulsoft reports to Project Database view sources. | `d317c0d` | Live `artx` inventory: 12 scripts (`manual=9`, `event=2`, `diagram=1`), 4 diagrams, 5 `userTask`, 1 `scriptTask`, 12 sequence flows; created report `35b6bdbe-f4ae-4ec1-99e9-c23db4df4543`; validation returned dashboard page, Project Database, marker match, view-name match, and `view_row_count=1`. |
 | Research. Report tab openId UI rules | Updated the sandbox edit form with a named report tab and `params.openId=true`; added a second sandbox content row to prove context scoping. Documented the rules in `docs/report-tab-openid-ui-research-2026-07-10.md`. | `8af5aaf` | Live `artx` update: edit form `15f5fb26-5db4-4153-8131-23a54411cd63` has `Отчет openId`; control row `b69e914d-9250-4672-ac81-047fdce887f8` created; no-context view data returned 2 rows, `contentId` returned 2 rows, `dataId=[openId]` returned 1 row; browser UI showed the tab and rendered `MCP Practice sandbox report`. |
+| Research. Data-bound openId report API template | Added a separate Codex-managed report `MCP Practice. OpenId Bound Report` and wired the edit-form report tab to it. The template uses Project Database and references the source view title column for current-row output. | `TBD-DATA-BOUND-OPENID-REPORT-COMMIT` | Live `artx` write created/updated report `49236112-3335-4ca4-9a85-7f2236f6365a`; readback confirmed dashboard page, Project Database source, title-field reference, and `edit_form_openid_report_tab=true`; `get-data` with `dataId=[openId]` still returns 1 row. Browser recheck found the embedded report viewer container empty for both static and data-bound reports, so visual proof remains open. |
 
 ## Active Stage
 
@@ -75,7 +78,7 @@ should be verified as `dataId: [openId]`, not `contentId` alone.
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
-| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab UI behavior is browser-verified; remaining capture priority is destructive/security flows and data-bound report visual proof. |
+| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Add repo-owned agents and skills scaffolding after typed tools land. | Next | Follow `docs/agents-and-skills.md`; do not create skills that document unverified APIs as facts. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
@@ -92,6 +95,7 @@ should be verified as `dataId: [openId]`, not `contentId` alone.
 | Remaining risky surfaces are security/destructive flows, not normal project-base builders. | Keep users/roles/destructive deletes behind separate sandbox scenario, explicit destructive gate, and UI/readback verification. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
+| Embedded report viewer currently renders an empty `viewer_*` container in the in-app browser, including for the static report that previously rendered. | Treat report template/API readback as verified, but keep data-bound report visual proof open until renderer/network behavior is diagnosed and the static report renders again. |
 | Generic REST write can create live UI objects but does not yet provide typed preflight semantics. | Use the ARTX help sandbox result to design narrow typed write tools with explicit allowed fields, dry-run diffs, and readback checks. |
 
 ## Next Concrete Actions
