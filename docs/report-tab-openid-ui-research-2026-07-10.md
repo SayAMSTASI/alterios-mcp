@@ -16,7 +16,8 @@ Updated the reproducible practice script:
 - static report id: `86ad4189-deaf-4744-96d5-6b1d22e73468`;
 - openId data-bound report id: `49236112-3335-4ca4-9a85-7f2236f6365a`;
 - primary content id: `bd51e83f-201e-4d53-bdc6-c4cd16754756`;
-- control content id: `b69e914d-9250-4672-ac81-047fdce887f8`.
+- control content id: `b69e914d-9250-4672-ac81-047fdce887f8`;
+- additional content id: `9a504330-5ce4-4a76-9043-bbc2fc293e3c`.
 
 The edit form has a second tab with a report cell:
 
@@ -50,7 +51,7 @@ The edit form has a second tab with a report cell:
 | openId report has dashboard page | `true` |
 | openId report has Project Database source | `true` |
 | openId report template references title column | `true` |
-| source view row count without context | `2` |
+| source view row count without context | `3` |
 | UI tab visible | yes |
 | embedded Stimulsoft viewer render | not currently confirmed; the in-app browser shows an empty `viewer_*` container for both the static and data-bound reports |
 
@@ -58,16 +59,17 @@ The edit form has a second tab with a report cell:
 
 Source view: `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`.
 
-With two rows in the sandbox source, context behavior is visible through the
-view API:
+The original openId experiment used two rows. A later additional sandbox row
+keeps the same context rule visible with three rows in the source view:
 
 | Request shape | Row count | Meaning |
 |---|---:|---|
-| `POST /api/views/v2/get-data` without context | 2 | Full source view. |
-| `POST /api/views/v2/get-data` with `contentId=<primary>` | 2 | `contentId` alone did not scope this view. |
+| `POST /api/views/v2/get-data` without context | 3 | Full source view. |
+| `POST /api/views/v2/get-data` with `contentId=<additional>` | 3 | `contentId` alone did not scope this view. |
 | `POST /api/views/v2/get-data` with `dataId=[<primary>]` | 1 | Current-record context works. |
 | `POST /api/views/v2/get-data` with `dataId=[<control>]` | 1 | A different openId scopes to its own row. |
-| `POST /api/views/v2/get-data-simplified` without context | 2 | Full source view as the report source sees it. |
+| `POST /api/views/v2/get-data` with `dataId=[<additional>]` | 1 | The third row follows the same rule. |
+| `POST /api/views/v2/get-data-simplified` without context | 3 | Full source view as the report source sees it. |
 
 ## Rules learned
 

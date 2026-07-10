@@ -46,6 +46,7 @@ MAIN_FORM_NAME = "MCP Practice"
 GROUP_NAME = "MCP Practice"
 CONTENT_ROW_TITLE = "MCP Practice. Тестовая запись"
 OPENID_CONTROL_ROW_TITLE = "MCP Practice. OpenId control row"
+ADDITIONAL_CONTENT_ROW_TITLE = "MCP Practice. Additional content row"
 
 SAVE_ICON_ID = "95ec6613-fdcc-4ad5-b93f-16e871b8cbbc"
 ADD_ICON_ID = "de3b1bed-27d2-4963-8024-64e7d71d9fb2"
@@ -303,6 +304,7 @@ def setup_metadata(
     ensure_group(client, results, main_form["_id"], profile=profile, project_id=project_id, execute=execute)
     content = ensure_practice_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
     ensure_openid_control_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
+    ensure_additional_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
     if content and content.get("_id"):
         ensure_practice_comment(client, results, content["_id"], profile=profile, project_id=project_id, execute=execute)
         ensure_file_upload(client, results, content_type["_id"], fields, content, profile=profile, project_id=project_id, execute=execute)
@@ -849,6 +851,55 @@ def ensure_openid_control_content(
     if not created or not created.get("_id"):
         raise RuntimeError(f"Create content {OPENID_CONTROL_ROW_TITLE!r} was not visible on readback.")
     results.append(Result("created", "content", OPENID_CONTROL_ROW_TITLE, created["_id"]))
+    return created
+
+
+def ensure_additional_content(
+    client: AlteriosClient,
+    results: list[Result],
+    content_type_id: str,
+    fields: list[dict[str, Any]],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    field_mnames = field_mnames_by_suffix(fields)
+    rows = list_content_rows(client, content_type_id, limit=500)
+    existing = next((row for row in rows if first((row.get("fields") or {}).get(field_mnames["title"])) == ADDITIONAL_CONTENT_ROW_TITLE), None)
+    payload_fields = {
+        field_mnames["title"]: [ADDITIONAL_CONTENT_ROW_TITLE],
+        field_mnames["status"]: ["checked"],
+        field_mnames["score"]: [42],
+        field_mnames["checked_at"]: ["2026-07-10"],
+        field_mnames["verified"]: [True],
+        field_mnames["comment"]: ["Additional sandbox content row for list and openId dataId verification."],
+    }
+    if existing:
+        updated = dict(existing)
+        updated["fields"] = dict(existing.get("fields") or {})
+        if all(updated["fields"].get(key) == value for key, value in payload_fields.items()):
+            results.append(Result("exists", "content", ADDITIONAL_CONTENT_ROW_TITLE, existing["_id"]))
+            return existing
+        updated["fields"].update(payload_fields)
+        payload = content_save_payload(updated)
+        saved = write_rest(client, "PATCH", "/api/contents/save", payload, profile=profile, project_id=project_id, execute=execute)
+        if not execute:
+            results.append(Result("planned", "content", ADDITIONAL_CONTENT_ROW_TITLE, existing["_id"]))
+            return existing
+        results.append(Result("updated", "content", ADDITIONAL_CONTENT_ROW_TITLE, existing["_id"]))
+        return saved if isinstance(saved, dict) else updated
+
+    payload = {"contentTypeId": content_type_id, "fields": payload_fields}
+    write_rest(client, "POST", "/api/contents/save", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "content", ADDITIONAL_CONTENT_ROW_TITLE))
+        return None
+    refreshed_rows = list_content_rows(client, content_type_id, limit=500)
+    created = next((row for row in refreshed_rows if first((row.get("fields") or {}).get(field_mnames["title"])) == ADDITIONAL_CONTENT_ROW_TITLE), None)
+    if not created or not created.get("_id"):
+        raise RuntimeError(f"Create content {ADDITIONAL_CONTENT_ROW_TITLE!r} was not visible on readback.")
+    results.append(Result("created", "content", ADDITIONAL_CONTENT_ROW_TITLE, created["_id"]))
     return created
 
 
@@ -2113,12 +2164,21 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
     rows = list_content_rows(client, content_type_id, limit=500) if content_type_id else []
     content = None
     openid_control_content = None
+    additional_content = None
     if field_mnames:
         content = next(
             (
                 row
                 for row in rows
                 if first((row.get("fields") or {}).get(field_mnames["title"])) == CONTENT_ROW_TITLE
+            ),
+            None,
+        )
+        additional_content = next(
+            (
+                row
+                for row in rows
+                if first((row.get("fields") or {}).get(field_mnames["title"])) == ADDITIONAL_CONTENT_ROW_TITLE
             ),
             None,
         )
@@ -2170,6 +2230,12 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "openid_control_content_title": (
             first((openid_control_content.get("fields") or {}).get(field_mnames["title"]))
             if openid_control_content and field_mnames
+            else None
+        ),
+        "additional_content_id": additional_content.get("_id") if additional_content else None,
+        "additional_content_title": (
+            first((additional_content.get("fields") or {}).get(field_mnames["title"]))
+            if additional_content and field_mnames
             else None
         ),
         "comment_found": bool(practice_comment),
