@@ -93,13 +93,13 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | Docs. Expanded user scenarios | Added `docs/expanded-user-scenarios.md` and linked it from README. The document expands scenarios for diagrams, views, groups, users, user groups, roles, inclusions, files, actions, listeners, multiple selection, reports, scripts, and content type transfer/publishing, while marking security/destructive and native publish gaps as evidence-required. | `8edd21a` | `pytest`: 115 passed; README/scenarios link check OK; `git diff --check` OK; README/scenarios secret scan clean; no live write executed. |
 | Build. Typed security/form-listener/bulk tools | Added typed users/user-groups/roles read/upsert/delete tools, `alterios_patch_form_cell_listeners`, `alterios_bulk_update_selected_content_fields`, and `alterios_plan_content_type_publish`. | `805b405` | `pytest`: 121 passed; `py_compile` for client/server OK; no-network tests cover security classification, dangerous gate enforcement, delete path audit, listener patching, bulk selected-row diff, and native publish blocking without UI/HAR evidence. No live security/delete write executed. |
 | Practice. Live security/delete and publish evidence | Verified sandbox content type publication flags, role create/update/delete, user-group create/update/delete, cleanup readback, and documented the remaining user-create backend contract gap. Also fixed redaction for `repassword`-style fields and stripped readback metadata from security audit target IDs. | `63b5d08` | Live `artx` writes: `/api/content-types/save` status `201`, final flags `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false`; `/api/roles` create `201`, update `200`, delete `200`, remaining roles `0`; `/api/user-groups` create `201`, update `200`, delete `200`, remaining groups `0`; user create attempts returned backend `HTTP 500` and cleanup scan found `0` sandbox users. Targeted tests for redaction/audit fixes passed. Evidence: `docs/live-write-evidence-2026-07-10.md`. |
-| Practice. UI user/delete and content-type transfer evidence | Captured UI-visible disposable user create/delete flow, API cleanup readback, frontend route evidence for user routes, and native content-type shared-list/clone route evidence. Translated key docs to Russian and documented multi-instance applicability. | pending | UI live: user form required `ownerId`; selecting `ArtX` created disabled user `47ac9730-2fa6-4cd2-8078-780f66bd009b`; row menu delete confirmed and cleanup `GET /api/users/listandcount` returned `remaining_matches=0`. Content-type transfer evidence: `GET /api/content-types?share=true` shows the published sandbox type and frontend service calls `POST /api/content-types/clone`; live clone not executed without a target sandbox project. |
+| Practice. UI user/delete and content-type transfer evidence | Captured UI-visible disposable user create/delete flow, API cleanup readback, frontend route evidence for user routes, and native content-type shared-list/clone route evidence. Translated key docs to Russian and documented multi-instance applicability. | `f2a762a` | UI live: user form required `ownerId`; selecting `ArtX` created disabled user `47ac9730-2fa6-4cd2-8078-780f66bd009b`; row menu delete confirmed and cleanup `GET /api/users/listandcount` returned `remaining_matches=0`. Content-type transfer evidence: `GET /api/content-types?share=true` shows the published sandbox type and frontend service calls `POST /api/content-types/clone`; live clone not executed without a target sandbox project. Tests: targeted 83 passed, full 126 passed, py_compile OK, diff/secret checks clean. |
 
 ## Активный этап
 
 | Этап | Статус | Ответственный | Критерии приемки |
 |---|---|---|---|
-| 14. UI/HAR write evidence and Russian docs | In Progress | Lead Engineer + Safety Verifier | Disposable user create/delete is UI/API verified; content-type cross-project transfer route evidence is documented; docs/Markdown is translated to Russian; tests, secret scan, commit and push remain. |
+| 14. UI/HAR write evidence and Russian docs | Done | Lead Engineer + Safety Verifier | Disposable user create/delete is UI/API verified; content-type cross-project transfer route evidence is documented; Markdown docs are Russian-facing; tests, secret scan and commit are complete. Push tracked in the final closeout. |
 
 ## Бэклог
 
@@ -142,8 +142,9 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 
 ## Следующие действия
 
-No active feature development remains in the current stage after the typed
-security/form/bulk expansion. Future work requires an explicit restart decision.
+В текущем closeout-этапе активная разработка закрыта после UI/HAR evidence,
+перевода Markdown-документации на русский и добавления native clone tool.
+Следующая разработка требует отдельного решения о рестарте работ.
 
 Deferred candidates:
 
