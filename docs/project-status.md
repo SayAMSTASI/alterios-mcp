@@ -20,7 +20,7 @@ The same practice script now covers comment write/readback and a visible
 The same practice script now covers file-field upload, saved manual script
 creation/execution, sandbox BPMN process/task completion, and dashboard report
 create/update/full-readback.
-Method coverage is now tracked explicitly: 50 MCP tools, 14 runtime services,
+Method coverage is now tracked explicitly: 51 MCP tools, 14 runtime services,
 15 live read-only route probes, 57 REST route/method patterns, and 13 operation
 classes.
 Reinventory on 2026-07-10 confirmed the main product gap: ART X project base
@@ -28,8 +28,9 @@ has live evidence for views, forms, scripts, BPMN/process/task side effects,
 files, comments, and reports. Typed-write expansion moved the MCP server from
 4 write-like tools out of 23 total tools to 18 write-like tools out of 43 total
 tools, then the metadata/data write expansion moved it to 23 write-like tools
-out of 50 total tools. The current build stage is shifting from typed write
-expansion to remaining high-risk security/destructive flows.
+out of 50 total tools. The dangerous-write safety pass added a read-only
+preflight classifier and moved the MCP surface to 51 tools while keeping
+write-like tools at 23.
 The 2026-07-10 script/diagram/report research now records all observed script
 types, all BPMN task-like nodes in the ART X project, and a second sandbox
 dashboard report that proves Project Database source binding rules.
@@ -63,6 +64,10 @@ Write-first metadata/data work now has typed MCP tools for content types,
 fields, content create, menu groups, and helps, with dry-run diffs, explicit
 profile/project targeting, write gate enforcement, managed-update guards, and
 readback where the API returns an id.
+Security/destructive flows now have a separate dangerous gate:
+`alterios_write_safety_preflight`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, and
+`allow_destructive=true` are required before generic REST/service execution can
+reach destructive or permission-changing routes.
 
 ## Completed
 
@@ -98,12 +103,13 @@ readback where the API returns an id.
 | Build. Skill forward-test and installer | Added `scripts/install_repo_skills.py`, installer tests, install documentation, forward-test report, PM inventory template, and skill improvements from three read-only subagent scenarios; installed the 8 skills into `C:\Users\admin\.codex\skills`. | `85acdc7` | Skill Creator `quick_validate`: repo 8/8 valid and installed 8/8 valid; `pytest`: 100 passed; installer dry-run reports 8 `skip` after install; installed source maps have no `../../../` paths. |
 | Build. Profile-level smoke matrix | Added `alterios-profile-smoke`, MCP tool `alterios_profile_smoke_matrix`, unit tests, README guidance, and sanitized live evidence in `docs/profile-smoke-matrix-2026-07-10.*`. | `c90963f` | Live read-only smoke: 2 profiles, project lists OK for both, 53 projects total, default-project route discovery 15/15 OK for both, write gate false; `pytest`: 103 passed; `git diff --check` OK; artifact secret/URL/UUID scan clean. |
 | Build. Typed metadata/data write tools | Added `alterios_list_content_types`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, and `alterios_upsert_help`. | `512cd55` | `pytest`: 111 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
+| Build. Dangerous write safety gate | Added `alterios_write_safety_preflight`, security-route classification, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, dangerous gate audit visibility, PATCH support for generic REST writes, and profile-smoke gate reporting. | `70bc301` | `pytest`: 115 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 10. Security/destructive sandbox gate | Planned | Lead Engineer + Safety Verifier + Write Tools Agent | Define and implement separate read-only-first evidence and extra gates for roles/security/delete flows before any destructive or permission-changing practice. |
+| 11. Security/destructive sandbox evidence | Next | Lead Engineer + Safety Verifier + Write Tools Agent | Use read-only UI/HAR/API evidence plus `alterios_write_safety_preflight` to map exact users/roles/delete routes before adding any typed destructive or permission-changing tool. |
 
 ## Backlog
 
@@ -111,6 +117,7 @@ readback where the API returns an id.
 |---:|---|---|---|
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
 | 1 | Add typed metadata/data create tools for content types, fields, content rows, groups, and helps. | Done | Implemented with dry-run diff, explicit `profile/project_id`, write gate, managed-update guard, target mismatch checks, and readback where the API returns an id. Unit-tested without live writes. |
+| 1 | Add separate dangerous write gate for security/destructive flows. | Done | `alterios_write_safety_preflight` classifies generic REST routes; `alterios_rest_write` and destructive services now require both `ALTERIOS_MCP_ALLOW_WRITE=1` and `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` plus `allow_destructive=true` for dangerous execution. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
@@ -129,8 +136,8 @@ readback where the API returns an id.
 | Risk | Mitigation |
 |---|---|
 | Runtime service endpoint compatibility is blocked in the current `vniimt` config because the endpoint template is `/api/scripts/execute-manual`. | Keep runtime service names cataloged only; do not treat them as executable through manual-script UUID endpoint. |
-| Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; use typed tools with readback for production workflows. |
-| Remaining risky surfaces are security/destructive flows, not normal project-base builders. | Keep users/roles/destructive deletes behind separate sandbox scenario, explicit destructive gate, and UI/readback verification. |
+| Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; dangerous routes additionally require `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` and `allow_destructive=true`. |
+| Remaining risky surfaces are security/destructive flows, not normal project-base builders. | Keep users/roles/destructive deletes behind read-only evidence, `alterios_write_safety_preflight`, typed target checks, explicit dangerous gate, and UI/readback verification. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
 | Embedded report viewer currently renders an empty `viewer_*` container in the in-app browser, including for the static report that previously rendered. | Treat report template/API readback as verified, but keep data-bound report visual proof open until renderer/network behavior is diagnosed and the static report renders again. |
@@ -138,8 +145,9 @@ readback where the API returns an id.
 
 ## Next Concrete Actions
 
-1. Keep destructive/security flows out of normal write tools until a separate
-   sandbox scenario and destructive gate are implemented.
+1. Capture read-only UI/HAR/API evidence for users/roles/delete routes and run
+   `alterios_write_safety_preflight` for each candidate before any typed tool is
+   added.
 2. Expand Stimulsoft validator with rendered PDF/image comparison once export
    or render tooling is available.
 
