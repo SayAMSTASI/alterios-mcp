@@ -1635,3 +1635,361 @@ def test_clone_shared_content_type_dry_run_uses_native_clone_route_without_real_
     assert result["response"]["source"]["name"] == "Shared material"
     assert result["response"]["source_project_id"] == "source-project"
     assert result["response"]["target_project_id"] == "target-project"
+
+
+def test_create_material_module_dry_run_stores_plan_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse([{"_id": "root", "name": "root", "root": True}])
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_create_material_module(
+            "Материалы",
+            "mat",
+            [{"name": "Наименование", "mname": "mat_name", "field_type": "text"}],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "scenario_material_module"
+    assert result["audit"]["operation"]["path"] == "scenario://material-module"
+    assert result["response"]["planned"]["steps"] == [
+        "upsert_content_type",
+        "upsert_fields",
+        "upsert_view",
+        "upsert_view_entity",
+        "upsert_view_fields",
+        "upsert_add_form",
+        "upsert_edit_form",
+        "upsert_list_form",
+        "upsert_group",
+        "readback_summary",
+    ]
+    assert result["response"]["planned"]["fields"][0]["view_mname"] == "name"
+    assert result["plan"]["plan_id"].startswith("wp_")
+    assert (tmp_path / result["plan"]["path"]).exists()
+
+
+def test_create_material_module_execution_requires_plan_id_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse([{"_id": "root", "name": "root", "root": True}])
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="plan_id is required"),
+    ):
+        server.alterios_create_material_module(
+            "Материалы",
+            "mat",
+            [{"name": "Наименование", "mname": "mat_name", "field_type": "text"}],
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_create_material_module_execution_rejects_changed_plan_options_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse([{"_id": "root", "name": "root", "root": True}])
+
+    fields = [{"name": "Наименование", "mname": "mat_name", "field_type": "text"}]
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        dry_run = server.alterios_create_material_module(
+            "Материалы",
+            "mat",
+            fields,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="operation does not match"),
+    ):
+        server.alterios_create_material_module(
+            "Материалы",
+            "mat",
+            fields,
+            icon_id="folder",
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_create_material_module_execution_creates_full_surface_without_real_network(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeMaterialClient:
+        def __init__(self) -> None:
+            self.content_types: dict[str, dict[str, object]] = {}
+            self.fields: dict[str, dict[str, object]] = {}
+            self.views: dict[str, dict[str, object]] = {}
+            self.view_entities_by_view: dict[str, list[dict[str, object]]] = {}
+            self.view_fields_by_view: dict[str, list[dict[str, object]]] = {}
+            self.forms: dict[str, dict[str, object]] = {}
+            self.groups: dict[str, dict[str, object]] = {"root": {"_id": "root", "name": "root", "root": True}}
+            self.next_ids = {
+                "ct": 1,
+                "field": 1,
+                "view": 1,
+                "entity": 1,
+                "view_field": 1,
+                "form": 1,
+                "group": 1,
+            }
+
+        def _new_id(self, kind: str) -> str:
+            value = f"{kind}-{self.next_ids[kind]}"
+            self.next_ids[kind] += 1
+            return value
+
+        def _listandcount(self, items: list[dict[str, object]]) -> FakeResponse:
+            return FakeResponse([items, len(items)])
+
+        def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return self._listandcount(list(self.content_types.values()))
+
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            return FakeResponse(self.content_types[content_type_id])
+
+        def save_content_type(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("ct"))
+            self.content_types[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def list_fields(
+            self,
+            *,
+            content_type_id: str | None = None,
+            field_id: str | None = None,
+            limit: int | None = None,
+            offset: int | None = None,
+        ) -> FakeResponse:
+            items = list(self.fields.values())
+            if field_id:
+                items = [item for item in items if item.get("_id") == field_id]
+            if content_type_id:
+                items = [item for item in items if item.get("contentTypeId") == content_type_id]
+            return FakeResponse(items)
+
+        def field_by_id(self, field_id: str) -> FakeResponse:
+            return FakeResponse(self.fields[field_id])
+
+        def save_field(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("field"))
+            self.fields[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return self._listandcount(list(self.views.values()))
+
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse(self.views[view_id])
+
+        def save_view(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("view"))
+            self.views[str(item["_id"])] = item
+            self.view_entities_by_view.setdefault(str(item["_id"]), [])
+            self.view_fields_by_view.setdefault(str(item["_id"]), [])
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def view_entities(self, view_id: str) -> FakeResponse:
+            return FakeResponse(self.view_entities_by_view.get(view_id, []))
+
+        def save_view_entity(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("entity"))
+            view_id = str(item["viewId"])
+            entities = self.view_entities_by_view.setdefault(view_id, [])
+            entities[:] = [existing for existing in entities if existing.get("_id") != item["_id"]]
+            entities.append(item)
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            return FakeResponse(self.view_fields_by_view.get(view_id, []))
+
+        def add_view_entity_field(
+            self,
+            entity_id: str,
+            *,
+            attribute: str | None = None,
+            content_type_field_id: str | None = None,
+        ) -> FakeResponse:
+            view_id = next(
+                view_id
+                for view_id, entities in self.view_entities_by_view.items()
+                if any(entity.get("_id") == entity_id for entity in entities)
+            )
+            item: dict[str, object] = {"_id": self._new_id("view_field"), "entityId": entity_id}
+            if attribute:
+                item.update({"attribute": attribute, "mname": attribute})
+            if content_type_field_id:
+                field = self.fields[content_type_field_id]
+                item.update({"contentTypeFieldId": content_type_field_id, "mname": field["mname"]})
+            self.view_fields_by_view.setdefault(view_id, []).append(item)
+            return FakeResponse({"_id": item["_id"]})
+
+        def save_view_field(self, payload: dict[str, object]) -> FakeResponse:
+            view_field_id = payload["_id"]
+            for fields in self.view_fields_by_view.values():
+                for index, item in enumerate(fields):
+                    if item.get("_id") == view_field_id:
+                        fields[index] = {**item, **payload}
+                        return FakeResponse({"_id": view_field_id, "saved": True})
+            raise KeyError(view_field_id)
+
+        def list_forms(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return self._listandcount(list(self.forms.values()))
+
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse(self.forms[form_id])
+
+        def save_form(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("form"))
+            self.forms[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def list_groups(self) -> FakeResponse:
+            return FakeResponse(list(self.groups.values()))
+
+        def save_group(self, payload: dict[str, object]) -> FakeResponse:
+            item = dict(payload)
+            item.setdefault("_id", self._new_id("group"))
+            self.groups[str(item["_id"])] = item
+            return FakeResponse({"_id": item["_id"], "saved": True})
+
+        def request(
+            self,
+            method: str,
+            path: str,
+            *,
+            params: dict[str, object] | None = None,
+            body: object | None = None,
+            requires_project: bool = True,
+        ) -> FakeResponse:
+            assert method == "POST"
+            assert path == "/api/views/v2/get-data-simplified"
+            assert body == {"viewId": "view-1", "limit": 1, "offset": 0}
+            return FakeResponse({"rows": [], "count": 0})
+
+    fields = [
+        {"name": "Наименование", "mname": "mat_name", "field_type": "text"},
+        {"name": "Количество", "mname": "mat_count", "field_type": "number"},
+    ]
+
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run_client = FakeMaterialClient()
+        with patch.object(server, "_client", return_value=dry_run_client):
+            dry_run = server.alterios_create_material_module(
+                "Материалы",
+                "mat",
+                fields,
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+    apply_client = FakeMaterialClient()
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=apply_client),
+    ):
+        result = server.alterios_create_material_module(
+            "Материалы",
+            "mat",
+            fields,
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["kind"] == "scenario_material_module"
+    assert result["response"]["ids"]["content_type_id"] == "ct-1"
+    assert result["response"]["ids"]["field_ids"] == {"mat_name": "field-1", "mat_count": "field-2"}
+    assert result["response"]["ids"]["view_id"] == "view-1"
+    assert result["response"]["readback"]["view_data_smoke"]["body"] == {"rows": [], "count": 0}
+    assert result["response"]["ids"]["add_form_id"] == "form-1"
+    assert result["response"]["ids"]["edit_form_id"] == "form-2"
+    assert result["response"]["ids"]["list_form_id"] == "form-3"
+    assert result["response"]["ids"]["group_id"] == "group-1"
+    assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "content"
+    assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"]["mat_name"]["order"] == 0
+    assert apply_client.forms["form-2"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "view_data"
+    assert apply_client.forms["form-2"]["tabs"][0]["rows"][1]["cells"][0]["type"] == "comments_list"
+    list_cell = apply_client.forms["form-3"]["tabs"][0]["rows"][0]["cells"][0]
+    assert list_cell["type"] == "view_data_list"
+    assert list_cell["displaying"]["fields"]["name"]["order"] == 1
+    assert list_cell["cellActionContainers"][0]["iconId"] == "add"
+    assert list_cell["valueActionContainers"][0]["iconId"] == "edit"
+    assert apply_client.groups["group-1"]["formId"] == "form-3"
+    assert result["journal"]["event_id"].startswith("wj_")

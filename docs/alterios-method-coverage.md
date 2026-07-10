@@ -16,8 +16,8 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 70 | Публичные callable tools в `src/alterios_mcp/server.py`. |
-| Write-like MCP tools | 32 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 71 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 33 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_create_material_module`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 78 | Read/detail/runtime/write/workflow/file/comment/report/security/content-transfer patterns ниже. |
@@ -47,7 +47,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; role and user-group create/update/delete live-verified in ART X sandbox; disposable user create/delete UI/API-verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 70
+## MCP Tools: 71
 
 | Tool | Вид |
 |---|---|
@@ -99,6 +99,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_upsert_view_entity` | Controlled typed view entity create/update |
 | `alterios_upsert_view_field` | Controlled typed view field attach/update |
 | `alterios_upsert_form` | Controlled typed form create/update |
+| `alterios_create_material_module` | Controlled scenario tool for content type, fields, view, add/edit/list forms, and menu group |
 | `alterios_patch_form_actions` | Controlled typed form actions patch |
 | `alterios_patch_form_tabs` | Controlled typed form tabs patch |
 | `alterios_patch_form_cell_listeners` | Controlled typed form cell listener patch |
@@ -137,11 +138,13 @@ bringing the surface to 66 tools and 31 write-like tools. The UI/HAR evidence
 pass added `alterios_clone_shared_content_type`, bringing the surface to 67
 tools and 32 write-like tools. The write workflow optimization pass added
 three read-only plan/journal tools, bringing the surface to 70 tools while
-keeping 32 write-like tools.
+keeping 32 write-like tools. The first scenario-tool pass added
+`alterios_create_material_module`, bringing the surface to 71 tools and 33
+write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 32 tools are
+does **not** mean the MCP operator surface is complete. Today 33 tools are
 write-like, and 2 of them are still broad generic escape hatches:
 
 - `alterios_add_comment` is typed but only covers comments;
@@ -158,6 +161,9 @@ write-like, and 2 of them are still broad generic escape hatches:
   `alterios_patch_form_actions`, `alterios_patch_form_tabs`, and
   `alterios_patch_form_cell_listeners` now cover the first typed view/form
   slice including targeted listener patching;
+- `alterios_create_material_module` composes content type, fields, view,
+  view entity, view fields, add/edit/list forms, menu group, `plan_id`
+  enforcement, and final readback into one сценарный write-tool;
 - `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`,
   `alterios_delete_user`, `alterios_delete_user_group`, and
   `alterios_delete_role` cover the first typed security/destructive admin

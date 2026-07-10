@@ -7,7 +7,7 @@
 
 ## Этап 15. Write workflow foundation
 
-Статус: начат.
+Статус: выполнен.
 
 Что входит:
 
@@ -37,6 +37,8 @@
 
 ### `alterios_create_material_module`
 
+Статус: реализован первым сценарным write-tool.
+
 Сценарий:
 
 1. content type;
@@ -53,7 +55,8 @@
 - dry-run создает составной план;
 - apply выполняет только сохраненный `plan_id`;
 - каждый шаг имеет readback;
-- итоговый модуль открывается из группы меню.
+- итоговый модуль привязан к группе меню;
+- runtime smoke выполняет `get-data-simplified` по созданному представлению.
 
 ### `alterios_create_report_tab`
 
@@ -125,8 +128,8 @@
 
 ## Рабочий порядок
 
-1. Закрыть этап 15 как базу для apply-by-plan.
-2. Сделать `alterios_create_material_module`.
+1. Закрыть этап 15 как базу для apply-by-plan. Готово.
+2. Сделать `alterios_create_material_module`. Готово.
 3. Сделать `alterios_create_report_tab`.
 4. Сделать `alterios_create_process_flow`.
 5. После сценарных tools перейти к render validation.

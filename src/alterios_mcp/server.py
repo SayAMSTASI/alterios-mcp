@@ -916,6 +916,517 @@ def _operation_result_shape(value: Any) -> str:
     return type(value).__name__
 
 
+def _response_body(value: Any) -> Any:
+    if isinstance(value, dict) and "body" in value:
+        return value.get("body")
+    return value
+
+
+def _material_module_operation(
+    *,
+    module_name: str,
+    field_name_prefix: str,
+    fields: list[dict[str, Any]],
+    content_type_id: str | None,
+    view_id: str | None,
+    add_form_id: str | None,
+    edit_form_id: str | None,
+    list_form_id: str | None,
+    group_id: str | None,
+    parent_group_id: str | None,
+    names: dict[str, str],
+    content_name_template: str | None,
+    icon_id: str | None,
+    add_icon_id: str | None,
+    edit_icon_id: str | None,
+    save_icon_id: str | None,
+    allow_unmanaged_update: bool,
+) -> WriteOperation:
+    request = {
+        "moduleName": module_name,
+        "fieldNamePrefix": field_name_prefix,
+        "fields": fields,
+        "contentTypeId": content_type_id,
+        "viewId": view_id,
+        "addFormId": add_form_id,
+        "editFormId": edit_form_id,
+        "listFormId": list_form_id,
+        "groupId": group_id,
+        "parentGroupId": parent_group_id,
+        "names": names,
+        "contentNameTemplate": content_name_template,
+        "icons": {
+            "group": icon_id,
+            "add": add_icon_id,
+            "edit": edit_icon_id,
+            "save": save_icon_id,
+        },
+        "allowUnmanagedUpdate": allow_unmanaged_update,
+    }
+    return _resource_operation(
+        name="SCENARIO create_material_module",
+        kind="scenario_material_module",
+        risk_level="write",
+        method="POST",
+        path="scenario://material-module",
+        summary=(
+            "Create or update a complete Alterios material module: content type, fields, view, "
+            "add/edit/list forms, and menu group."
+        ),
+        request={key: value for key, value in request.items() if value is not None},
+    )
+
+
+def _normalize_material_module_fields(
+    fields: list[dict[str, Any]],
+    *,
+    field_name_prefix: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(fields, list) or not fields:
+        raise ValueError("fields must contain at least one field definition.")
+    normalized: list[dict[str, Any]] = []
+    seen_mnames: set[str] = set()
+    for index, raw in enumerate(fields):
+        if not isinstance(raw, dict):
+            raise ValueError("Each field definition must be a JSON object.")
+        name = str(raw.get("name") or "").strip()
+        mname = str(raw.get("mname") or "").strip()
+        field_type = str(raw.get("field_type") or raw.get("type") or "").strip()
+        if not name:
+            raise ValueError(f"fields[{index}].name must not be empty.")
+        if not mname:
+            raise ValueError(f"fields[{index}].mname must not be empty.")
+        if not field_type:
+            raise ValueError(f"fields[{index}].field_type must not be empty.")
+        if mname in seen_mnames:
+            raise ValueError(f"Duplicate field mname {mname!r}.")
+        seen_mnames.add(mname)
+        order = raw.get("order")
+        normalized_field: dict[str, Any] = {
+            "name": name,
+            "mname": mname,
+            "field_type": field_type,
+            "view_mname": str(raw.get("view_mname") or _material_view_mname(mname, field_name_prefix)).strip(),
+            "order": int(order) if order is not None else index,
+        }
+        for source_key, target_key in (
+            ("field_id", "field_id"),
+            ("description", "description"),
+            ("help", "help"),
+            ("tooltip", "tooltip"),
+            ("required", "required"),
+            ("default_value", "default_value"),
+            ("defaultValue", "default_value"),
+            ("form_display", "form_display"),
+            ("formDisplay", "form_display"),
+            ("settings", "settings"),
+        ):
+            if source_key in raw:
+                normalized_field[target_key] = raw[source_key]
+        normalized.append(normalized_field)
+    return normalized
+
+
+def _material_view_mname(field_mname: str, field_name_prefix: str) -> str:
+    prefix = f"{field_name_prefix}_"
+    if field_name_prefix and field_mname.startswith(prefix):
+        return field_mname.removeprefix(prefix)
+    if field_mname.startswith("field_"):
+        return field_mname.removeprefix("field_")
+    return field_mname
+
+
+def _material_module_names(module_name: str, names: dict[str, str] | None = None) -> dict[str, str]:
+    overrides = names or {}
+    return {
+        "content_type": overrides.get("content_type") or module_name,
+        "view": overrides.get("view") or f"{module_name}. Список",
+        "add_form": overrides.get("add_form") or f"{module_name}. Добавить",
+        "edit_form": overrides.get("edit_form") or f"{module_name}. Карточка",
+        "list_form": overrides.get("list_form") or module_name,
+        "group": overrides.get("group") or module_name,
+    }
+
+
+def _material_flex_styles() -> dict[str, Any]:
+    return {"flexGrow": 1, "flexBasis": 0, "flexShrink": 1, "flexBasisUnit": "%"}
+
+
+def _material_row_styles() -> dict[str, Any]:
+    return _material_flex_styles()
+
+
+def _material_content_display_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        field["mname"]: {"order": int(field.get("order", index)), "title": field["name"]}
+        for index, field in enumerate(fields)
+    }
+
+
+def _material_view_display_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
+    display: dict[str, Any] = {"_id": {"order": 0, "hidden": True}}
+    for index, field in enumerate(fields, start=1):
+        field_order = int(field.get("order", index - 1)) + 1
+        display[field["view_mname"]] = {"order": field_order, "hidden": False, "title": field["name"]}
+    return display
+
+
+def _material_content_form_row(module_name: str, content_type_id: str, fields: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "cells": [
+            {
+                "name": module_name,
+                "type": "content",
+                "adding": {},
+                "params": {
+                    "openId": False,
+                    "createNew": True,
+                    "contentTypeId": content_type_id,
+                    "engineVersion": None,
+                },
+                "styles": _material_flex_styles(),
+                "editing": {},
+                "emitting": {},
+                "reporting": {"reports": []},
+                "displaying": {"fields": _material_content_display_fields(fields), "header": {}, "editForm": {}},
+                "cellActionContainers": [],
+            }
+        ],
+        "styles": _material_row_styles(),
+        "reverse": False,
+    }
+
+
+def _material_view_data_row(module_name: str, view_id: str, fields: list[dict[str, Any]], *, editable: bool) -> dict[str, Any]:
+    return {
+        "cells": [
+            {
+                "name": module_name,
+                "type": "view_data",
+                "adding": {},
+                "params": {"openId": True, "viewId": view_id, "engineVersion": "v2"},
+                "styles": _material_flex_styles(),
+                "editing": {"enabled": bool(editable)},
+                "emitting": {},
+                "reporting": {"reports": []},
+                "displaying": {"fields": _material_view_display_fields(fields), "header": {}, "editForm": {}},
+                "cellActionContainers": [],
+            }
+        ],
+        "styles": _material_row_styles(),
+        "reverse": False,
+    }
+
+
+def _material_comments_row() -> dict[str, Any]:
+    return {
+        "cells": [
+            {
+                "name": "Комментарии",
+                "type": "comments_list",
+                "adding": {},
+                "params": {"openId": True, "entity": "any"},
+                "styles": _material_flex_styles(),
+                "editing": {},
+                "emitting": {},
+                "reporting": {},
+                "displaying": {"fields": {}, "header": {"title": "Комментарии", "position": "top_left"}},
+                "cellActionContainers": [],
+            }
+        ],
+        "styles": _material_row_styles(),
+        "reverse": False,
+    }
+
+
+def _material_open_form_container(
+    *,
+    title: str,
+    icon_id: str | None,
+    form_id: str,
+    form_name: str,
+    view_entity_id: str,
+    position: str,
+) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": title,
+        "styles": {},
+        "actions": [
+            {
+                "_id": form_id,
+                "name": form_name,
+                "type": "forms",
+                "openInDialog": True,
+                "openInNewTab": False,
+                "viewEntityId": view_entity_id,
+                "argumentsConfig": {},
+            }
+        ],
+        "position": position,
+        "default": title == "Добавить",
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
+def _material_save_action_container(icon_id: str | None) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": "Сохранить",
+        "styles": {},
+        "actions": [{"_id": None, "type": "data_managing", "argumentsConfig": {}, "dataManagingType": "submit_all"}],
+        "position": "bottom_left",
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
+def _material_view_data_list_row(
+    *,
+    module_name: str,
+    view_id: str,
+    view_entity_id: str,
+    add_form_id: str,
+    add_form_name: str,
+    edit_form_id: str,
+    edit_form_name: str,
+    fields: list[dict[str, Any]],
+    add_icon_id: str | None,
+    edit_icon_id: str | None,
+) -> dict[str, Any]:
+    return {
+        "cells": [
+            {
+                "name": module_name,
+                "type": "view_data_list",
+                "adding": {"items": []},
+                "params": {"openId": True, "viewId": view_id, "engineVersion": "v2"},
+                "styles": _material_flex_styles(),
+                "editing": {},
+                "emitting": {"listeners": []},
+                "reporting": {"reports": []},
+                "displaying": {
+                    "list": {"pageSizeOptions": []},
+                    "fields": _material_view_display_fields(fields),
+                    "header": {},
+                    "editForm": {},
+                },
+                "cellActionContainers": [
+                    _material_open_form_container(
+                        title="Добавить",
+                        icon_id=add_icon_id,
+                        form_id=add_form_id,
+                        form_name=add_form_name,
+                        view_entity_id=view_entity_id,
+                        position="top_left",
+                    )
+                ],
+                "valueActionContainers": [
+                    _material_open_form_container(
+                        title="Редактировать",
+                        icon_id=edit_icon_id,
+                        form_id=edit_form_id,
+                        form_name=edit_form_name,
+                        view_entity_id=view_entity_id,
+                        position="toolbar",
+                    )
+                ],
+            }
+        ],
+        "styles": _material_row_styles(),
+        "reverse": False,
+    }
+
+
+def _material_module_preflight(
+    client: AlteriosClient,
+    *,
+    names: dict[str, str],
+    fields: list[dict[str, Any]],
+    content_type_id: str | None,
+    view_id: str | None,
+    add_form_id: str | None,
+    edit_form_id: str | None,
+    list_form_id: str | None,
+    group_id: str | None,
+    parent_group_id: str | None,
+    allow_unmanaged_update: bool,
+) -> dict[str, Any]:
+    content_type = _find_content_type(client, content_type_id=content_type_id, name=names["content_type"])
+    if content_type:
+        _assert_managed_or_allowed(content_type, kind="Content type", allow_unmanaged_update=allow_unmanaged_update)
+
+    field_preflight = []
+    if content_type and content_type.get("_id"):
+        for field in fields:
+            existing_field = _find_field(
+                client,
+                content_type_id=str(content_type["_id"]),
+                field_id=field.get("field_id"),
+                mname=field["mname"],
+                name=field["name"],
+            )
+            if existing_field:
+                _assert_managed_or_allowed(existing_field, kind="Field", allow_unmanaged_update=allow_unmanaged_update)
+            field_preflight.append({"field": field["mname"], "existing": _resource_summary(existing_field)})
+
+    view = _find_view(client, view_id=view_id, name=names["view"])
+    if view:
+        _assert_managed_or_allowed(view, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+
+    view_entity = None
+    if view and view.get("_id"):
+        view_entity = _find_view_entity(
+            client,
+            view_id=str(view["_id"]),
+            name=names["content_type"],
+            entity_type="content",
+        )
+
+    forms = {
+        "add": _find_form(client, form_id=add_form_id, name=names["add_form"]),
+        "edit": _find_form(client, form_id=edit_form_id, name=names["edit_form"]),
+        "list": _find_form(client, form_id=list_form_id, name=names["list_form"]),
+    }
+    for kind, form in forms.items():
+        if form:
+            _assert_managed_or_allowed(form, kind=f"{kind} form", allow_unmanaged_update=allow_unmanaged_update)
+
+    group = _find_group(client, group_id=group_id, name=names["group"])
+    if group:
+        _assert_managed_or_allowed(group, kind="Group", allow_unmanaged_update=allow_unmanaged_update)
+    parent = _find_group(client, group_id=parent_group_id, include_root=True) if parent_group_id else _find_root_group(client)
+    if parent_group_id and not parent:
+        raise ValueError(f"Parent group {parent_group_id!r} was not found.")
+
+    return {
+        "content_type": _resource_summary(content_type),
+        "fields": field_preflight,
+        "view": _resource_summary(view),
+        "view_entity": _resource_summary(view_entity),
+        "forms": {key: _resource_summary(value) for key, value in forms.items()},
+        "group": _resource_summary(group),
+        "parent_group": _resource_summary(parent),
+    }
+
+
+def _material_module_plan_preview(
+    *,
+    module_name: str,
+    names: dict[str, str],
+    fields: list[dict[str, Any]],
+    field_name_prefix: str,
+    content_type_id: str | None,
+    view_id: str | None,
+    add_form_id: str | None,
+    edit_form_id: str | None,
+    list_form_id: str | None,
+    group_id: str | None,
+    parent_group_id: str | None,
+    icon_id: str | None,
+    add_icon_id: str | None,
+    edit_icon_id: str | None,
+    save_icon_id: str | None,
+) -> dict[str, Any]:
+    planned_content_type_id = content_type_id or "$content_type_id"
+    planned_view_id = view_id or "$view_id"
+    planned_view_entity_id = "$view_entity_id"
+    planned_add_form_id = add_form_id or "$add_form_id"
+    planned_edit_form_id = edit_form_id or "$edit_form_id"
+    planned_list_form_id = list_form_id or "$list_form_id"
+    return {
+        "steps": [
+            "upsert_content_type",
+            "upsert_fields",
+            "upsert_view",
+            "upsert_view_entity",
+            "upsert_view_fields",
+            "upsert_add_form",
+            "upsert_edit_form",
+            "upsert_list_form",
+            "upsert_group",
+            "readback_summary",
+        ],
+        "content_type": {
+            "name": names["content_type"],
+            "content_type_id": content_type_id,
+            "field_name_prefix": field_name_prefix,
+        },
+        "fields": fields,
+        "view": {
+            "name": names["view"],
+            "view_id": view_id,
+            "entity": {
+                "name": names["content_type"],
+                "type": "content",
+                "config": {
+                    "main": True,
+                    "position": {"x": -260, "y": -180},
+                    "contentTypesIds": [planned_content_type_id],
+                },
+            },
+        },
+        "forms": {
+            "add": {
+                "name": names["add_form"],
+                "form_id": add_form_id,
+                "tabs": [{"name": None, "rows": [_material_content_form_row(module_name, planned_content_type_id, fields)]}],
+                "formActionContainers": [_material_save_action_container(save_icon_id)],
+            },
+            "edit": {
+                "name": names["edit_form"],
+                "form_id": edit_form_id,
+                "tabs": [
+                    {
+                        "name": None,
+                        "rows": [
+                            _material_view_data_row(module_name, planned_view_id, fields, editable=True),
+                            _material_comments_row(),
+                        ],
+                    }
+                ],
+                "formActionContainers": [_material_save_action_container(save_icon_id)],
+            },
+            "list": {
+                "name": names["list_form"],
+                "form_id": list_form_id,
+                "tabs": [
+                    {
+                        "name": None,
+                        "rows": [
+                            _material_view_data_list_row(
+                                module_name=module_name,
+                                view_id=planned_view_id,
+                                view_entity_id=planned_view_entity_id,
+                                add_form_id=planned_add_form_id,
+                                add_form_name=names["add_form"],
+                                edit_form_id=planned_edit_form_id,
+                                edit_form_name=names["edit_form"],
+                                fields=fields,
+                                add_icon_id=add_icon_id,
+                                edit_icon_id=edit_icon_id,
+                            )
+                        ],
+                    }
+                ],
+                "formActionContainers": [],
+            },
+        },
+        "group": {
+            "name": names["group"],
+            "group_id": group_id,
+            "parent_group_id": parent_group_id,
+            "form_id": planned_list_form_id,
+            "icon_id": icon_id,
+        },
+    }
+
+
 @mcp.tool()
 def alterios_config(profile: str | None = None) -> dict[str, Any]:
     """Return redacted Alterios configuration and missing required values."""
@@ -2692,6 +3203,370 @@ def alterios_upsert_form(
     readback_body = client.form_by_id(saved_id).as_dict() if saved_id else {"body": _find_form(client, name=name)}
     response_payload.update({"saved": saved, "readback": readback_body})
     return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_create_material_module(
+    module_name: str,
+    field_name_prefix: str,
+    fields: list[dict[str, Any]],
+    content_type_id: str | None = None,
+    view_id: str | None = None,
+    add_form_id: str | None = None,
+    edit_form_id: str | None = None,
+    list_form_id: str | None = None,
+    group_id: str | None = None,
+    names: dict[str, str] | None = None,
+    content_name_template: str | None = None,
+    parent_group_id: str | None = None,
+    icon_id: str | None = "inventory_2",
+    add_icon_id: str | None = "add",
+    edit_icon_id: str | None = "edit",
+    save_icon_id: str | None = "save",
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or apply a full Alterios material module: content type, fields, view, forms, and group."""
+    normalized_module_name = module_name.strip()
+    normalized_prefix = field_name_prefix.strip()
+    if not normalized_module_name:
+        raise ValueError("module_name must not be empty.")
+    if not normalized_prefix:
+        raise ValueError("field_name_prefix must not be empty.")
+    normalized_fields = _normalize_material_module_fields(fields, field_name_prefix=normalized_prefix)
+    resolved_names = _material_module_names(normalized_module_name, names)
+    operation = _material_module_operation(
+        module_name=normalized_module_name,
+        field_name_prefix=normalized_prefix,
+        fields=normalized_fields,
+        content_type_id=content_type_id,
+        view_id=view_id,
+        add_form_id=add_form_id,
+        edit_form_id=edit_form_id,
+        list_form_id=list_form_id,
+        group_id=group_id,
+        parent_group_id=parent_group_id,
+        names=resolved_names,
+        content_name_template=content_name_template,
+        icon_id=icon_id,
+        add_icon_id=add_icon_id,
+        edit_icon_id=edit_icon_id,
+        save_icon_id=save_icon_id,
+        allow_unmanaged_update=allow_unmanaged_update,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    client = _client(profile, project_id)
+    preflight = _material_module_preflight(
+        client,
+        names=resolved_names,
+        fields=normalized_fields,
+        content_type_id=content_type_id,
+        view_id=view_id,
+        add_form_id=add_form_id,
+        edit_form_id=edit_form_id,
+        list_form_id=list_form_id,
+        group_id=group_id,
+        parent_group_id=parent_group_id,
+        allow_unmanaged_update=allow_unmanaged_update,
+    )
+    response_payload: dict[str, Any] = {
+        "module_name": normalized_module_name,
+        "names": resolved_names,
+        "preflight": preflight,
+        "planned": _material_module_plan_preview(
+            module_name=normalized_module_name,
+            names=resolved_names,
+            fields=normalized_fields,
+            field_name_prefix=normalized_prefix,
+            content_type_id=content_type_id or (preflight.get("content_type") or {}).get("_id"),
+            view_id=view_id or (preflight.get("view") or {}).get("_id"),
+            add_form_id=add_form_id or ((preflight.get("forms") or {}).get("add") or {}).get("_id"),
+            edit_form_id=edit_form_id or ((preflight.get("forms") or {}).get("edit") or {}).get("_id"),
+            list_form_id=list_form_id or ((preflight.get("forms") or {}).get("list") or {}).get("_id"),
+            group_id=group_id or (preflight.get("group") or {}).get("_id"),
+            parent_group_id=parent_group_id or (preflight.get("parent_group") or {}).get("_id"),
+            icon_id=icon_id,
+            add_icon_id=add_icon_id,
+            edit_icon_id=edit_icon_id,
+            save_icon_id=save_icon_id,
+        ),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_create_material_module.")
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+
+    steps: list[dict[str, Any]] = []
+
+    content_type_result = alterios_upsert_content_type(
+        resolved_names["content_type"],
+        content_type_id=content_type_id,
+        field_name_prefix=normalized_prefix,
+        content_name_template=content_name_template,
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    content_type_body = _response_body((content_type_result.get("response") or {}).get("readback"))
+    content_type_id = _extract_response_id(content_type_body) or _extract_response_id(content_type_result) or content_type_id
+    if not content_type_id:
+        raise ValueError("Content type id was not resolved after save.")
+    steps.append({"step": "content_type", "id": content_type_id, "result": content_type_result})
+
+    saved_fields: list[dict[str, Any]] = []
+    for field in normalized_fields:
+        field_result = alterios_upsert_field(
+            content_type_id,
+            field["name"],
+            field["field_type"],
+            field_id=field.get("field_id"),
+            mname=field["mname"],
+            description=field.get("description"),
+            help=field.get("help"),
+            tooltip=field.get("tooltip"),
+            order=field.get("order"),
+            required=field.get("required"),
+            default_value=field.get("default_value"),
+            form_display=field.get("form_display"),
+            settings=field.get("settings"),
+            allow_unmanaged_update=allow_unmanaged_update,
+            dry_run=False,
+            profile=profile,
+            project_id=project_id,
+        )
+        field_body = _response_body((field_result.get("response") or {}).get("readback"))
+        field_id = _extract_response_id(field_body) or _extract_response_id(field_result) or field.get("field_id")
+        if not field_id:
+            raise ValueError(f"Field id was not resolved after save for {field['mname']!r}.")
+        saved_field = {**field, "_id": field_id}
+        if isinstance(field_body, dict):
+            saved_field.update({key: value for key, value in field_body.items() if key in {"_id", "name", "mname", "type"}})
+        saved_fields.append(saved_field)
+        steps.append({"step": "field", "id": field_id, "mname": field["mname"], "result": field_result})
+
+    view_result = alterios_upsert_view(
+        resolved_names["view"],
+        view_id=view_id,
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    view_body = _response_body((view_result.get("response") or {}).get("readback"))
+    view_id = _extract_response_id(view_body) or _extract_response_id(view_result) or view_id
+    if not view_id:
+        raise ValueError("View id was not resolved after save.")
+    steps.append({"step": "view", "id": view_id, "result": view_result})
+
+    view_entity_result = alterios_upsert_view_entity(
+        view_id,
+        resolved_names["content_type"],
+        entity_type="content",
+        config={"main": True, "position": {"x": -260, "y": -180}, "contentTypesIds": [content_type_id]},
+        joins=[],
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    view_entity_body = _response_body((view_entity_result.get("response") or {}).get("readback"))
+    view_entity_id = _extract_response_id(view_entity_body) or _extract_response_id(view_entity_result)
+    if not view_entity_id:
+        raise ValueError("View entity id was not resolved after save.")
+    steps.append({"step": "view_entity", "id": view_entity_id, "result": view_entity_result})
+
+    id_view_field_result = alterios_upsert_view_field(
+        view_id,
+        view_entity_id,
+        attribute="_id",
+        alias="ID",
+        mname="_id",
+        order=0,
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    steps.append({"step": "view_field", "attribute": "_id", "result": id_view_field_result})
+    saved_view_fields: list[dict[str, Any]] = []
+    for index, field in enumerate(saved_fields, start=1):
+        view_order = int(field.get("order", index - 1)) + 1
+        view_field_result = alterios_upsert_view_field(
+            view_id,
+            view_entity_id,
+            content_type_field_id=str(field["_id"]),
+            alias=field["name"],
+            mname=field["view_mname"],
+            order=view_order,
+            allow_unmanaged_update=allow_unmanaged_update,
+            dry_run=False,
+            profile=profile,
+            project_id=project_id,
+        )
+        view_field_body = _response_body((view_field_result.get("response") or {}).get("readback"))
+        saved_view_fields.append(
+            {
+                "field_id": field["_id"],
+                "field_mname": field["mname"],
+                "view_field_id": _extract_response_id(view_field_body),
+                "view_mname": field["view_mname"],
+            }
+        )
+        steps.append({"step": "view_field", "field_id": field["_id"], "result": view_field_result})
+
+    add_tabs = [
+        {
+            "name": None,
+            "rows": [_material_content_form_row(normalized_module_name, content_type_id, saved_fields)],
+        }
+    ]
+    add_form_result = alterios_upsert_form(
+        resolved_names["add_form"],
+        form_id=add_form_id,
+        page_title=resolved_names["add_form"],
+        tabs=add_tabs,
+        form_action_containers=[_material_save_action_container(save_icon_id)],
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    add_form_body = _response_body((add_form_result.get("response") or {}).get("readback"))
+    add_form_id = _extract_response_id(add_form_body) or _extract_response_id(add_form_result) or add_form_id
+    if not add_form_id:
+        raise ValueError("Add form id was not resolved after save.")
+    steps.append({"step": "add_form", "id": add_form_id, "result": add_form_result})
+
+    edit_tabs = [
+        {
+            "name": None,
+            "rows": [
+                _material_view_data_row(normalized_module_name, view_id, saved_fields, editable=True),
+                _material_comments_row(),
+            ],
+        }
+    ]
+    edit_form_result = alterios_upsert_form(
+        resolved_names["edit_form"],
+        form_id=edit_form_id,
+        page_title=resolved_names["edit_form"],
+        tabs=edit_tabs,
+        form_action_containers=[_material_save_action_container(save_icon_id)],
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    edit_form_body = _response_body((edit_form_result.get("response") or {}).get("readback"))
+    edit_form_id = _extract_response_id(edit_form_body) or _extract_response_id(edit_form_result) or edit_form_id
+    if not edit_form_id:
+        raise ValueError("Edit form id was not resolved after save.")
+    steps.append({"step": "edit_form", "id": edit_form_id, "result": edit_form_result})
+
+    list_tabs = [
+        {
+            "name": None,
+            "rows": [
+                _material_view_data_list_row(
+                    module_name=normalized_module_name,
+                    view_id=view_id,
+                    view_entity_id=view_entity_id,
+                    add_form_id=add_form_id,
+                    add_form_name=resolved_names["add_form"],
+                    edit_form_id=edit_form_id,
+                    edit_form_name=resolved_names["edit_form"],
+                    fields=saved_fields,
+                    add_icon_id=add_icon_id,
+                    edit_icon_id=edit_icon_id,
+                )
+            ],
+        }
+    ]
+    list_form_result = alterios_upsert_form(
+        resolved_names["list_form"],
+        form_id=list_form_id,
+        page_title=resolved_names["list_form"],
+        tabs=list_tabs,
+        form_action_containers=[],
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    list_form_body = _response_body((list_form_result.get("response") or {}).get("readback"))
+    list_form_id = _extract_response_id(list_form_body) or _extract_response_id(list_form_result) or list_form_id
+    if not list_form_id:
+        raise ValueError("List form id was not resolved after save.")
+    steps.append({"step": "list_form", "id": list_form_id, "result": list_form_result})
+
+    group_result = alterios_upsert_group(
+        resolved_names["group"],
+        group_id=group_id,
+        form_id=list_form_id,
+        parent_group_id=parent_group_id,
+        icon_id=icon_id,
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    group_body = _response_body((group_result.get("response") or {}).get("readback"))
+    group_id = _extract_response_id(group_body) or _extract_response_id(group_result) or group_id
+    if not group_id:
+        raise ValueError("Group id was not resolved after save.")
+    steps.append({"step": "group", "id": group_id, "result": group_result})
+
+    readback = {
+        "content_type": _resource_summary(_find_content_type(client, content_type_id=content_type_id)),
+        "fields": [
+            _resource_summary(_find_field(client, content_type_id=content_type_id, field_id=str(field["_id"])))
+            for field in saved_fields
+        ],
+        "view": _resource_summary(_find_view(client, view_id=view_id)),
+        "view_data_smoke": client.request(
+            "POST",
+            "/api/views/v2/get-data-simplified",
+            body={"viewId": view_id, "limit": 1, "offset": 0},
+        ).as_dict(),
+        "view_entity": _resource_summary(_find_view_entity(client, view_id=view_id, entity_id=view_entity_id)),
+        "view_fields": saved_view_fields,
+        "forms": {
+            "add": _resource_summary(_find_form(client, form_id=add_form_id)),
+            "edit": _resource_summary(_find_form(client, form_id=edit_form_id)),
+            "list": _resource_summary(_find_form(client, form_id=list_form_id)),
+        },
+        "group": _resource_summary(_find_group(client, group_id=group_id)),
+    }
+    response_payload.update(
+        {
+            "ids": {
+                "content_type_id": content_type_id,
+                "field_ids": {field["mname"]: field["_id"] for field in saved_fields},
+                "view_id": view_id,
+                "view_entity_id": view_entity_id,
+                "add_form_id": add_form_id,
+                "edit_form_id": edit_form_id,
+                "list_form_id": list_form_id,
+                "group_id": group_id,
+            },
+            "steps": steps,
+            "readback": readback,
+        }
+    )
+    return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
 
 @mcp.tool()
