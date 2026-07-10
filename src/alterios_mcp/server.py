@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from .client import (
     AlteriosClient,
     AlteriosConfig,
+    AlteriosRequestError,
     content_update_payload,
     configured_profiles,
     normalize_content_field_value,
@@ -322,6 +323,95 @@ def _resource_summary(resource: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+def _security_resource_summary(resource: dict[str, Any] | None) -> dict[str, Any] | None:
+    if resource is None:
+        return None
+    return {
+        "_id": resource.get("_id"),
+        "name": resource.get("name"),
+        "email": resource.get("email"),
+        "description": resource.get("description"),
+        "projectId": resource.get("projectId"),
+        "isActive": resource.get("isActive"),
+        "rolesIds": resource.get("rolesIds"),
+        "groupsIds": resource.get("groupsIds"),
+        "projectsIds": resource.get("projectsIds"),
+    }
+
+
+def _filter_items(items: list[dict[str, Any]], search: str | None, keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    if not search:
+        return items
+    needle = search.strip().lower()
+    if not needle:
+        return items
+    filtered = []
+    for item in items:
+        haystack = " ".join(str(item.get(key) or "") for key in keys).lower()
+        if needle in haystack:
+            filtered.append(item)
+    return filtered
+
+
+def _listandcount_tool_response(
+    response: Any,
+    *,
+    search: str | None = None,
+    keys: tuple[str, ...] = ("_id", "name"),
+) -> dict[str, Any]:
+    payload = response.as_dict()
+    if search:
+        items = _filter_items(listandcount_items(response.body), search, keys)
+        payload["local_filter"] = {"search": search, "matched_count": len(items), "items": items}
+    return payload
+
+
+def _security_resource_operation(
+    *,
+    collection: str,
+    action: str,
+    kind: str,
+    resource_id: str | None,
+    request: dict[str, Any],
+    summary: str,
+) -> WriteOperation:
+    method = "DELETE" if action == "delete" else ("PATCH" if resource_id else "POST")
+    path = f"/api/{collection}/{resource_id}" if resource_id else f"/api/{collection}"
+    return _resource_operation(
+        name=f"{method} {path}",
+        kind=kind,
+        method=method,
+        path=path,
+        summary=summary,
+        request=request,
+        risk_level="security",
+    )
+
+
+def _security_payload(existing: dict[str, Any] | None, payload: dict[str, Any], resource_id: str | None) -> dict[str, Any]:
+    if not payload:
+        raise ValueError("payload must contain at least one field.")
+    merged = {**(existing or {}), **payload}
+    if resource_id:
+        merged["_id"] = resource_id
+    return merged
+
+
+def _delete_readback(client: AlteriosClient, kind: str, resource_id: str) -> dict[str, Any]:
+    try:
+        if kind == "user":
+            body = client.user_by_id(resource_id).body
+        elif kind == "user_group":
+            body = client.user_group_by_id(resource_id).body
+        elif kind == "role":
+            body = client.role_by_id(resource_id).body
+        else:
+            raise ValueError(f"Unsupported delete readback kind: {kind}")
+    except AlteriosRequestError:
+        return {"deleted": True, "body": None}
+    return {"deleted": False, "body": body}
+
+
 def _find_named_resource(items: Any, name: str) -> dict[str, Any] | None:
     for item in listandcount_items(items):
         if item.get("name") == name:
@@ -404,6 +494,73 @@ def _find_group(
     for group in groups:
         if name and group.get("name") == name and (include_root or not group.get("root")):
             return group
+    return None
+
+
+def _find_user(
+    client: AlteriosClient,
+    *,
+    user_id: str | None = None,
+    email: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if user_id:
+        try:
+            body = client.user_by_id(user_id).body
+        except AlteriosRequestError:
+            return None
+        if not isinstance(body, dict):
+            raise ValueError("User readback returned unexpected payload.")
+        return body
+    items = listandcount_items(client.list_users(limit=5000).body)
+    normalized_email = email.strip().lower() if email else None
+    for item in items:
+        if normalized_email and str(item.get("email") or "").lower() == normalized_email:
+            return item
+        if name:
+            haystack = " ".join(
+                str(item.get(key) or "") for key in ("name", "firstName", "lastName", "middleName", "email")
+            ).lower()
+            if name.strip().lower() in haystack:
+                return item
+    return None
+
+
+def _find_user_group(
+    client: AlteriosClient,
+    *,
+    user_group_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if user_group_id:
+        try:
+            body = client.user_group_by_id(user_group_id).body
+        except AlteriosRequestError:
+            return None
+        if not isinstance(body, dict):
+            raise ValueError("User group readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_user_groups(limit=5000).body, name)
+    return None
+
+
+def _find_role(
+    client: AlteriosClient,
+    *,
+    role_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if role_id:
+        try:
+            body = client.role_by_id(role_id).body
+        except AlteriosRequestError:
+            return None
+        if not isinstance(body, dict):
+            raise ValueError("Role readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_roles(limit=5000).body, name)
     return None
 
 
@@ -926,6 +1083,75 @@ def alterios_list_content_types(
 
 
 @mcp.tool()
+def alterios_list_users(
+    limit: int = 1000,
+    offset: int = 0,
+    search: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios users through the typed security listandcount route."""
+    response = _client(profile, project_id).list_users(limit=limit, offset=offset)
+    return _listandcount_tool_response(response, search=search, keys=("_id", "name", "email", "firstName", "lastName"))
+
+
+@mcp.tool()
+def alterios_get_user(
+    user_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read one Alterios user by ID through the typed security route."""
+    return _client(profile, project_id).user_by_id(user_id).as_dict()
+
+
+@mcp.tool()
+def alterios_list_user_groups(
+    limit: int = 1000,
+    offset: int = 0,
+    search: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios user groups through the typed security listandcount route."""
+    response = _client(profile, project_id).list_user_groups(limit=limit, offset=offset)
+    return _listandcount_tool_response(response, search=search, keys=("_id", "name", "description"))
+
+
+@mcp.tool()
+def alterios_get_user_group(
+    user_group_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read one Alterios user group by ID through the typed security route."""
+    return _client(profile, project_id).user_group_by_id(user_group_id).as_dict()
+
+
+@mcp.tool()
+def alterios_list_roles(
+    limit: int = 1000,
+    offset: int = 0,
+    search: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read Alterios roles through the typed security listandcount route."""
+    response = _client(profile, project_id).list_roles(limit=limit, offset=offset)
+    return _listandcount_tool_response(response, search=search, keys=("_id", "name", "description", "code"))
+
+
+@mcp.tool()
+def alterios_get_role(
+    role_id: str,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read one Alterios role by ID through the typed security route."""
+    return _client(profile, project_id).role_by_id(role_id).as_dict()
+
+
+@mcp.tool()
 def alterios_file_metadata(
     file_ids: list[str],
     profile: str | None = None,
@@ -933,6 +1159,336 @@ def alterios_file_metadata(
 ) -> dict[str, Any]:
     """Read Alterios file metadata for one or more file IDs."""
     return _client(profile, project_id).file_metadata(file_ids).as_dict()
+
+
+@mcp.tool()
+def alterios_upsert_user(
+    payload: dict[str, Any],
+    user_id: str | None = None,
+    lookup_email: str | None = None,
+    lookup_name: str | None = None,
+    expected_email: str | None = None,
+    allow_create: bool = False,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios user. Classified as security write."""
+    client = _client(profile, project_id)
+    existing = _find_user(client, user_id=user_id, email=lookup_email, name=lookup_name)
+    if not existing and not allow_create:
+        raise ValueError("User was not found; pass allow_create=True only after security review.")
+    if existing and expected_email and str(existing.get("email") or "").lower() != expected_email.strip().lower():
+        raise ValueError(f"User email mismatch: expected {expected_email!r}, got {existing.get('email')!r}.")
+    resource_id = user_id or (str(existing.get("_id")) if existing and existing.get("_id") else None)
+    planned_payload = _security_payload(existing, payload, resource_id)
+    operation = _security_resource_operation(
+        collection="users",
+        action="upsert",
+        kind="user",
+        resource_id=resource_id,
+        request=planned_payload,
+        summary="Create or update an Alterios user and verify through user readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _security_resource_summary(existing),
+        "diff": _resource_diff(existing, planned_payload, tuple(sorted(planned_payload.keys()))),
+        "planned_payload": strip_alterios_metadata(planned_payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    saved = client.save_user(planned_payload).as_dict()
+    saved_id = _extract_response_id(saved) or planned_payload.get("_id")
+    readback = client.user_by_id(str(saved_id)).as_dict() if saved_id else None
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_user_group(
+    payload: dict[str, Any],
+    user_group_id: str | None = None,
+    lookup_name: str | None = None,
+    expected_name: str | None = None,
+    allow_create: bool = False,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios user group. Classified as security write."""
+    client = _client(profile, project_id)
+    existing = _find_user_group(client, user_group_id=user_group_id, name=lookup_name)
+    if not existing and not allow_create:
+        raise ValueError("User group was not found; pass allow_create=True only after security review.")
+    if existing and expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"User group name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    resource_id = user_group_id or (str(existing.get("_id")) if existing and existing.get("_id") else None)
+    planned_payload = _security_payload(existing, payload, resource_id)
+    operation = _security_resource_operation(
+        collection="user-groups",
+        action="upsert",
+        kind="user_group",
+        resource_id=resource_id,
+        request=planned_payload,
+        summary="Create or update an Alterios user group and verify through user-group readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _security_resource_summary(existing),
+        "diff": _resource_diff(existing, planned_payload, tuple(sorted(planned_payload.keys()))),
+        "planned_payload": strip_alterios_metadata(planned_payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    saved = client.save_user_group(planned_payload).as_dict()
+    saved_id = _extract_response_id(saved) or planned_payload.get("_id")
+    readback = client.user_group_by_id(str(saved_id)).as_dict() if saved_id else None
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_role(
+    payload: dict[str, Any],
+    role_id: str | None = None,
+    lookup_name: str | None = None,
+    expected_name: str | None = None,
+    allow_create: bool = False,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios role. Classified as security write."""
+    client = _client(profile, project_id)
+    existing = _find_role(client, role_id=role_id, name=lookup_name)
+    if not existing and not allow_create:
+        raise ValueError("Role was not found; pass allow_create=True only after security review.")
+    if existing and expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Role name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    resource_id = role_id or (str(existing.get("_id")) if existing and existing.get("_id") else None)
+    planned_payload = _security_payload(existing, payload, resource_id)
+    operation = _security_resource_operation(
+        collection="roles",
+        action="upsert",
+        kind="role",
+        resource_id=resource_id,
+        request=planned_payload,
+        summary="Create or update an Alterios role and verify through role readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _security_resource_summary(existing),
+        "diff": _resource_diff(existing, planned_payload, tuple(sorted(planned_payload.keys()))),
+        "planned_payload": strip_alterios_metadata(planned_payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    saved = client.save_role(planned_payload).as_dict()
+    saved_id = _extract_response_id(saved) or planned_payload.get("_id")
+    readback = client.role_by_id(str(saved_id)).as_dict() if saved_id else None
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_delete_user(
+    user_id: str,
+    expected_email: str | None = None,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or delete an Alterios user. Classified as security/destructive write."""
+    client = _client(profile, project_id)
+    existing = _find_user(client, user_id=user_id)
+    if not existing:
+        raise ValueError(f"User {user_id!r} was not found.")
+    if expected_email and str(existing.get("email") or "").lower() != expected_email.strip().lower():
+        raise ValueError(f"User email mismatch: expected {expected_email!r}, got {existing.get('email')!r}.")
+    operation = _security_resource_operation(
+        collection="users",
+        action="delete",
+        kind="user_delete",
+        resource_id=user_id,
+        request={"_id": user_id, "expectedEmail": expected_email},
+        summary="Delete an Alterios user and verify absence through user readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {"preflight": _security_resource_summary(existing)}
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    deleted = client.delete_user(user_id).as_dict()
+    response_payload.update({"deleted": deleted, "delete_readback": _delete_readback(client, "user", user_id)})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_delete_user_group(
+    user_group_id: str,
+    expected_name: str | None = None,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or delete an Alterios user group. Classified as security/destructive write."""
+    client = _client(profile, project_id)
+    existing = _find_user_group(client, user_group_id=user_group_id)
+    if not existing:
+        raise ValueError(f"User group {user_group_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"User group name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    operation = _security_resource_operation(
+        collection="user-groups",
+        action="delete",
+        kind="user_group_delete",
+        resource_id=user_group_id,
+        request={"_id": user_group_id, "expectedName": expected_name},
+        summary="Delete an Alterios user group and verify absence through user-group readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {"preflight": _security_resource_summary(existing)}
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    deleted = client.delete_user_group(user_group_id).as_dict()
+    response_payload.update(
+        {"deleted": deleted, "delete_readback": _delete_readback(client, "user_group", user_group_id)}
+    )
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_delete_role(
+    role_id: str,
+    expected_name: str | None = None,
+    dry_run: bool = True,
+    allow_destructive: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or delete an Alterios role. Classified as security/destructive write."""
+    client = _client(profile, project_id)
+    existing = _find_role(client, role_id=role_id)
+    if not existing:
+        raise ValueError(f"Role {role_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Role name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    operation = _security_resource_operation(
+        collection="roles",
+        action="delete",
+        kind="role_delete",
+        resource_id=role_id,
+        request={"_id": role_id, "expectedName": expected_name},
+        summary="Delete an Alterios role and verify absence through role readback.",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    response_payload: dict[str, Any] = {"preflight": _security_resource_summary(existing)}
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+        dangerous_write_enabled=_dangerous_write_enabled(),
+        allow_destructive=allow_destructive,
+    )
+    deleted = client.delete_role(role_id).as_dict()
+    response_payload.update({"deleted": deleted, "delete_readback": _delete_readback(client, "role", role_id)})
+    return controlled_write_result(audit=audit, response=response_payload)
 
 
 @mcp.tool()
@@ -1080,6 +1636,62 @@ def alterios_upsert_content_type(
     readback = client.content_type_by_id(saved_id).as_dict() if saved_id else {"body": _find_content_type(client, name=name)}
     response_payload.update({"saved": saved, "readback": readback})
     return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_plan_content_type_publish(
+    content_type_id: str,
+    target_project_ids: list[str],
+    ui_har_evidence: dict[str, Any] | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan native content-type publish/transfer; native write stays blocked until UI/HAR evidence exists."""
+    normalized_targets = [str(target_id).strip() for target_id in target_project_ids if str(target_id).strip()]
+    if not content_type_id.strip():
+        raise ValueError("content_type_id must not be empty.")
+    if not normalized_targets:
+        raise ValueError("target_project_ids must contain at least one project id.")
+    if len(set(normalized_targets)) != len(normalized_targets):
+        raise ValueError("target_project_ids must not contain duplicates.")
+    client = _client(profile, project_id)
+    content_type = _find_content_type(client, content_type_id=content_type_id)
+    if not content_type:
+        raise ValueError(f"Content type {content_type_id!r} was not found.")
+
+    route = (ui_har_evidence or {}).get("route") if isinstance(ui_har_evidence, dict) else None
+    method = str((ui_har_evidence or {}).get("method") or "").upper() if isinstance(ui_har_evidence, dict) else ""
+    payload_shape = (ui_har_evidence or {}).get("payload_shape") if isinstance(ui_har_evidence, dict) else None
+    native_ready = bool(route and method in {"POST", "PUT", "PATCH"} and payload_shape)
+    return {
+        "source": _resource_summary(content_type),
+        "target_project_ids": normalized_targets,
+        "native_publish": {
+            "ready": native_ready,
+            "status": "route_evidence_available" if native_ready else "blocked_until_ui_har_evidence",
+            "required_evidence": [
+                "UI or HAR route path",
+                "HTTP method",
+                "redacted payload shape",
+                "source contentTypeId and target project IDs",
+                "readback route proving availability in every target project",
+            ],
+            "provided_evidence": {
+                "method": method or None,
+                "route": route,
+                "payload_shape": payload_shape,
+            },
+        },
+        "safe_fallback_plan": [
+            "Read source content type and fields from the source project.",
+            "Create or update the target content type in each explicit target project.",
+            "Recreate fields, views, forms, groups, scripts, reports, icons, and dependencies by typed tools.",
+            "Run target readback and UI checks per project.",
+        ],
+        "next_step": "Run alterios_write_safety_preflight for the confirmed native route before adding/executing a native publish tool."
+        if native_ready
+        else "Capture UI/HAR evidence first; do not execute native publish by inference.",
+    }
 
 
 @mcp.tool()
@@ -1480,6 +2092,104 @@ def alterios_update_content_fields(
     ).as_dict()
     after = client.content_by_id(content_id).as_dict()
     response_payload.update({"updated": updated, "readback": after})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_bulk_update_selected_content_fields(
+    selected_content_ids: list[str],
+    field_values: dict[str, Any],
+    expected_count: int | None = None,
+    expected_content_type_id: str | None = None,
+    groups_ids: list[str] | None = None,
+    max_count: int = 100,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or update fields on multiple selected Alterios content rows with per-row preflight/readback."""
+    normalized_ids = [str(content_id).strip() for content_id in selected_content_ids if str(content_id).strip()]
+    if not normalized_ids:
+        raise ValueError("selected_content_ids must contain at least one content id.")
+    if len(set(normalized_ids)) != len(normalized_ids):
+        raise ValueError("selected_content_ids must not contain duplicates.")
+    if expected_count is not None and expected_count != len(normalized_ids):
+        raise ValueError(f"expected_count mismatch: expected {expected_count}, got {len(normalized_ids)}.")
+    if max_count < 1:
+        raise ValueError("max_count must be positive.")
+    if len(normalized_ids) > max_count:
+        raise ValueError(f"Refusing to update {len(normalized_ids)} rows; max_count is {max_count}.")
+    if not field_values:
+        raise ValueError("field_values must contain at least one field.")
+
+    operation = _resource_operation(
+        name="PATCH /api/contents/save x selected",
+        kind="bulk_selection",
+        method="PATCH",
+        path="/api/contents/save",
+        summary="Bulk-update fields on selected Alterios content rows with per-row preflight and readback.",
+        request={
+            "selectedContentIds": normalized_ids,
+            "expectedContentTypeId": expected_content_type_id,
+            "fields": field_values,
+            "groupsIds": groups_ids,
+        },
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    if not dry_run:
+        assert_write_allowed(
+            profile=profile,
+            project_id=project_id,
+            operation=operation,
+            write_enabled=_write_enabled(),
+        )
+
+    client = _client(profile, project_id)
+    rows: list[dict[str, Any]] = []
+    for content_id in normalized_ids:
+        before = client.content_by_id(content_id).body
+        if not isinstance(before, dict):
+            raise ValueError(f"Content {content_id!r} preflight returned unexpected payload.")
+        _assert_expected_content(before, expected_content_type_id=expected_content_type_id)
+        planned_payload = content_update_payload(
+            before,
+            field_values,
+            content_type_id=expected_content_type_id,
+            groups_ids=groups_ids,
+        )
+        rows.append(
+            {
+                "content": _content_summary(before),
+                "field_diff": _field_diff(before.get("fields") or {}, field_values),
+                "planned_payload": planned_payload,
+            }
+        )
+
+    response_payload: dict[str, Any] = {
+        "selected_count": len(normalized_ids),
+        "field_keys": sorted(str(key) for key in field_values.keys()),
+        "rows": rows,
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    updates = []
+    for content_id in normalized_ids:
+        updated = client.update_content_fields(
+            content_id,
+            field_values,
+            content_type_id=expected_content_type_id,
+            groups_ids=groups_ids,
+        ).as_dict()
+        readback = client.content_by_id(content_id).as_dict()
+        updates.append({"content_id": content_id, "updated": updated, "readback": readback})
+    response_payload["updates"] = updates
     return controlled_write_result(audit=audit, response=response_payload)
 
 
@@ -1936,6 +2646,85 @@ def alterios_patch_form_tabs(
         profile=profile,
         project_id=project_id,
     )
+
+
+@mcp.tool()
+def alterios_patch_form_cell_listeners(
+    form_id: str,
+    tab_index: int,
+    row_index: int,
+    cell_index: int,
+    listeners: list[dict[str, Any]],
+    expected_name: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or patch one form cell's emitting.listeners without replacing the whole form manually."""
+    if tab_index < 0 or row_index < 0 or cell_index < 0:
+        raise ValueError("tab_index, row_index, and cell_index must be non-negative.")
+    if not isinstance(listeners, list):
+        raise ValueError("listeners must be a list.")
+    client = _client(profile, project_id)
+    existing = _find_form(client, form_id=form_id)
+    if not existing:
+        raise ValueError(f"Form {form_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Form name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+
+    tabs = json.loads(json.dumps(existing.get("tabs") or [], ensure_ascii=False))
+    try:
+        cell = tabs[tab_index]["rows"][row_index]["cells"][cell_index]
+    except (IndexError, KeyError, TypeError) as exc:
+        raise ValueError(
+            f"Cell path tabs[{tab_index}].rows[{row_index}].cells[{cell_index}] was not found."
+        ) from exc
+    if not isinstance(cell, dict):
+        raise ValueError("Target form cell is not a JSON object.")
+    emitting = cell.get("emitting")
+    if not isinstance(emitting, dict):
+        emitting = {}
+        cell["emitting"] = emitting
+    before = emitting.get("listeners")
+    emitting["listeners"] = listeners
+
+    operation = _resource_operation(
+        name="PATCH /api/forms/{id}",
+        kind="form_listeners",
+        method="PATCH",
+        path=f"/api/forms/{form_id}",
+        summary="Patch emitting.listeners for one Alterios form cell and verify through form readback.",
+        request={
+            "_id": form_id,
+            "cellPath": f"tabs[{tab_index}].rows[{row_index}].cells[{cell_index}]",
+            "listeners": listeners,
+        },
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    payload = {**existing, "tabs": tabs}
+    response_payload: dict[str, Any] = {
+        "form": _resource_summary(existing),
+        "cell_path": f"tabs[{tab_index}].rows[{row_index}].cells[{cell_index}]",
+        "before": before,
+        "after": listeners,
+        "changed": before != listeners,
+        "planned_payload": {"_id": form_id, "tabs": tabs},
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_form(payload).as_dict()
+    readback = client.form_by_id(form_id).as_dict()
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
 
 
 @mcp.tool()

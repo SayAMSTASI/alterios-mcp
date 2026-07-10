@@ -1255,3 +1255,195 @@ def test_add_comment_execution_returns_created_comment_and_readback_without_real
     assert result["dry_run"] is False
     assert result["response"]["created"]["body"]["_id"] == "comment-1"
     assert result["response"]["readback"]["body"] == [{"_id": "comment-1", "body": "Practice comment"}]
+
+
+def test_upsert_user_dry_run_is_security_write_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def user_by_id(self, user_id: str) -> FakeResponse:
+            assert user_id == "user-1"
+            return FakeResponse({"_id": "user-1", "email": "user@example.test", "isActive": True})
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_user(
+            {"isActive": False},
+            user_id="user-1",
+            expected_email="user@example.test",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "user"
+    assert result["audit"]["operation"]["risk_level"] == "security"
+    assert result["audit"]["operation"]["path"] == "/api/users/user-1"
+    assert result["response"]["preflight"]["email"] == "user@example.test"
+    assert result["response"]["planned_payload"]["isActive"] is False
+
+
+def test_upsert_user_execution_requires_dangerous_gate_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def user_by_id(self, user_id: str) -> FakeResponse:
+            return FakeResponse({"_id": user_id, "email": "user@example.test"})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ControlledWriteError, match="ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE"),
+    ):
+        server.alterios_upsert_user(
+            {"isActive": False},
+            user_id="user-1",
+            dry_run=False,
+            allow_destructive=True,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_delete_role_dry_run_uses_security_delete_path_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def role_by_id(self, role_id: str) -> FakeResponse:
+            assert role_id == "role-1"
+            return FakeResponse({"_id": "role-1", "name": "Operator"})
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_delete_role(
+            "role-1",
+            expected_name="Operator",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "role_delete"
+    assert result["audit"]["operation"]["risk_level"] == "security"
+    assert result["audit"]["operation"]["method"] == "DELETE"
+    assert result["audit"]["operation"]["path"] == "/api/roles/role-1"
+
+
+def test_form_cell_listener_patch_dry_run_updates_only_target_cell_without_real_network() -> None:
+    form = {
+        "_id": "form-1",
+        "name": "Managed form",
+        "description": "Codex-managed form",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {"type": "field", "emitting": {"listeners": [{"type": "old"}]}},
+                            {"type": "field", "emitting": {"listeners": [{"type": "keep"}]}},
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    class FakeResponse:
+        body = form
+
+    class FakeClient:
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            assert form_id == "form-1"
+            return FakeResponse()
+
+    listeners = [{"type": "manual_script", "scriptId": "script-1", "args": {"openId": True}}]
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_patch_form_cell_listeners(
+            "form-1",
+            0,
+            0,
+            0,
+            listeners,
+            expected_name="Managed form",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "form_listeners"
+    assert result["response"]["before"] == [{"type": "old"}]
+    assert result["response"]["after"] == listeners
+    patched_tabs = result["response"]["planned_payload"]["tabs"]
+    assert patched_tabs[0]["rows"][0]["cells"][0]["emitting"]["listeners"] == listeners
+    assert patched_tabs[0]["rows"][0]["cells"][1]["emitting"]["listeners"] == [{"type": "keep"}]
+
+
+def test_bulk_update_selected_content_fields_dry_run_returns_per_row_diff_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        rows = {
+            "content-1": {"_id": "content-1", "contentTypeId": "ct-1", "fields": {"status": ["old"]}},
+            "content-2": {"_id": "content-2", "contentTypeId": "ct-1", "fields": {"status": ["old"]}},
+        }
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            return FakeResponse(self.rows[content_id])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_bulk_update_selected_content_fields(
+            ["content-1", "content-2"],
+            {"status": "new"},
+            expected_count=2,
+            expected_content_type_id="ct-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "bulk_selection"
+    assert result["audit"]["operation"]["target_ids"] == ["content-1", "content-2", "ct-1"]
+    assert result["response"]["selected_count"] == 2
+    assert result["response"]["rows"][0]["field_diff"] == [
+        {"field": "status", "before": ["old"], "after": ["new"], "changed": True}
+    ]
+
+
+def test_content_type_publish_planner_blocks_native_without_ui_har_evidence() -> None:
+    class FakeResponse:
+        body = {"_id": "ct-1", "name": "Material", "description": "Codex-managed"}
+
+    class FakeClient:
+        def content_type_by_id(self, content_type_id: str) -> FakeResponse:
+            assert content_type_id == "ct-1"
+            return FakeResponse()
+
+    with patch.object(server, "_client", return_value=FakeClient()):
+        result = server.alterios_plan_content_type_publish(
+            "ct-1",
+            ["project-2"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["native_publish"]["ready"] is False
+    assert result["native_publish"]["status"] == "blocked_until_ui_har_evidence"
+    assert result["target_project_ids"] == ["project-2"]

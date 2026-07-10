@@ -274,11 +274,29 @@ class AlteriosClient:
     def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
         return self.request("GET", "/api/content-types/listandcount", params={"limit": limit, "offset": offset})
 
+    def list_users(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/users/listandcount", params={"limit": limit, "offset": offset})
+
+    def list_user_groups(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/user-groups/listandcount", params={"limit": limit, "offset": offset})
+
+    def list_roles(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/roles/listandcount", params={"limit": limit, "offset": offset})
+
     def view_by_id(self, view_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/views/listandcount", view_id, "View")
 
     def content_type_by_id(self, content_type_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/content-types/listandcount", content_type_id, "Content type")
+
+    def user_by_id(self, user_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/users/listandcount", user_id, "User")
+
+    def user_group_by_id(self, user_group_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/user-groups/listandcount", user_group_id, "User group")
+
+    def role_by_id(self, role_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/roles/listandcount", role_id, "Role")
 
     def field_by_id(self, field_id: str) -> AlteriosResponse:
         response = self.list_fields(field_id=field_id, limit=1, offset=0)
@@ -366,6 +384,24 @@ class AlteriosClient:
 
     def save_group(self, payload: dict[str, Any]) -> AlteriosResponse:
         return self.save_resource("groups", payload)
+
+    def save_user(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("users", payload)
+
+    def save_user_group(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("user-groups", payload)
+
+    def save_role(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("roles", payload)
+
+    def delete_user(self, user_id: str) -> AlteriosResponse:
+        return self.delete_resource("users", user_id)
+
+    def delete_user_group(self, user_group_id: str) -> AlteriosResponse:
+        return self.delete_resource("user-groups", user_group_id)
+
+    def delete_role(self, role_id: str) -> AlteriosResponse:
+        return self.delete_resource("roles", role_id)
 
     def list_helps(self) -> AlteriosResponse:
         return self.request("GET", "/api/helps")
@@ -685,6 +721,20 @@ class AlteriosClient:
             except AlteriosRequestError as exc:
                 errors.append(str(exc))
         raise AlteriosRequestError(f"Update /api/{collection}/{resource_id} failed: {'; '.join(errors)}")
+
+    def delete_resource(self, collection: str, resource_id: str) -> AlteriosResponse:
+        if not resource_id.strip():
+            raise ValueError("resource_id must not be empty")
+        errors: list[str] = []
+        for path, body in (
+            (f"/api/{collection}/{path_segment(resource_id)}", {}),
+            (f"/api/{collection}", {"_id": resource_id}),
+        ):
+            try:
+                return self.request("DELETE", path, body=body)
+            except AlteriosRequestError as exc:
+                errors.append(str(exc))
+        raise AlteriosRequestError(f"Delete /api/{collection}/{resource_id} failed: {'; '.join(errors)}")
 
     def _listandcount_item_by_id(self, path: str, item_id: str, label: str) -> AlteriosResponse:
         if not item_id.strip():
