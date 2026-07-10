@@ -344,6 +344,10 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
 - [docs/administrator-guide.md](docs/administrator-guide.md) - инструкция
   администратора по установке, настройке, безопасной записи, проверкам и
   сопровождению MCP.
+- [docs/expanded-user-scenarios.md](docs/expanded-user-scenarios.md) -
+  расширенные сценарии: диаграммы, представления, группы, пользователи, роли,
+  включения, файлы, действия, listeners, множественный выбор, отчеты, скрипты и
+  публикация типов материалов.
 - [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md) - матрица
   инструментов, route patterns и operation classes.
 - [docs/form-surface-inventory.md](docs/form-surface-inventory.md) - инвентаризация
