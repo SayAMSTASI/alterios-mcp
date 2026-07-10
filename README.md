@@ -356,7 +356,10 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
 - [docs/skill-installation.md](docs/skill-installation.md) - установка repo-owned
   skills в локальный Codex.
 
-## Что дальше по план-графику
+## Отложенные направления
+
+Активная разработка текущего этапа закрыта. Новые работы стоит запускать
+отдельным решением и фиксировать в `docs/project-status.md`.
 
 1. Собрать read-only UI/HAR/API evidence для users, roles, delete и других
    destructive/security маршрутов.
@@ -364,6 +367,5 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
    и destructive операций, если они действительно нужны.
 3. Расширить Stimulsoft-проверку до render/PDF/image comparison, когда будет
    доступен надежный экспорт или renderer.
-4. Подготовить отдельные инструкции администратора и пользователя на базе
-   Documentation Scribe.
-5. Довести release packaging и changelog process после стабилизации write-поверхности.
+4. Довести release packaging и changelog process, если репозиторий готовится к
+   tagged release.

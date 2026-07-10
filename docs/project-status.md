@@ -74,6 +74,9 @@ the installed `gost-documentation-builder` skill and a local Alterios playbook.
 The root README is now a user-facing entrypoint: it explains functionality by
 work scenario, safe write gates, profile setup, MCP startup, agents/skills, and
 the next roadmap steps without exposing sensitive project details.
+The administrator guide is now published at `docs/administrator-guide.md` and
+closes the current development/documentation stage for operational use. Further
+feature work is not active unless explicitly restarted.
 
 ## Completed
 
@@ -112,12 +115,13 @@ the next roadmap steps without exposing sensitive project details.
 | Build. Dangerous write safety gate | Added `alterios_write_safety_preflight`, security-route classification, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, dangerous gate audit visibility, PATCH support for generic REST writes, and profile-smoke gate reporting. | `70bc301` | `pytest`: 115 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 | Design. Documentation Scribe agent | Added Documentation Scribe / Писарь to the multi-agent matrix and created `docs/gost-documentation-scribe-agent.md` for ГОСТ-oriented administrator/user instructions. | `6b19685` | `pytest`: 115 passed; `git diff --check` OK; changed-file secret scan clean; no live write executed. |
 | Docs. User-facing README | Reworked the root README into a clear Russian user guide covering functionality, write safety, profile setup, MCP startup, common scenarios, agents/skills, verification, and next roadmap steps. | `5dea221` | `pytest`: 115 passed; README link check OK; `git diff --check` OK; README/docs secret scan clean; no live write executed. |
+| Docs. Administrator guide and closeout | Added `docs/administrator-guide.md` as the administrator instruction for installation, profile configuration, MCP startup, safe writes, operating workflows, checks, diagnostics, update procedure, backup expectations, and current development closeout. | `b0cb63d` | `pytest`: 115 passed; README/admin-guide link check OK; `git diff --check` OK; README/admin-guide/status secret scan clean; no live write executed. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 11. Security/destructive sandbox evidence | Next | Lead Engineer + Safety Verifier + Write Tools Agent | Use read-only UI/HAR/API evidence plus `alterios_write_safety_preflight` to map exact users/roles/delete routes before adding any typed destructive or permission-changing tool. |
+| 12. Development closeout | Done | Lead Engineer + Documentation Scribe | Administrator guide is published, README links to it, current feature development is closed, and remaining work is tracked as deferred/post-release backlog. |
 
 ## Backlog
 
@@ -128,13 +132,14 @@ the next roadmap steps without exposing sensitive project details.
 | 1 | Add separate dangerous write gate for security/destructive flows. | Done | `alterios_write_safety_preflight` classifies generic REST routes; `alterios_rest_write` and destructive services now require both `ALTERIOS_MCP_ALLOW_WRITE=1` and `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` plus `allow_destructive=true` for dangerous execution. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
-| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
+| 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | Deferred | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. Deferred because current development is being closed. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
 | 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Done | First pass created 8 skills with source maps, OpenAI metadata, structure tests, and Skill Creator validation. |
 | 2 | Forward-test and install repo-owned skills. | Done | Three read-only subagent scenarios covered inventory/PM, form/icons/BPMN, and write/report/safety; installer copies skills to the local Codex skills dir and rewrites installed source maps to absolute repo paths. |
 | 2 | Add Documentation Scribe / Писарь agent for ГОСТ-oriented instructions. | Done | Added docs-only agent, local playbook, handoff format, and documentation pipeline. It reuses installed `gost-documentation-builder` instead of creating a duplicate repo-owned skill. |
-| 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
+| 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Deferred | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
+| 2 | Prepare administrator instruction. | Done | Published `docs/administrator-guide.md` and linked it from README. User instruction is not produced in this closeout because the current request asked for administrator instruction only. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Done | `alterios-profile-smoke` and `alterios_profile_smoke_matrix` record sanitized profile/project coverage; live 2026-07-10 run covered `artx` and `vniimt` with 15/15 default-project route smoke each. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
@@ -154,14 +159,18 @@ the next roadmap steps without exposing sensitive project details.
 
 ## Next Concrete Actions
 
+No active feature development remains in the current stage. Future work requires
+an explicit restart decision.
+
+Deferred candidates:
+
 1. Capture read-only UI/HAR/API evidence for users/roles/delete routes and run
    `alterios_write_safety_preflight` for each candidate before any typed tool is
    added.
-2. Prepare separate administrator and user instructions from the README source
-   map: verified setup commands, MCP startup, profile configuration, write
-   gates, common workflows, screenshots needed, and unresolved facts.
-3. Expand Stimulsoft validator with rendered PDF/image comparison once export
+2. Expand Stimulsoft validator with rendered PDF/image comparison once export
    or render tooling is available.
+3. Start release packaging and changelog process if the repository is prepared
+   for a tagged release.
 
 ## PM Update Checklist
 
