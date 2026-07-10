@@ -52,6 +52,9 @@ The multi-agent operating contract now has a detailed task matrix for PM,
 project-base inventory, material/data modeling, view building, form surfaces,
 UI icons/actions, script/BPMN flows, Stimulsoft reports, write tools, safety
 verification, and skill curation.
+Repo-owned skills have now been forward-tested with read-only subagents,
+improved from the findings, and installed into the local Codex skills directory
+with absolute source-map references back to this repository.
 
 ## Completed
 
@@ -84,12 +87,13 @@ verification, and skill curation.
 | Research. Form + Script/BPMN + Icons deep inventory | Added `alterios-deep-inventory`, live ART X form matrix, script/BPMN linkage matrix, icon usage matrix, and UTF-8 icon standard copy. | `fb98c14` | Live read-only run on `artx` project found 40 forms, 47 cells, 74 actions, 12 scripts, 4 diagrams, 8 BPMN form links, 7 form-script links, and 121 icon usages; read errors: 0. |
 | Design. Agent task matrix | Expanded `docs/agents-and-skills.md` into a concrete multi-agent task contract and synced `docs/roadmap.md` with the expanded role set. | `703e593` | `pytest`: 95 passed; `git diff --check` OK; docs secret scan found only public write-gate variable names. |
 | Build. Repo-owned skill set | Added the first 8 repo-owned Alterios skills under `skills/`, each with `SKILL.md`, `agents/openai.yaml`, and `references/source-map.md`; added structure tests and documented the set in README/agents docs. | `d664588` | Skill Creator `quick_validate`: 8/8 valid; `pytest`: 97 passed; `git diff --check` OK; skills/docs secret scan clean; two read-only subagents reviewed references, required rules, duplication risks, and acceptance checks. |
+| Build. Skill forward-test and installer | Added `scripts/install_repo_skills.py`, installer tests, install documentation, forward-test report, PM inventory template, and skill improvements from three read-only subagent scenarios; installed the 8 skills into `C:\Users\admin\.codex\skills`. | `85acdc7` | Skill Creator `quick_validate`: repo 8/8 valid and installed 8/8 valid; `pytest`: 100 passed; installer dry-run reports 8 `skip` after install; installed source maps have no `../../../` paths. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 8. Skill forward-test and install path | In Progress | Lead Engineer + Skill Curator + Safety Verifier | Forward-test the 8 skills on realistic Alterios tasks, document how to install or load them from the repo, and keep duplication or stale-reference risks visible. |
+| 9. Profile-level smoke matrix | In Progress | Lead Engineer + Project Base Explorer + Safety Verifier | Run profile-level read-only smoke across configured Alterios instances, record profile/project coverage, and keep writes disabled. |
 
 ## Backlog
 
@@ -102,6 +106,7 @@ verification, and skill curation.
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
 | 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Done | First pass created 8 skills with source maps, OpenAI metadata, structure tests, and Skill Creator validation. |
+| 2 | Forward-test and install repo-owned skills. | Done | Three read-only subagent scenarios covered inventory/PM, form/icons/BPMN, and write/report/safety; installer copies skills to the local Codex skills dir and rewrites installed source maps to absolute repo paths. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
@@ -122,11 +127,8 @@ verification, and skill curation.
 
 ## Next Concrete Actions
 
-1. Forward-test the 8 repo-owned skills on realistic project-base, form, BPMN,
-   report, write-tool, safety, and PM tasks.
-2. Document the install/load path for repo-owned skills.
-3. Add profile-level smoke matrix across configured Alterios instances.
-4. Keep destructive/security flows out of normal write tools until a separate
+1. Add profile-level smoke matrix across configured Alterios instances.
+2. Keep destructive/security flows out of normal write tools until a separate
    sandbox scenario and destructive gate are implemented.
 
 ## PM Update Checklist
