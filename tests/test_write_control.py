@@ -1840,6 +1840,8 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
         def save_field(self, payload: dict[str, object]) -> FakeResponse:
             item = dict(payload)
             item.setdefault("_id", self._new_id("field"))
+            if str(item.get("mname") or "").startswith("mat_"):
+                item["mname"] = f"field_test__{item['mname']}"
             self.fields[str(item["_id"])] = item
             return FakeResponse({"_id": item["_id"], "saved": True})
 
@@ -1889,7 +1891,10 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
                 item.update({"attribute": attribute, "mname": attribute})
             if content_type_field_id:
                 field = self.fields[content_type_field_id]
-                item.update({"contentTypeFieldId": content_type_field_id, "mname": field["mname"]})
+                view_mname = str(field["mname"])
+                if view_mname.startswith("field_"):
+                    view_mname = view_mname.removeprefix("field_")
+                item.update({"contentTypeFieldId": content_type_field_id, "mname": view_mname})
             self.view_fields_by_view.setdefault(view_id, []).append(item)
             return FakeResponse({"_id": item["_id"]})
 
@@ -1949,6 +1954,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
                 "Материалы",
                 "mat",
                 fields,
+                content_name_template="{{mat_name}}",
                 profile="vniimt",
                 project_id="project-1",
             )
@@ -1966,6 +1972,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             "Материалы",
             "mat",
             fields,
+            content_name_template="{{mat_name}}",
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -1975,20 +1982,36 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     assert result["dry_run"] is False
     assert result["audit"]["operation"]["kind"] == "scenario_material_module"
     assert result["response"]["ids"]["content_type_id"] == "ct-1"
-    assert result["response"]["ids"]["field_ids"] == {"mat_name": "field-1", "mat_count": "field-2"}
+    assert result["response"]["ids"]["field_ids"] == {
+        "field_test__mat_name": "field-1",
+        "field_test__mat_count": "field-2",
+    }
+    assert result["response"]["ids"]["requested_field_ids"] == {"mat_name": "field-1", "mat_count": "field-2"}
     assert result["response"]["ids"]["view_id"] == "view-1"
     assert result["response"]["readback"]["view_data_smoke"]["body"] == {"rows": [], "count": 0}
     assert result["response"]["ids"]["add_form_id"] == "form-1"
     assert result["response"]["ids"]["edit_form_id"] == "form-2"
     assert result["response"]["ids"]["list_form_id"] == "form-3"
     assert result["response"]["ids"]["group_id"] == "group-1"
+    assert apply_client.content_types["ct-1"]["contentNameTemplate"] == "{{field_test__mat_name}}"
     assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "content"
-    assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"]["mat_name"]["order"] == 0
+    assert (
+        apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"][
+            "field_test__mat_name"
+        ]["order"]
+        == 0
+    )
     assert apply_client.forms["form-2"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "view_data"
+    assert (
+        apply_client.forms["form-2"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"]["test__mat_name"][
+            "order"
+        ]
+        == 1
+    )
     assert apply_client.forms["form-2"]["tabs"][0]["rows"][1]["cells"][0]["type"] == "comments_list"
     list_cell = apply_client.forms["form-3"]["tabs"][0]["rows"][0]["cells"][0]
     assert list_cell["type"] == "view_data_list"
-    assert list_cell["displaying"]["fields"]["name"]["order"] == 1
+    assert list_cell["displaying"]["fields"]["test__mat_name"]["order"] == 1
     assert list_cell["cellActionContainers"][0]["iconId"] == "add"
     assert list_cell["valueActionContainers"][0]["iconId"] == "edit"
     assert apply_client.groups["group-1"]["formId"] == "form-3"

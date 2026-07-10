@@ -4,6 +4,7 @@ import base64
 import binascii
 import json
 import os
+import re
 import time
 from typing import Any
 from xml.sax.saxutils import escape as _xml_escape
@@ -1037,6 +1038,19 @@ def _material_view_mname(field_mname: str, field_name_prefix: str) -> str:
     if field_mname.startswith("field_"):
         return field_mname.removeprefix("field_")
     return field_mname
+
+
+def _material_resolve_content_name_template(template: str | None, fields: list[dict[str, Any]]) -> str | None:
+    if template is None:
+        return None
+    resolved = template
+    for field in fields:
+        requested_mname = str(field.get("requested_mname") or "").strip()
+        actual_mname = str(field.get("mname") or "").strip()
+        if not requested_mname or not actual_mname or requested_mname == actual_mname:
+            continue
+        resolved = re.sub(r"{{\s*" + re.escape(requested_mname) + r"\s*}}", "{{" + actual_mname + "}}", resolved)
+    return resolved
 
 
 def _material_module_names(module_name: str, names: dict[str, str] | None = None) -> dict[str, str]:
@@ -3860,11 +3874,41 @@ def alterios_create_material_module(
         field_id = _extract_response_id(field_body) or _extract_response_id(field_result) or field.get("field_id")
         if not field_id:
             raise ValueError(f"Field id was not resolved after save for {field['mname']!r}.")
-        saved_field = {**field, "_id": field_id}
+        saved_field = {**field, "_id": field_id, "requested_mname": field["mname"]}
         if isinstance(field_body, dict):
             saved_field.update({key: value for key, value in field_body.items() if key in {"_id", "name", "mname", "type"}})
+        saved_field["view_mname"] = _material_view_mname(str(saved_field.get("mname") or field["mname"]), normalized_prefix)
         saved_fields.append(saved_field)
-        steps.append({"step": "field", "id": field_id, "mname": field["mname"], "result": field_result})
+        steps.append(
+            {
+                "step": "field",
+                "id": field_id,
+                "mname": saved_field.get("mname"),
+                "requested_mname": field["mname"],
+                "result": field_result,
+            }
+        )
+
+    resolved_content_name_template = _material_resolve_content_name_template(content_name_template, saved_fields)
+    if resolved_content_name_template and resolved_content_name_template != content_name_template:
+        content_type_template_result = alterios_upsert_content_type(
+            resolved_names["content_type"],
+            content_type_id=content_type_id,
+            field_name_prefix=normalized_prefix,
+            content_name_template=resolved_content_name_template,
+            allow_unmanaged_update=allow_unmanaged_update,
+            dry_run=False,
+            profile=profile,
+            project_id=project_id,
+        )
+        steps.append(
+            {
+                "step": "content_type_template",
+                "id": content_type_id,
+                "content_name_template": resolved_content_name_template,
+                "result": content_type_template_result,
+            }
+        )
 
     view_result = alterios_upsert_view(
         resolved_names["view"],
@@ -3926,11 +3970,15 @@ def alterios_create_material_module(
             project_id=project_id,
         )
         view_field_body = _response_body((view_field_result.get("response") or {}).get("readback"))
+        view_field_id = _extract_response_id(view_field_body)
+        if isinstance(view_field_body, dict) and view_field_body.get("mname"):
+            field["view_mname"] = str(view_field_body["mname"])
         saved_view_fields.append(
             {
                 "field_id": field["_id"],
                 "field_mname": field["mname"],
-                "view_field_id": _extract_response_id(view_field_body),
+                "requested_field_mname": field.get("requested_mname"),
+                "view_field_id": view_field_id,
                 "view_mname": field["view_mname"],
             }
         )
@@ -4064,6 +4112,7 @@ def alterios_create_material_module(
             "ids": {
                 "content_type_id": content_type_id,
                 "field_ids": {field["mname"]: field["_id"] for field in saved_fields},
+                "requested_field_ids": {field["requested_mname"]: field["_id"] for field in saved_fields},
                 "view_id": view_id,
                 "view_entity_id": view_entity_id,
                 "add_form_id": add_form_id,
