@@ -20,15 +20,16 @@ The same practice script now covers comment write/readback and a visible
 The same practice script now covers file-field upload, saved manual script
 creation/execution, sandbox BPMN process/task completion, and dashboard report
 create/update/full-readback.
-Method coverage is now tracked explicitly: 25 MCP tools, 14 runtime services,
+Method coverage is now tracked explicitly: 50 MCP tools, 14 runtime services,
 15 live read-only route probes, 57 REST route/method patterns, and 13 operation
 classes.
 Reinventory on 2026-07-10 confirmed the main product gap: ART X project base
 has live evidence for views, forms, scripts, BPMN/process/task side effects,
 files, comments, and reports. Typed-write expansion moved the MCP server from
 4 write-like tools out of 23 total tools to 18 write-like tools out of 43 total
-tools. The current build stage is shifting from typed write expansion to
-repo-owned agents/skills and remaining high-risk security/destructive flows.
+tools, then the metadata/data write expansion moved it to 23 write-like tools
+out of 50 total tools. The current build stage is shifting from typed write
+expansion to remaining high-risk security/destructive flows.
 The 2026-07-10 script/diagram/report research now records all observed script
 types, all BPMN task-like nodes in the ART X project, and a second sandbox
 dashboard report that proves Project Database source binding rules.
@@ -58,6 +59,10 @@ with absolute source-map references back to this repository.
 Profile-level live smoke now has a reusable `alterios-profile-smoke` CLI,
 MCP tool `alterios_profile_smoke_matrix`, and sanitized JSON/Markdown evidence
 for configured Alterios instances.
+Write-first metadata/data work now has typed MCP tools for content types,
+fields, content create, menu groups, and helps, with dry-run diffs, explicit
+profile/project targeting, write gate enforcement, managed-update guards, and
+readback where the API returns an id.
 
 ## Completed
 
@@ -92,6 +97,7 @@ for configured Alterios instances.
 | Build. Repo-owned skill set | Added the first 8 repo-owned Alterios skills under `skills/`, each with `SKILL.md`, `agents/openai.yaml`, and `references/source-map.md`; added structure tests and documented the set in README/agents docs. | `d664588` | Skill Creator `quick_validate`: 8/8 valid; `pytest`: 97 passed; `git diff --check` OK; skills/docs secret scan clean; two read-only subagents reviewed references, required rules, duplication risks, and acceptance checks. |
 | Build. Skill forward-test and installer | Added `scripts/install_repo_skills.py`, installer tests, install documentation, forward-test report, PM inventory template, and skill improvements from three read-only subagent scenarios; installed the 8 skills into `C:\Users\admin\.codex\skills`. | `85acdc7` | Skill Creator `quick_validate`: repo 8/8 valid and installed 8/8 valid; `pytest`: 100 passed; installer dry-run reports 8 `skip` after install; installed source maps have no `../../../` paths. |
 | Build. Profile-level smoke matrix | Added `alterios-profile-smoke`, MCP tool `alterios_profile_smoke_matrix`, unit tests, README guidance, and sanitized live evidence in `docs/profile-smoke-matrix-2026-07-10.*`. | `c90963f` | Live read-only smoke: 2 profiles, project lists OK for both, 53 projects total, default-project route discovery 15/15 OK for both, write gate false; `pytest`: 103 passed; `git diff --check` OK; artifact secret/URL/UUID scan clean. |
+| Build. Typed metadata/data write tools | Added `alterios_list_content_types`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, and `alterios_upsert_help`. | `512cd55` | `pytest`: 111 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 
 ## Active Stage
 
@@ -104,6 +110,7 @@ for configured Alterios instances.
 | Priority | Task | Status | Notes |
 |---:|---|---|---|
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
+| 1 | Add typed metadata/data create tools for content types, fields, content rows, groups, and helps. | Done | Implemented with dry-run diff, explicit `profile/project_id`, write gate, managed-update guard, target mismatch checks, and readback where the API returns an id. Unit-tested without live writes. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
@@ -127,7 +134,7 @@ for configured Alterios instances.
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
 | Embedded report viewer currently renders an empty `viewer_*` container in the in-app browser, including for the static report that previously rendered. | Treat report template/API readback as verified, but keep data-bound report visual proof open until renderer/network behavior is diagnosed and the static report renders again. |
-| Generic REST write can create live UI objects but does not yet provide typed preflight semantics. | Use the ARTX help sandbox result to design narrow typed write tools with explicit allowed fields, dry-run diffs, and readback checks. |
+| Generic REST write remains a broad escape hatch for route shapes not yet modeled as typed tools. | Prefer typed metadata/data, content/file, view/form, script/BPMN/task, and report tools; keep generic writes for deliberate one-off discovery with explicit gates and readback. |
 
 ## Next Concrete Actions
 
