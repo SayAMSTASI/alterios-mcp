@@ -1,140 +1,177 @@
 # alterios-mcp
 
-Готовый к эксплуатации MCP-сервер и набор инструментов инвентаризации для
-экземпляров Alterios/LIMS.
+`alterios-mcp` - MCP-сервер для работы с Alterios/LIMS из Codex и других MCP-клиентов.
+Он нужен, чтобы инвентаризировать проекты Alterios, читать настройки, строить формы,
+представления, скрипты, BPMN-процессы и отчеты, а также выполнять управляемую запись
+с dry-run, явными gate-флагами и readback-проверкой.
 
-Репозиторий развивается как полноценный операционный MCP, а не как узкий MVP.
-Базовый контракт:
+Проект развивается как полноценный рабочий MCP для Alterios, а не как MVP. Основной
+фокус - безопасная запись в проектную базу, при этом чтение и инвентаризация нужны
+как обязательная подготовка перед изменениями.
 
-- Один MCP-профиль соответствует одному экземпляру Alterios: base URL, метод
-  авторизации, токен, шаблон endpoint для скриптов и таймауты.
+## Для кого
+
+- Для администратора Alterios, который хочет быстро проверить состав проекта,
+  настройки форм, представлений, скриптов, диаграмм, отчетов и меню.
+- Для разработчика или аналитика, который через Codex проектирует и изменяет
+  структуру Alterios без ручной рутины в интерфейсе.
+- Для проектной команды, которой нужны воспроизводимые изменения: dry-run, запись,
+  readback, отчет о проверке и понятный журнал статуса.
+- Для автора пользовательских и администраторских инструкций, которому нужно
+  получать проверенные факты из проекта, а не описывать систему вручную.
+
+## Что умеет сейчас
+
+Текущая поверхность MCP: **51 инструмент**, из них **23 write-like инструмента**.
+Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
+
+### Профили и проекты
+
+- Поддержка нескольких экземпляров Alterios через профили.
+- Один профиль = один экземпляр Alterios: base URL, авторизация, токен,
+  endpoint-шаблоны и таймауты.
 - Один экземпляр Alterios может содержать много проектов.
-- Инструменты, завязанные на проект, принимают явный `project_id`. `project_id`
-  из переменных окружения - только удобное значение по умолчанию, а не
-  идентичность профиля.
-- Инструменты уровня экземпляра, например инвентаризация проектов, не должны
-  требовать `project_id`.
-- Секреты читаются из переменных окружения или приватного dotenv-файла, не
-  коммитятся в репозиторий и не возвращаются инструментами.
+- Инструменты уровня проекта принимают явный `project_id`; профиль не подменяет
+  проект и не должен использоваться как скрытый выбор рабочей области.
+- Есть smoke-проверка всех профилей и default-проектов.
 
-## Текущие Инструменты
+### Инвентаризация project base
 
-- `alterios_config` - проверка профиля и конфигурации с редактированием
-  секретов и списками недостающих значений.
-- `alterios_list_profiles` - список настроенных экземпляров Alterios с
-  редактированием секретов, выбранным профилем и missing-check по каждому
-  профилю.
-- `alterios_list_projects` - инвентаризация проектов на уровне экземпляра.
-- `alterios_profile_smoke_matrix` - read-only матрица по всем профилям:
-  локальный конфиг, список проектов и проверка маршрутов проекта по default
-  `project_id`, если он настроен.
-- `alterios_write_safety_preflight` - read-only классификация proposed REST
-  write/delete/security маршрута без network request; показывает risk level и
-  gates, которые понадобятся перед исполнением.
-- `alterios_service_catalog` - каталог известных script-service функций с
-  метками чтения/записи, уровнями риска, подсказками по аргументам и примерами.
-- `alterios_call_readonly_service` - защищенные вызовы известных
-  script-service функций только для чтения, например `getTasks`, `getContents` и `getViewData`,
-  если настроен совместимый внешний сервисный endpoint.
-- `alterios_rest_get` - безопасные REST-чтения по маршрутам `/api/...`.
-- `alterios_list_objects` - инвентаризация типовых объектов Alterios через
-  проверенные `listandcount` маршруты.
-- `alterios_view_data_simplified` - проверочное чтение
-  `/api/views/v2/get-data-simplified`.
-- `alterios_report_full` - чтение полного отчета через кодированный маршрут
-  `/api/reports/full/{filter}`.
-- `alterios_get_view`, `alterios_view_entities` и
-  `alterios_view_fields_populated` - чтение объекта представления, его
-  join/entity-конфигурации и заполненных метаданных полей.
-- `alterios_get_form` - чтение полной формы по ID.
-- `alterios_list_fields` - инвентаризация полей типа контента с опциональными
-  фильтрами `content_type_id` или `field_id`.
-- `alterios_list_content_types` - типизированная инвентаризация типов материалов
-  через `/api/content-types/listandcount`.
-- `alterios_list_groups` - инвентаризация групп проекта через `/api/groups`.
-- `alterios_file_metadata` - чтение метаданных файлов через `/api/file/list`.
-- `alterios_list_comments` - инвентаризация комментариев через
-  `/api/v1/comments`.
-- `alterios_add_comment` - создание комментария через `/api/v1/comments` с
-  `entity=any` по умолчанию для совместимости с `comments_list`, dry-run,
-  write-gate и readback.
-- `alterios_upsert_content_type` - typed create/update типа материала через
-  `/api/content-types/save` с managed-marker guard, dry-run diff, write-gate и
-  readback.
-- `alterios_upsert_field` - typed create/update поля типа материала через
-  `/api/fields/save` с проверкой родительского content type, managed-marker
-  guard, dry-run diff, write-gate и readback фактического `mname`.
-- `alterios_create_content` - typed create `/api/contents/save` для новой
-  content-записи: preflight content type, нормализация field values в массивы,
-  dry-run, write-gate и readback, когда API возвращает id.
-- `alterios_upsert_group` - typed create/update пункта меню через `/api/groups`
-  с root/parent preflight, form binding, iconId, managed-marker guard,
-  dry-run diff, write-gate и readback.
-- `alterios_upsert_help` - typed create/update справки через `/api/helps` с
-  managed-marker guard, dry-run diff, write-gate и readback.
-- `alterios_update_content_fields` - typed PATCH `/api/contents/save` для
-  существующей content-записи: preflight, expected content type/name, dry-run
-  diff, write-gate и readback.
-- `alterios_file_upload_to_field` - typed multipart upload в file-field через
-  `/api/file/upload/field` с последующим сохранением file value в
-  `/api/contents/save`, проверкой field metadata и readback.
-- `alterios_upsert_view` - typed create/update представления с preflight,
-  managed-marker guard, dry-run diff, write-gate и readback.
-- `alterios_upsert_view_entity` - typed create/update view entity с проверкой
-  родительского view и readback.
-- `alterios_upsert_view_field` - typed attach/update поля view через
-  `/api/view-entities/add-one-field` и `/api/view-fields/save`.
-- `alterios_upsert_form` - typed create/update формы целиком с tabs,
-  action containers, managed-marker guard и readback.
-- `alterios_patch_form_actions` - узкая замена `formActionContainers` формы.
-- `alterios_patch_form_tabs` - узкая замена `tabs` формы.
-- `alterios_analyze_form_surface` - read-only аудит формы по layout/F-pattern,
-  источникам данных, ролям, стилям и icon-first действиям.
-- `alterios_upsert_script` - typed create/update manual/event/diagram script
-  через `/api/scripts` с preflight, managed-marker guard, dry-run diff,
-  write-gate и readback.
-- `alterios_validate_script` - read-only проверка script type, active,
-  librariesIds/config и managed marker.
-- `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
-  UUID скрипта с preflight, active/name checks и readback.
-- `alterios_upsert_bpmn_diagram` - typed create/update BPMN diagram через
-  `/api/diagrams` с managed-marker guard и readback.
-- `alterios_start_process`, `alterios_list_process_tasks`,
-  `alterios_complete_task`, `alterios_validate_process_result` - typed
-  workflow/process/task surface для start/read/complete/validate side effects.
-- `alterios_upsert_report`, `alterios_patch_report_template`,
-  `alterios_validate_report_project_base` - typed report/dashboard surface с
-  `/api/reports`, `/api/reports/full/{filter}`, Project Database validation и
-  контрольным `get-data-simplified` по source view.
-- `alterios_validate_stimulsoft_layout` - read-only проверка Stimulsoft
-  template/report geometry: пересечения, выход за границы страницы,
-  zero-size components и риски `CanGrow`/`CanShrink` без `ShiftMode`.
-- `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
-  контекстом `content_id`, массивом `data_id` и `user_filters`.
-- `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
-- `alterios_add_comment`, `alterios_upsert_content_type`,
-  `alterios_upsert_field`, `alterios_create_content`,
-  `alterios_upsert_group`, `alterios_upsert_help`,
-  `alterios_update_content_fields`, `alterios_file_upload_to_field`,
-  `alterios_upsert_view`,
-  `alterios_upsert_view_entity`, `alterios_upsert_view_field`,
-  `alterios_upsert_form`, `alterios_patch_form_actions`,
-  `alterios_patch_form_tabs`, `alterios_upsert_script`,
-  `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`,
-  `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`,
-  `alterios_patch_report_template`, `alterios_call_write_service` и
-  `alterios_rest_write` - отключены, пока
-  явно не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают
-  dry-run audit и не выполняют запись.
-  Для destructive/security маршрутов дополнительно нужен
-  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и `allow_destructive=true`.
+MCP умеет собирать состав проекта:
 
-Инструменты уровня проекта следует вызывать с `project_id`, когда целевой проект
-известен из URL, UI-сессии или контекста задачи. Настроенный
-`ALTERIOS_<PROFILE>_PROJECT_ID` - только значение по умолчанию для
-повторяющейся работы с известным проектом.
+- проекты экземпляра;
+- типы материалов и поля;
+- представления, view entities и view fields;
+- формы, tabs, rows, cells и action containers;
+- группы меню и справки;
+- контент, файлы и комментарии;
+- скрипты, BPMN-диаграммы, процессы и задачи;
+- отчеты и Stimulsoft-шаблоны;
+- iconId и правила UI-действий.
 
-## Установка
+Для глубоких срезов есть отдельные CLI:
+
+- `alterios-deep-inventory` - формы, скрипты, BPMN-связи и иконки;
+- `alterios-form-surface-check` - проверка формы на layout/F-pattern,
+  источники данных, роли, стили и действия;
+- `alterios-stimulsoft-layout-check` - статическая проверка Stimulsoft layout
+  на пересечения, выход за страницу и риски динамической высоты;
+- `alterios-profile-smoke` - матрица профилей и project-route smoke.
+
+### Запись в Alterios
+
+Основные write-сценарии уже закрыты типизированными инструментами:
+
+- создание и обновление типов материалов;
+- создание и обновление полей;
+- создание контента;
+- обновление значений существующего контента;
+- загрузка файла в file-field;
+- создание и обновление групп меню;
+- создание и обновление справок;
+- создание и обновление представлений, view entities и view fields;
+- создание и обновление форм;
+- точечная замена `tabs` и `formActionContainers`;
+- создание и обновление manual/event/diagram scripts;
+- запуск manual script;
+- создание и обновление BPMN-диаграмм;
+- запуск процесса, чтение задач, завершение задачи, проверка side effects;
+- создание и обновление отчетов;
+- patch Stimulsoft template;
+- создание комментариев.
+
+Есть generic-инструменты `alterios_rest_write` и `alterios_call_write_service`,
+но для штатной работы предпочтительны типизированные инструменты: они знают контекст,
+проверяют цель, формируют dry-run audit и делают readback там, где API это позволяет.
+
+### Формы и пользовательский UI
+
+MCP учитывает не только JSON формы, но и пользовательский смысл поверхности:
+
+- тип формы: `main`, `list`, `add`, `edit`, `detail`, `task`;
+- вкладки, строки, ячейки и пустые места;
+- `field`, `view_data`, `view_data_list`, `report`, `comments_list`,
+  help/rich/html-контент;
+- источники данных: `openId`, `dataId`, `viewEntityId`, view/report binding;
+- условия отображения, роли, стили, параметры;
+- порядок действий: редактировать, просмотр, удалить;
+- compact icon-first кнопки и меню строки через троеточие;
+- стандарт иконок Google Fonts Icons.
+
+Правила иконок описаны в [docs/alterios-icon-standards.md](docs/alterios-icon-standards.md).
+
+### Скрипты, BPMN и задачи
+
+MCP умеет связывать:
+
+- manual scripts;
+- event scripts;
+- diagram scripts;
+- form actions, которые запускают скрипты;
+- BPMN `scriptTask`, service/listener refs и `userTask`;
+- `camunda:formKey` и task forms;
+- процессы, задачи и side effects по данным.
+
+Связующая карта лежит в [docs/script-bpmn-linkage.md](docs/script-bpmn-linkage.md).
+
+### Отчеты и Stimulsoft
+
+Поддержаны отчеты на Project Database:
+
+- создание/обновление отчета;
+- patch JSON-шаблона;
+- чтение full report;
+- проверка связи отчета с представлением;
+- проверка current-record контекста через `dataId: [openId]`;
+- статическая проверка геометрии Stimulsoft-компонентов;
+- правила размещения элементов, чтобы они не съезжались в печатной форме.
+
+Подробный playbook: [docs/stimulsoft-report-layout-and-analytics.md](docs/stimulsoft-report-layout-and-analytics.md).
+
+### Агенты и skills
+
+В репозитории есть рабочий набор Alterios skills:
+
+- `alterios-project-base-inventory`;
+- `alterios-form-view-surface`;
+- `alterios-ui-icons-and-actions`;
+- `alterios-script-bpmn-flow`;
+- `alterios-write-tools`;
+- `alterios-stimulsoft-project-db`;
+- `alterios-safety-verifier`;
+- `alterios-pm-control-loop`.
+
+Отдельно добавлен агент **Documentation Scribe / Писарь** для подготовки
+пользовательских и администраторских инструкций по ГОСТ/ЕСПД и ГОСТ 34. Он
+использует установленный skill `gost-documentation-builder` и локальный Alterios
+playbook: [docs/gost-documentation-scribe-agent.md](docs/gost-documentation-scribe-agent.md).
+
+Матрица агентов и ролей: [docs/agents-and-skills.md](docs/agents-and-skills.md).
+
+## Безопасность записи
+
+Запись выключена по умолчанию.
+
+Чтобы изменение реально ушло в Alterios, должны совпасть условия:
+
+1. Передан явный `profile`.
+2. Для project-level инструментов передан явный `project_id`.
+3. Инструмент вызван с `dry_run=false`.
+4. В окружении включен `ALTERIOS_MCP_ALLOW_WRITE=1`.
+5. Для destructive/security маршрутов дополнительно включен
+   `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`.
+6. Для destructive/security вызова дополнительно передан `allow_destructive=true`.
+
+Если условия не выполнены, write-инструменты возвращают dry-run audit и не
+выполняют сетевую запись.
+
+Перед неизвестными, destructive или permission-changing маршрутами используйте
+`alterios_write_safety_preflight`: он классифицирует proposed REST route без
+network request и показывает, какие gate-флаги понадобятся.
+
+## Быстрый старт
+
+### 1. Установка
 
 ```powershell
 git clone https://github.com/<owner>/alterios-mcp.git
@@ -143,37 +180,26 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -e ".[dev]"
 ```
 
-## Настройка Alterios
+### 2. Приватный конфиг
 
-Используйте локальный приватный `.env`; не коммитьте его.
+Секреты не должны попадать в репозиторий. Предпочтительный вариант - хранить
+приватный dotenv вне папки проекта и передавать путь через `ALTERIOS_DOTENV_PATH`.
 
-```powershell
-Copy-Item .env.example .env
-```
-
-Пример профиля для одного экземпляра Alterios:
+Пример приватного файла:
 
 ```dotenv
 ALTERIOS_PROFILE=primary
 ALTERIOS_PROFILES=primary,secondary
 
-ALTERIOS_PRIMARY_BASE_URL=https://alterios.example.local
+ALTERIOS_PRIMARY_BASE_URL=https://alterios-primary.example.local
 ALTERIOS_PRIMARY_API_TOKEN=put-token-here
-
-# Необязательное значение по умолчанию. Для инструментов уровня проекта лучше передавать project_id явно.
 ALTERIOS_PRIMARY_PROJECT_ID=put-optional-default-project-id-here
-
 ALTERIOS_PRIMARY_ENDPOINT_TEMPLATE={base_url}/api/scripts/execute-manual
 ALTERIOS_PRIMARY_BODY_STYLE=manual_script
 ALTERIOS_PRIMARY_AUTH_HEADER=x-api-key
 ALTERIOS_PRIMARY_AUTH_SCHEME=
 ALTERIOS_PRIMARY_TIMEOUT_SECONDS=20
-```
 
-Несколько экземпляров Alterios можно держать в одном приватном dotenv-файле.
-Добавьте второй профиль с собственным префиксом:
-
-```dotenv
 ALTERIOS_SECONDARY_BASE_URL=https://alterios-secondary.example.local
 ALTERIOS_SECONDARY_API_TOKEN=put-token-here
 ALTERIOS_SECONDARY_PROJECT_ID=put-optional-default-project-id-here
@@ -182,45 +208,37 @@ ALTERIOS_SECONDARY_BODY_STYLE=manual_script
 ALTERIOS_SECONDARY_AUTH_HEADER=Authorization
 ALTERIOS_SECONDARY_AUTH_SCHEME=Bearer
 ALTERIOS_SECONDARY_TIMEOUT_SECONDS=20
+
+ALTERIOS_MCP_ALLOW_WRITE=0
 ```
 
-Профили можно перечислить явно через `ALTERIOS_PROFILES` или оставить
-автодетект по переменным вида `ALTERIOS_<PROFILE>_*`. Проверка всех настроенных
-экземпляров без сетевых вызовов:
-
-```powershell
-python -m alterios_mcp.discovery --profiles --json
-```
-
-Чтобы посмотреть список профилей с другим выбранным экземпляром, не меняя
-dotenv, передайте профиль явно:
-
-```powershell
-python -m alterios_mcp.discovery --profiles --profile secondary --json
-```
-
-Для конкретного экземпляра используйте `--profile` в CLI или аргумент `profile`
-в MCP tool-е. Для конкретного проекта внутри выбранного экземпляра передавайте
-`project_id` явно.
-
-`BASE_URL`, `API_TOKEN` и `PROJECT_ID` намеренно изолированы по профилю. Если
-выбран профиль, сервер не делает скрытый переход на другой экземпляр или проект.
-Профильные настройки транспорта (`AUTH_HEADER`, `AUTH_SCHEME`,
-`ENDPOINT_TEMPLATE`, `BODY_STYLE`, `TIMEOUT_SECONDS`) также можно задавать с тем
-же префиксом `ALTERIOS_<PROFILE>_...`; при их отсутствии применяются обычные
-дефолты клиента или явно заданные общие значения.
-
-Чтобы использовать уже существующую приватную конфигурацию и не копировать
-секреты в этот репозиторий, задайте `ALTERIOS_DOTENV_PATH` вне репозитория:
+Подключить файл в текущей PowerShell-сессии:
 
 ```powershell
 $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
-python -m alterios_mcp.discovery --profile primary --projects --json
 ```
 
-В конфиг Codex MCP лучше передавать уже установленный console script
-`alterios-mcp.exe` и тот же путь к приватному dotenv. Это исключает путаницу
-с рабочей директорией и импортом модуля:
+### 3. Проверка профилей
+
+```powershell
+.\.venv\Scripts\alterios-profile-smoke.exe --json
+```
+
+Минимальная локальная проверка конфигурации без записи:
+
+```powershell
+.\.venv\Scripts\alterios-discover.exe --profiles --json
+```
+
+### 4. Запуск MCP-сервера
+
+Локально:
+
+```powershell
+.\.venv\Scripts\alterios-mcp.exe
+```
+
+Пример подключения в Codex MCP config:
 
 ```toml
 [mcp_servers.alterios]
@@ -233,229 +251,116 @@ tool_timeout_sec = 120
 ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 ```
 
-Эквивалентный fallback через Python-модуль:
+Fallback через Python:
 
 ```toml
 [mcp_servers.alterios]
 command = "C:\\path\\to\\alterios-mcp\\.venv\\Scripts\\python.exe"
 args = ["-m", "alterios_mcp.server"]
+startup_timeout_sec = 60
+tool_timeout_sec = 120
 
 [mcp_servers.alterios.env]
 ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 ```
 
-## Инвентаризация
+## Как выполнять запись
 
-Список проектов выбранного экземпляра Alterios:
+Рабочий порядок такой:
 
-```powershell
-python -m alterios_mcp.discovery --profile primary --projects --json
-```
+1. Проверить профиль и проект через `alterios_config` или `alterios-profile-smoke`.
+2. Вызвать нужный write-инструмент в dry-run режиме.
+3. Проверить audit: целевой объект, route, diff, gate status, ожидаемый readback.
+4. Включить `ALTERIOS_MCP_ALLOW_WRITE=1` только для безопасной целевой среды.
+5. Повторить вызов с `dry_run=false`.
+6. Проверить readback через тот же инструмент или отдельный read-only tool.
+7. Зафиксировать результат в `docs/project-status.md`, если это часть этапа работ.
 
-Read-only smoke по всем настроенным профилям без раскрытия токенов и URL:
+Для destructive/security операций сначала нужен отдельный read-only анализ route
+и `alterios_write_safety_preflight`. Типизированные destructive/security tools
+намеренно не добавляются без live UI/HAR/API evidence.
 
-```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
-alterios-profile-smoke `
-  --out-json docs\profile-smoke-matrix-2026-07-10.json `
-  --out-md docs\profile-smoke-matrix-2026-07-10.md
-```
+## Основные пользовательские сценарии
 
-Проверка конкретного проекта с явным `project_id`:
+### Инвентаризировать проект
 
-```powershell
-python -m alterios_mcp.discovery --profile primary `
-  --project-id put-target-project-id-here `
-  --json
-```
+Используйте read-only tools и `alterios-deep-inventory`, чтобы получить список
+форм, представлений, скриптов, диаграмм, отчетов, связей и иконок. Результаты
+можно использовать как source map для последующих изменений.
 
-Сохранение воспроизводимого артефакта инвентаризации:
+### Построить тип материалов
 
-```powershell
-New-Item -ItemType Directory -Force artifacts\alterios-mcp | Out-Null
-python -m alterios_mcp.discovery --profile primary `
-  --project-id put-target-project-id-here `
-  --json > artifacts\alterios-mcp\live-readonly-matrix.json
-```
+MCP может создать content type, поля, форму добавления/редактирования, list/main
+view, группу меню и тестовую запись. Запись выполняется через dry-run -> write
+gate -> readback.
 
-Сканирование существующего репозитория Alterios-автоматизации на известные API
-пути и кандидаты в script-service функции:
+### Доработать форму
 
-```powershell
-python -m alterios_mcp.static_scan C:\path\to\alterios-automation `
-  --json > artifacts\alterios-mcp\static-calls.json
-```
+MCP анализирует расположение элементов, пустые места, источники данных, роли,
+стили, условия, действия и иконки. После анализа можно точечно заменить tabs или
+action containers без полной ручной пересборки формы.
 
-Глубокая read-only инвентаризация форм, связей scripts/BPMN и iconId usage для
-конкретного проекта:
+### Связать форму, скрипт и BPMN
 
-```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
-alterios-deep-inventory `
-  --profile artx `
-  --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba `
-  --out-dir docs
-```
+MCP может показать, какие действия формы запускают скрипты, какие userTask
+открывают формы, какие scriptTask/listeners ссылаются на scripts и какие side
+effects надо проверить после запуска процесса или завершения задачи.
 
-Команда записывает:
+### Сделать отчет или печатную форму
 
-- `docs/form-surface-inventory.md` и `docs/form-surface-inventory.json`;
-- `docs/script-bpmn-linkage.md` и `docs/script-bpmn-linkage.json`;
-- `docs/icon-usage-matrix.json`.
+MCP помогает подключить Project Database source, проверить source view, openId
+контекст, Stimulsoft layout и риски съезда элементов. Для визуального финального
+приемочного контроля пока нужен отдельный render/UI proof.
 
-Статический сканер по умолчанию пропускает сгенерированные и тяжелые рабочие
-директории: `artifacts`, `data`, `outputs`, `site` и `work`. Используйте
-`--include-generated` только когда нужно намеренное полное медленное
-сканирование.
+### Подготовить инструкцию пользователя или администратора
 
-## Снятие Browser/UI Вызовов
+Documentation Scribe собирает проверенные факты из проекта, отделяет подтвержденное
+от предположений и оформляет инструкции в понятной структуре. Для ГОСТ-ориентированных
+документов используется `gost-documentation-builder`.
 
-Для снятия фактических вызовов из веб-интерфейса Alterios используйте
-анализатор HAR/JSON-событий. Он не выполняет запросы к Alterios сам: только
-читает сохраненный сетевой дамп, выкидывает не-API шум, редактирует секреты и
-классифицирует маршруты по риску.
+## Проверка проекта
+
+Перед коммитом запускайте:
 
 ```powershell
-python -m alterios_mcp.ui_flow .\capture.har `
-  --profile primary `
-  --project-id put-target-project-id-here `
-  --scenario content-form-open `
-  --json > artifacts\alterios-mcp\ui-flow-content-form-open.json
+.\.venv\Scripts\python -m pytest
+git diff --check
 ```
 
-Команда доступна и как console script:
+Для проверки README и документов на случайные секреты:
 
 ```powershell
-alterios-ui-flow .\capture.har --scenario content-form-open --json
+rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.*[A-Za-z0-9]{30,}|password\s*=\s*[^<\s].{8,})" README.md docs
 ```
 
-Неизвестные `POST`, `PUT`, `PATCH` и `DELETE` маршруты считаются write-like и
-попадают в write-gate. Известные read-only исключения, например
-`POST /api/views/v2/get-data`, описаны явно. Подробный workflow и правила
-редактирования артефактов описаны в
-[docs/browser-ui-discovery.md](docs/browser-ui-discovery.md).
+Выход `rg` с кодом `1` означает, что совпадений не найдено.
 
-## Запуск MCP-Сервера
+## Документы
 
-```powershell
-.\.venv\Scripts\alterios-mcp.exe
-```
+- [docs/project-status.md](docs/project-status.md) - текущий статус, этапы,
+  проверки, риски и ближайшие действия.
+- [docs/controlled-writes.md](docs/controlled-writes.md) - правила безопасной
+  записи.
+- [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md) - матрица
+  инструментов, route patterns и operation classes.
+- [docs/form-surface-inventory.md](docs/form-surface-inventory.md) - инвентаризация
+  форм.
+- [docs/script-bpmn-linkage.md](docs/script-bpmn-linkage.md) - связи scripts,
+  forms и BPMN.
+- [docs/stimulsoft-report-layout-and-analytics.md](docs/stimulsoft-report-layout-and-analytics.md) -
+  правила отчетов и Stimulsoft layout.
+- [docs/agents-and-skills.md](docs/agents-and-skills.md) - роли агентов и skills.
+- [docs/skill-installation.md](docs/skill-installation.md) - установка repo-owned
+  skills в локальный Codex.
 
-Это stdio MCP-сервер: при ручном запуске он не печатает обычный CLI-отчет, а
-ждет JSON-RPC сообщения от MCP-клиента. Для проверки конфигурации запускайте
-не сервер, а discovery-smoke:
+## Что дальше по план-графику
 
-```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
-.\.venv\Scripts\alterios-discover.exe --profiles --profile primary --json
-```
-
-Включайте режим записи только для проверенного безопасного профиля и проекта:
-
-```powershell
-$env:ALTERIOS_MCP_ALLOW_WRITE = "1"
-```
-
-Для destructive/security сценариев включайте отдельный gate только в выделенной
-sandbox-сессии:
-
-```powershell
-$env:ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE = "1"
-```
-
-Перед вызовами, которые могут менять состояние, запустите `alterios_config`,
-проверьте выбранный профиль и передайте `project_id` явно. Поэтапный рабочий
-план описан в [docs/roadmap.md](docs/roadmap.md), стратегия
-инвентаризации - в
-[docs/discovery-plan.md](docs/discovery-plan.md).
-
-Политика controlled writes описана в
-[docs/controlled-writes.md](docs/controlled-writes.md). Для реального выполнения
-write-capable tool-а нужно одновременно:
-
-- передать явные `profile` и `project_id`;
-- включить `ALTERIOS_MCP_ALLOW_WRITE=1`;
-- передать `dry_run=false`;
-- для destructive/security операций дополнительно включить
-  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и передать
-  `allow_destructive=true`.
-
-Управление проектом ведется в [docs/project-status.md](docs/project-status.md).
-Правила мультиагентной работы и контрольные точки PM описаны в
-[docs/project-management.md](docs/project-management.md). Контракт будущих
-агентов и skill-пакетов описан в
-[docs/agents-and-skills.md](docs/agents-and-skills.md). Каталог runtime-сервисов
-скриптов описан в
-[docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
-Карта сущностей Alterios, возможных обращений, настроек и порядка write-практики
-описана в [docs/alterios-entity-surface-catalog.md](docs/alterios-entity-surface-catalog.md).
-Количество покрытых методов, route/method patterns и статусы live/cataloged
-ведутся в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
-Текущая реинвентаризация write-surface и project base:
-[docs/reinventory-2026-07-10.md](docs/reinventory-2026-07-10.md).
-
-## Repo-Owned Skills
-
-Первый набор Codex skills хранится в `skills/`. Это не замена MCP tools, а
-тонкие рабочие инструкции для повторяемых задач Alterios:
-
-- `alterios-project-base-inventory` - инвентаризация project base и route evidence;
-- `alterios-form-view-surface` - формы, представления, layout и `openId`;
-- `alterios-ui-icons-and-actions` - Google Fonts Icons, `iconId` и порядок действий;
-- `alterios-script-bpmn-flow` - scripts, BPMN, task forms и side effects;
-- `alterios-write-tools` - guarded typed write tools, dry-run и readback;
-- `alterios-stimulsoft-project-db` - Stimulsoft отчеты от Project Database;
-- `alterios-safety-verifier` - проверки, секреты, write-gate и UI/readback;
-- `alterios-pm-control-loop` - этапы, риски, acceptance criteria и handoff.
-
-Каждый skill содержит `SKILL.md`, `agents/openai.yaml` и
-`references/source-map.md`, который указывает на проверенные документы и
-матрицы в `docs/`.
-
-Установка repo-owned skills в локальный каталог Codex:
-
-```powershell
-.\.venv\Scripts\python scripts\install_repo_skills.py --execute --json
-```
-
-Подробности: [docs/skill-installation.md](docs/skill-installation.md).
-
-## Practice-Сценарии
-
-Для тестового проекта можно держать отдельный воспроизводимый practice chain:
-создать или проверить sandbox content type, representative fields, table view,
-add/edit/main forms, menu group и одну sandbox-запись. В публичном README
-используются только placeholders; конкретный локальный скрипт и проект держите
-в приватной документации или локальных runbook-файлах. По умолчанию команда
-должна работать как dry-run:
-
-```powershell
-$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
-$env:PYTHONPATH = "src"
-python scripts\<sandbox-practice-script>.py `
-  --profile sandbox `
-  --project-id put-sandbox-project-id-here `
-  --json
-```
-
-Для выполнения записи нужен явный write-gate:
-
-```powershell
-$env:ALTERIOS_MCP_ALLOW_WRITE = "1"
-python scripts\<sandbox-practice-script>.py `
-  --profile sandbox `
-  --project-id put-sandbox-project-id-here `
-  --execute `
-  --json
-```
-
-Важно: `/api/scripts/execute-manual` выполняет сохраненные Alterios-скрипты по
-UUID. Этот endpoint не вызывает имена runtime-сервисов вроде `getTasks`.
-Имена runtime-сервисов остаются в каталоге до тех пор, пока совместимый внешний
-сервисный endpoint не будет настроен и проверен.
-
-## Проверка
-
-```powershell
-python -m pytest
-```
+1. Собрать read-only UI/HAR/API evidence для users, roles, delete и других
+   destructive/security маршрутов.
+2. После evidence добавить типизированные tools для безопасных permission-changing
+   и destructive операций, если они действительно нужны.
+3. Расширить Stimulsoft-проверку до render/PDF/image comparison, когда будет
+   доступен надежный экспорт или renderer.
+4. Подготовить отдельные инструкции администратора и пользователя на базе
+   Documentation Scribe.
+5. Довести release packaging и changelog process после стабилизации write-поверхности.
