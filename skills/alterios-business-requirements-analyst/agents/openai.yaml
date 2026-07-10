@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Requirements Analyst"
+  short_description: "Draft Alterios BRD and TRZ specs"
+  default_prompt: "Use $alterios-business-requirements-analyst to turn an Alterios business request into a developer-ready specification."

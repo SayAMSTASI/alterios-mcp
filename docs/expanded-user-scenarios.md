@@ -8,8 +8,8 @@
 
 Контекст текущего покрытия:
 
-- MCP tools: 67;
-- write-like MCP tools: 32;
+- MCP tools: 75;
+- write-like MCP tools: 35;
 - project-base сценарии уже покрывают content types, fields, content, files,
   views, forms, scripts, BPMN/process/tasks, reports, groups, comments;
 - users, roles, user groups writes и destructive delete имеют typed security
@@ -124,6 +124,30 @@
 - связанный список дочерних объектов;
 - source view для отчета;
 - source view для dashboard/analytics.
+
+### 3.1. Связи, поля и фильтры
+
+Представление считается настроенным только после проверки связей и данных:
+
+- `viewEntity` задает источник и, при необходимости, цепочку `joins`;
+- связь родитель/дочерний объект должна иметь конкретный relation field;
+- добавление поля в content type не добавляет его автоматически в view:
+  нужен отдельный `view field` с alias/order/display rules;
+- фильтры фиксируются как часть требований: статические, пользовательские,
+  роль-зависимые, current-record через `openId`/`dataId`;
+- сортировка задается явно, если порядок строк важен для пользователя;
+- source view для отчета не должен содержать лишние поля, которые не
+  используются в шаблоне или аналитике;
+- `contentId` без `dataId: [openId]` не считается проверкой current-record
+  фильтрации.
+
+Минимальный readback:
+
+1. `alterios_view_entities` показывает ожидаемый entity chain.
+2. `alterios_view_fields_populated` показывает все нужные поля и alias.
+3. `alterios_view_data_simplified` возвращает ожидаемые строки.
+4. Для карточки текущей записи `alterios_view_data` с `dataId: [openId]`
+   возвращает только строки текущего контекста.
 
 ## 4. Группы меню
 

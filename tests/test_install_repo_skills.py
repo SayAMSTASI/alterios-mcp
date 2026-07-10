@@ -23,10 +23,11 @@ def test_plan_install_lists_repo_skills(tmp_path: Path) -> None:
     module = _load_module()
     plans = module.plan_install(ROOT / "skills", tmp_path)
 
-    assert len(plans) == 8
+    assert len(plans) == 9
     assert {item.action for item in plans} == {"install"}
     assert {item.name for item in plans} == {
         "alterios-project-base-inventory",
+        "alterios-business-requirements-analyst",
         "alterios-form-view-surface",
         "alterios-ui-icons-and-actions",
         "alterios-script-bpmn-flow",

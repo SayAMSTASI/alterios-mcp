@@ -8,6 +8,7 @@ SKILLS_DIR = ROOT / "skills"
 
 EXPECTED_SKILLS = {
     "alterios-project-base-inventory",
+    "alterios-business-requirements-analyst",
     "alterios-form-view-surface",
     "alterios-ui-icons-and-actions",
     "alterios-script-bpmn-flow",

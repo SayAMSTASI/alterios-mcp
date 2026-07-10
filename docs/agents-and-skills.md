@@ -22,6 +22,7 @@
 |---|---|---|---|---|---:|
 | Lead Engineer | Всегда, как владелец сессии | Интегрирует вывод агентов, выбирает конечное решение, запускает проверки, коммитит и пушит | Все артефакты агентов, код, live evidence | Проверенный repo state, commit/push, краткий итог | Да |
 | PM Control Loop | В начале этапа и после каждого проверенного среза | Разбить цель на этапы, зафиксировать acceptance criteria, вести статус, риски, блокеры, следующий шаг | `docs/project-status.md`, backlog, текущая цель пользователя | Обновленный статус, stage gate, список следующих задач | Только docs |
+| Business/System Analyst / Аналитик требований | Когда запрос нужно превратить в постановку, ТРЗ, сценарии или developer handoff | Формализовать бизнес-цель, роли, сценарии, модель данных, views/forms/scripts/BPMN/reports, acceptance criteria, open questions и Stage 19 preflight | Запрос пользователя, inventory, `alterios_project_health`, UI/HAR evidence, договор/ТЗ/протокол при наличии | Постановка/ТРЗ, карта объектов, view/form/process/report requirements, acceptance checklist | Только docs |
 | Project Base Explorer | Перед любыми изменениями project base или расширением покрытия | Read-only инвентаризация проектов, content types, fields, views, forms, scripts, diagrams, reports, files, comments, users/groups, tasks/processes; поиск route/response shape | `profile`, `project_id`, discovery JSON, live API read-only | JSON/MD матрицы, id/name map, route map, gaps | Нет |
 | Data Model Engineer | При типах материалов, полях, связях, источниках данных | Проектировать content types/material types, persisted field types, refs, file fields, calc/spreadsheet/combined/person fields, `contentNameTemplate`, role/source constraints | Inventory, `alterios-field-types`, существующие content types/fields | Спецификация модели, field matrix, safe migration plan | Да, scoped |
 | View Builder | При списках, представлениях, источниках для форм/отчетов | Проектировать views, view entities, joins, view fields, filters, sorts, display names, source fields, current-record context, `dataId/openId` behavior | Content model, view inventory, expected UI rows | View spec, view field matrix, get-data readback plan | Да, scoped |
@@ -52,6 +53,30 @@ Done:
 - acceptance criteria измеримы;
 - статус не скрывает открытые риски;
 - завершенный этап связан с commit hash в следующем статусном срезе.
+
+### Business/System Analyst / Аналитик Требований
+
+Задачи:
+
+- переводить бизнес-запрос в постановку или ТРЗ до проектирования и записи;
+- отделять подтвержденные факты от предположений и неизвестных значений;
+- описывать пользователей, роли, права, сценарии, ошибки и acceptance criteria;
+- раскладывать будущую реализацию на Alterios-объекты: content types, fields,
+  views, forms, scripts, BPMN, reports, groups, icons, users/roles;
+- для представлений фиксировать source content type, `viewEntity`, joins,
+  relation field, view fields, filters, sorts, `openId/dataId` и readback;
+- перед live-write через сценарные tools требовать `alterios_project_health`
+  без blocking errors;
+- отдавать профильным агентам scoped handoff, а не общий пересказ задачи.
+
+Done:
+
+- есть структура постановки/ТРЗ с источниками, рисками и вопросами;
+- требования проверяемы и имеют acceptance criteria;
+- связи представлений описаны конкретными полями/joins, а не словами "связано";
+- понятно, какие MCP tools будут использоваться и какие проверки нужны;
+- live-write не запланирован без `profile`, `project_id`, health preflight,
+  dry-run `plan_id` и readback.
 
 ### Project Base Explorer
 
@@ -269,13 +294,14 @@ Done:
 ### Материалы, Представления И Формы
 
 1. PM Control Loop задает stage и acceptance criteria.
-2. Project Base Explorer собирает текущие content types, fields, views, forms.
-3. Data Model Engineer проектирует тип материала и поля.
-4. View Builder собирает view и проверяет `get-data`.
-5. Form Surface Engineer размещает поля, списки, отчеты, комментарии и действия.
-6. UI Icons & Actions Reviewer проверяет иконки и порядок действий.
-7. Safety Verifier запускает проверки и readback.
-8. Lead Engineer интегрирует, коммитит, пушит и обновляет статус.
+2. Business/System Analyst формализует постановку, роли, сценарии и acceptance.
+3. Project Base Explorer собирает текущие content types, fields, views, forms.
+4. Data Model Engineer проектирует тип материала и поля.
+5. View Builder собирает view и проверяет связи, поля, фильтры и `get-data`.
+6. Form Surface Engineer размещает поля, списки, отчеты, комментарии и действия.
+7. UI Icons & Actions Reviewer проверяет иконки и порядок действий.
+8. Safety Verifier запускает проверки и readback.
+9. Lead Engineer интегрирует, коммитит, пушит и обновляет статус.
 
 ### Scripts/BPMN/Tasks
 
@@ -295,14 +321,15 @@ Done:
 ### Инструкции Администратора И Пользователя
 
 1. PM Control Loop фиксирует аудиторию, тип документа и acceptance criteria.
-2. Project Base Explorer и профильные агенты передают проверенные источники:
+2. Business/System Analyst готовит постановку, структуру требований и open questions.
+3. Project Base Explorer и профильные агенты передают проверенные источники:
    tools, routes, forms, scripts, BPMN, reports, screenshots и ограничения.
-3. Documentation Scribe / Писарь выбирает ГОСТ 19 / ГОСТ 34 базис, составляет
+4. Documentation Scribe / Писарь выбирает ГОСТ 19 / ГОСТ 34 базис, составляет
    fill map и draft инструкции.
-4. Safety Verifier проверяет, что документ не содержит секретов, неподтвержденных
+5. Safety Verifier проверяет, что документ не содержит секретов, неподтвержденных
    фактов, нечитабельных screenshots и смешения пользовательских/админских
    процедур.
-5. Lead Engineer интегрирует документ в репозиторий, запускает проверки и
+6. Lead Engineer интегрирует документ в репозиторий, запускает проверки и
    обновляет статус.
 
 ### Новый MCP Tool
@@ -318,7 +345,7 @@ Done:
 Skills добавляются только после того, как соответствующий workflow уже проверен
 кодом или live sandbox. Иначе skill начнет закреплять догадки.
 
-Первый набор из 8 repo-owned skills создан в `skills/`. Эти skills являются
+Рабочий набор repo-owned skills создан в `skills/`. Эти skills являются
 тонкими диспетчерами: `SKILL.md` содержит триггеры, workflow, safety rules и
 границы ответственности, а `references/source-map.md` указывает на проверенные
 docs, JSON-матрицы, тесты и кодовые области.
@@ -326,6 +353,7 @@ docs, JSON-матрицы, тесты и кодовые области.
 | Skill | Когда создавать | Основной владелец | Что должен знать |
 |---|---|---|---|
 | `alterios-project-base-inventory` | После deep inventory project-base matrix | Project Base Explorer | Профиль, project_id, listandcount, object totals, route/readback evidence |
+| `alterios-business-requirements-analyst` | После появления Stage 19 и документационного workflow | Business/System Analyst | Постановка/ТРЗ, сценарии, view/form/process/report requirements, acceptance criteria |
 | `alterios-form-view-surface` | После `docs/form-surface-inventory.md` и JSON-матрицы | Form Surface Engineer | View links, form tabs/actions, no-gap layout, F-pattern, roles/source/styles |
 | `alterios-ui-icons-and-actions` | После `docs/icon-usage-matrix.json` и UTF-8 icon standard | UI Icons & Actions Reviewer | Google Fonts Icons, size 16, `#4B77D1`, action meaning, iconId validation |
 | `alterios-script-bpmn-flow` | После `docs/script-bpmn-linkage.md` и parser refs | Script/BPMN Flow Integrator | Script types, form actions, BPMN formKey/listeners/script refs, side effects |
@@ -334,12 +362,13 @@ docs, JSON-матрицы, тесты и кодовые области.
 | `alterios-safety-verifier` | После scanner/test/readback workflow стабилизации | Safety Verifier | Tests, secret redaction, dry-run/write-gate, UI/HAR evidence |
 | `alterios-pm-control-loop` | После стабилизации `project-status` и stage format | PM Control Loop | Stage control, acceptance criteria, risks, next steps |
 
-Documentation Scribe / Писарь на первом проходе не требует отдельного
-repo-owned skill: он использует установленный `gost-documentation-builder` и
-локальный playbook `docs/gost-documentation-scribe-agent.md`. Отдельный skill
-`alterios-gost-documentation-scribe` стоит создавать только после того, как
-будут подготовлены и проверены реальные инструкции администратора и
-пользователя для Alterios MCP.
+Business/System Analyst имеет отдельный repo-owned skill
+`alterios-business-requirements-analyst`, потому что он формирует вход для всех
+write-сценариев. Documentation Scribe / Писарь пока не дублирует
+`gost-documentation-builder`: он использует установленный документный skill,
+локальный playbook `docs/gost-documentation-scribe-agent.md` и, при DOCX,
+document-render workflow. Отдельный repo-owned skill для Писаря стоит создавать
+только после серии проверенных инструкций администратора/пользователя.
 
 Формат каждого skill folder:
 

@@ -743,6 +743,7 @@ git pull --ff-only
   (`/api/content-types/clone`) подтвержден, но live clone остается gated до
   отдельного target sandbox project;
 - реализованы repo-owned skills и installer;
+- добавлен Business/System Analyst / Аналитик требований для постановок и ТРЗ;
 - создан Documentation Scribe / Писарь;
 - README переведен в пользовательскую точку входа;
 - настоящая инструкция закрывает административный контур.

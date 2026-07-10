@@ -12,6 +12,7 @@
 | Explorer Agent | Ограниченные вопросы по codebase/API с evidence и ссылками на файлы. | Нет |
 | Worker Agent | Реализация ограниченной задачи в заранее заданной зоне файлов. | Да |
 | Verifier Agent | Независимые проверки, обзор рисков и отчет о gaps. | Нет |
+| Business/System Analyst / Аналитик требований | Постановка, ТРЗ, сценарии, требования к views/forms/scripts/BPMN/reports и acceptance criteria. | Нет |
 | Documentation Scribe / Писарь | Инструкции администратора/пользователя и ГОСТ/ЕСПД-документация по проверенным источникам. | Нет |
 
 Lead Engineer отвечает за итоговое состояние репозитория. Subagents могут

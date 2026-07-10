@@ -92,13 +92,15 @@ writes; оставшаяся работа - довести coverage, safety и r
 
 ## 7. Агенты и skills
 
-- Держать agent roles как project control layer: PM, Project Base Explorer,
-  Data Model Engineer, View Builder, Form Surface Engineer, UI Icons & Actions
-  Reviewer, Script/BPMN Flow Integrator, Report/Stimulsoft Specialist, Write
-  Tool Engineer, Safety Verifier и Skill Curator.
+- Держать agent roles как project control layer: PM, Business/System Analyst,
+  Project Base Explorer, Data Model Engineer, View Builder, Form Surface
+  Engineer, UI Icons & Actions Reviewer, Script/BPMN Flow Integrator,
+  Report/Stimulsoft Specialist, Write Tool Engineer, Safety Verifier,
+  Documentation Scribe и Skill Curator.
 - Хранить operating contract в `docs/agents-and-skills.md`.
 - Добавлять repo-owned skills только после реализации workflow и проверки
   через tests или live sandbox readback.
-- Стартовый набор skills: project base inventory, typed write tools,
-  form/view surfaces, BPMN task flow и Stimulsoft Project Database reports.
+- Стартовый набор skills: project base inventory, requirements analyst, typed
+  write tools, form/view surfaces, BPMN task flow и Stimulsoft Project
+  Database reports.
 - Не кодировать в skills непроверенное API behavior как факт.
