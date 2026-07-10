@@ -52,12 +52,16 @@
 
 ## Фактический MCP Surface
 
-Сейчас в `src/alterios_mcp/server.py` опубликовано 23 MCP tools.
-Write-like tools только 4:
+На момент реинвентаризации в `src/alterios_mcp/server.py` было опубликовано
+23 MCP tools, из них write-like tools только 4. Первый кодовый этап после этой
+реинвентаризации добавил 2 typed content/file tools; текущий surface: 25 tools,
+6 write-like tools.
 
 | Tool | Что делает | Ограничение |
 |---|---|---|
 | `alterios_add_comment` | Typed comment write | Покрывает только комментарии |
+| `alterios_update_content_fields` | Typed content write | Добавлено после реинвентаризации; PATCH `/api/contents/save` с preflight/diff/readback |
+| `alterios_file_upload_to_field` | Typed file-field write | Добавлено после реинвентаризации; multipart upload + сохранение file value |
 | `alterios_call_write_service` | Generic runtime service write | Нет typed контракта по сущностям |
 | `alterios_execute_manual_script` | Запуск сохраненного manual script UUID | Не создает и не обновляет скрипты |
 | `alterios_rest_write` | Generic REST write | Слишком широкий интерфейс для стабильной работы |
@@ -232,7 +236,7 @@ commands по сущностям:
 |---|---|---|
 | 1 | Исправить и зафиксировать запуск MCP через `alterios-mcp.exe` | README содержит рабочий Codex config и smoke через `alterios-discover.exe` |
 | 2 | Вынести общие typed write helpers | Единые preflight, dry-run diff, managed-marker guard, write-gate, readback |
-| 3 | Добавить content/file typed tools | `alterios_update_content_fields`, `alterios_file_upload_to_field`, тесты, live sandbox readback |
+| 3 | Добавить content/file typed tools | Выполнено: `alterios_update_content_fields`, `alterios_file_upload_to_field`, тесты, live sandbox readback |
 | 4 | Добавить views/forms typed tools | Upsert view/entity/field/form/action, sandbox idempotency, UI/HAR validation |
 | 5 | Добавить scripts typed tools | Upsert manual/event/diagram script, execute preflight, form binding |
 | 6 | Добавить BPMN/process/task tools | Diagram upsert, process start, task list/complete, process result validation |
@@ -240,6 +244,6 @@ commands по сущностям:
 | 8 | Добавить repo agents/skills | Агентные роли и skill-пакеты привязаны к проверенным tools и docs |
 | 9 | Закрыть security/destructive flows | Только после отдельного sandbox сценария и явного destructive gate |
 
-Первый кодовый шаг после этой реинвентаризации: typed content/file tools,
-потому что они дают быстрый проверяемый write-result и переиспользуют уже
-созданный `MCP Practice` sandbox.
+Первый кодовый шаг после этой реинвентаризации выполнен: typed content/file
+tools добавлены и проверены на `MCP Practice` sandbox. Следующий шаг - typed
+views/forms tools, потому что они закрывают основной UI-конструкторский слой.

@@ -50,10 +50,17 @@
 - `alterios_add_comment` - создание комментария через `/api/v1/comments` с
   `entity=any` по умолчанию для совместимости с `comments_list`, dry-run,
   write-gate и readback.
+- `alterios_update_content_fields` - typed PATCH `/api/contents/save` для
+  существующей content-записи: preflight, expected content type/name, dry-run
+  diff, write-gate и readback.
+- `alterios_file_upload_to_field` - typed multipart upload в file-field через
+  `/api/file/upload/field` с последующим сохранением file value в
+  `/api/contents/save`, проверкой field metadata и readback.
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
-- `alterios_add_comment`, `alterios_call_write_service` и
+- `alterios_add_comment`, `alterios_update_content_fields`,
+  `alterios_file_upload_to_field`, `alterios_call_write_service` и
   `alterios_rest_write` - отключены, пока явно не выставлен
   `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают dry-run audit и не
   выполняют запись.

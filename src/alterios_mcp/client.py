@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -269,6 +271,96 @@ class AlteriosClient:
         if not file_ids:
             raise ValueError("file_ids must contain at least one file id")
         return self.request("GET", "/api/file/list", params={"id": file_ids})
+
+    def content_by_id(self, content_id: str) -> AlteriosResponse:
+        if not content_id.strip():
+            raise ValueError("content_id must not be empty")
+        response = self.request(
+            "GET",
+            "/api/contents/listandcount",
+            params={"_id": content_id, "limit": 1, "offset": 0},
+        )
+        items = listandcount_items(response.body)
+        if not items:
+            raise AlteriosRequestError(f"Content {content_id!r} was not found.")
+        return AlteriosResponse(response.status_code, response.content_type, items[0])
+
+    def update_content_fields(
+        self,
+        content_id: str,
+        field_values: dict[str, Any],
+        *,
+        content_type_id: str | None = None,
+        groups_ids: list[str] | None = None,
+        name: str | None = None,
+    ) -> AlteriosResponse:
+        if not field_values:
+            raise ValueError("field_values must contain at least one field")
+        existing = self.content_by_id(content_id).body
+        if not isinstance(existing, dict):
+            raise AlteriosRequestError("Content readback returned unexpected payload.")
+        payload = content_update_payload(
+            existing,
+            field_values,
+            content_type_id=content_type_id,
+            groups_ids=groups_ids,
+            name=name,
+        )
+        return self.request("PATCH", "/api/contents/save", body=payload)
+
+    def upload_file_to_field(
+        self,
+        data: bytes,
+        *,
+        filename: str,
+        content_type_id: str,
+        field_id: str,
+        mime_type: str | None = None,
+    ) -> AlteriosResponse:
+        if not data:
+            raise ValueError("file data must not be empty")
+        if not filename.strip():
+            raise ValueError("filename must not be empty")
+        if not content_type_id.strip():
+            raise ValueError("content_type_id must not be empty")
+        if not field_id.strip():
+            raise ValueError("field_id must not be empty")
+
+        boundary = "----CodexAlteriosBoundary" + uuid.uuid4().hex
+        resolved_mime_type = mime_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        body = build_multipart(boundary, "upload", filename, resolved_mime_type, data)
+        headers = dict(self._headers())
+        headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(body)),
+                "contenttype": content_type_id,
+                "field": field_id,
+                "ngsw-bypass": "true",
+            }
+        )
+        request = Request(
+            self.config.base_url.rstrip("/") + "/api/file/upload/field",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                return AlteriosResponse(
+                    response.status,
+                    response.headers.get("Content-Type", ""),
+                    parse_response_body(response.read(), response.headers.get("Content-Type", "")),
+                )
+        except HTTPError as exc:
+            content_type = exc.headers.get("Content-Type", "") if exc.headers else ""
+            parsed_body = parse_response_body(exc.read(), content_type)
+            raise AlteriosRequestError(f"HTTP {exc.code}: {safe_error(parsed_body)}") from exc
+        except TimeoutError as exc:
+            raise AlteriosRequestError("Network error: timed out") from exc
+        except URLError as exc:
+            raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
 
     def list_comments(
         self,
@@ -609,6 +701,70 @@ def safe_error(payload: Any) -> str:
     if isinstance(payload, list):
         return f"list[{len(payload)}]"
     return str(payload)[:300]
+
+
+def listandcount_items(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        if payload and isinstance(payload[0], list):
+            return [item for item in payload[0] if isinstance(item, dict)]
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    raise AlteriosRequestError("listandcount returned unexpected payload.")
+
+
+def content_update_payload(
+    existing: dict[str, Any],
+    field_values: dict[str, Any],
+    *,
+    content_type_id: str | None = None,
+    groups_ids: list[str] | None = None,
+    name: str | None = None,
+) -> dict[str, Any]:
+    content_id = str(existing.get("_id") or "").strip()
+    if not content_id:
+        raise AlteriosRequestError("Content readback does not contain _id.")
+
+    resolved_content_type_id = content_type_id or existing.get("contentTypeId")
+    if not resolved_content_type_id:
+        raise AlteriosRequestError("Content type id is required for content update.")
+
+    fields = dict(existing.get("fields") or {})
+    for field_name, value in field_values.items():
+        if not str(field_name).strip():
+            raise ValueError("field_values contains an empty field name")
+        fields[str(field_name)] = normalize_content_field_value(value)
+
+    payload: dict[str, Any] = {
+        "_id": content_id,
+        "contentTypeId": resolved_content_type_id,
+        "fields": fields,
+    }
+    resolved_groups_ids = groups_ids if groups_ids is not None else existing.get("groupsIds")
+    if resolved_groups_ids is not None:
+        payload["groupsIds"] = resolved_groups_ids
+    resolved_name = name if name is not None else existing.get("name")
+    if resolved_name is not None:
+        payload["name"] = resolved_name
+    return payload
+
+
+def normalize_content_field_value(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else [value]
+
+
+def build_multipart(boundary: str, field_name: str, filename: str, mime_type: str, data: bytes) -> bytes:
+    safe_filename = filename.replace('"', "'")
+    head_text = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{field_name}"; filename="{safe_filename}"\r\n'
+        f"Content-Type: {mime_type}\r\n\r\n"
+    )
+    tail_text = f"\r\n--{boundary}--\r\n"
+    return head_text.encode("utf-8") + data + tail_text.encode("utf-8")
 
 
 def looks_like_uuid(value: str) -> bool:

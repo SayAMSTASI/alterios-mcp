@@ -335,6 +335,118 @@ def test_file_metadata_requires_ids_and_repeats_query_without_network() -> None:
     assert parse_qs(parsed.query) == {"id": ["file-1", "file-2"]}
 
 
+def test_content_by_id_uses_id_filter_and_returns_single_row_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    body = {"total": 1, "values": [{"_id": "content-1", "fields": {"field_title": ["Old"]}}]}
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", body)) as send:
+        response = client.content_by_id("content-1")
+
+    parsed = urlparse(send.call_args.args[0].url)
+    assert parsed.path == "/api/contents/listandcount"
+    assert parse_qs(parsed.query) == {"_id": ["content-1"], "limit": ["1"], "offset": ["0"]}
+    assert response.body == {"_id": "content-1", "fields": {"field_title": ["Old"]}}
+
+
+def test_update_content_fields_patches_existing_content_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+    responses = [
+        AlteriosResponse(
+            200,
+            "application/json",
+            {
+                "total": 1,
+                "values": [
+                    {
+                        "_id": "content-1",
+                        "contentTypeId": "ct-1",
+                        "name": "Row",
+                        "groupsIds": ["group-1"],
+                        "fields": {"field_title": ["Old"], "field_score": [1]},
+                    }
+                ],
+            },
+        ),
+        AlteriosResponse(200, "application/json", {"_id": "content-1", "ok": True}),
+    ]
+
+    with patch.object(client, "_send", side_effect=responses) as send:
+        client.update_content_fields("content-1", {"field_title": "New", "field_empty": []})
+
+    prepared = send.call_args_list[1].args[0]
+    assert prepared.method == "PATCH"
+    assert prepared.url == "https://alterios.example/api/contents/save"
+    assert prepared.body == {
+        "_id": "content-1",
+        "contentTypeId": "ct-1",
+        "name": "Row",
+        "groupsIds": ["group-1"],
+        "fields": {"field_title": ["New"], "field_score": [1], "field_empty": []},
+    }
+
+
+def test_upload_file_to_field_posts_multipart_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+        auth_header="x-api-key",
+        auth_scheme="",
+    )
+    client = AlteriosClient(config)
+    captured = {}
+
+    class FakeHTTPResponse:
+        status = 200
+        headers = {"Content-Type": "application/json"}
+
+        def __enter__(self) -> "FakeHTTPResponse":
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b'{"_id":"file-1","filename":"demo.txt","size":4}'
+
+    def fake_urlopen(request: object, timeout: float) -> FakeHTTPResponse:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return FakeHTTPResponse()
+
+    with patch("alterios_mcp.client.urlopen", side_effect=fake_urlopen):
+        response = client.upload_file_to_field(
+            b"demo",
+            filename="demo.txt",
+            content_type_id="ct-1",
+            field_id="field-1",
+            mime_type="text/plain",
+        )
+
+    request = captured["request"]
+    headers = {key.lower(): value for key, value in request.header_items()}
+    assert request.get_method() == "POST"
+    assert request.full_url == "https://alterios.example/api/file/upload/field"
+    assert headers["projectid"] == "project-1"
+    assert headers["x-api-key"] == "secret-token"
+    assert headers["contenttype"] == "ct-1"
+    assert headers["field"] == "field-1"
+    assert headers["content-type"].startswith("multipart/form-data; boundary=")
+    assert b'filename="demo.txt"' in request.data
+    assert b"demo" in request.data
+    assert response.body == {"_id": "file-1", "filename": "demo.txt", "size": 4}
+
+
 def test_list_comments_builds_v1_query_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

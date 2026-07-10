@@ -143,6 +143,198 @@ def test_add_comment_defaults_to_dry_run_without_network() -> None:
     assert result["audit"]["operation"]["target_ids"] == ["content-1"]
 
 
+def test_update_content_fields_dry_run_returns_preflight_diff_without_real_network() -> None:
+    class FakeResponse:
+        body = {
+            "_id": "content-1",
+            "contentTypeId": "ct-1",
+            "name": "Row",
+            "fields": {"field_title": ["Old"]},
+        }
+
+    class FakeClient:
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            assert content_id == "content-1"
+            return FakeResponse()
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_update_content_fields(
+            "content-1",
+            {"field_title": "New"},
+            expected_content_type_id="ct-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "content_fields"
+    assert result["audit"]["operation"]["target_ids"] == ["content-1", "ct-1"]
+    assert result["response"]["field_diff"] == [
+        {"field": "field_title", "before": ["Old"], "after": ["New"], "changed": True}
+    ]
+    assert result["response"]["planned_payload"]["fields"]["field_title"] == ["New"]
+
+
+def test_update_content_fields_execution_uses_write_gate_and_readback_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.saved = False
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            fields = {"field_title": ["New"]} if self.saved else {"field_title": ["Old"]}
+            return FakeResponse({"_id": content_id, "contentTypeId": "ct-1", "name": "Row", "fields": fields})
+
+        def update_content_fields(
+            self,
+            content_id: str,
+            field_values: dict[str, object],
+            *,
+            content_type_id: str | None = None,
+            groups_ids: list[str] | None = None,
+            name: str | None = None,
+        ) -> FakeResponse:
+            assert content_id == "content-1"
+            assert field_values == {"field_title": "New"}
+            assert content_type_id == "ct-1"
+            self.saved = True
+            return FakeResponse({"_id": content_id, "updated": True})
+
+    fake_client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=fake_client),
+    ):
+        result = server.alterios_update_content_fields(
+            "content-1",
+            {"field_title": "New"},
+            expected_content_type_id="ct-1",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["updated"]["body"] == {"_id": "content-1", "updated": True}
+    assert result["response"]["readback"]["body"]["fields"] == {"field_title": ["New"]}
+
+
+def test_file_upload_to_field_dry_run_resolves_file_field_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            assert content_id == "content-1"
+            return FakeResponse({"_id": content_id, "contentTypeId": "ct-1", "name": "Row", "fields": {}})
+
+        def list_fields(self, *, content_type_id: str, field_id: str | None = None, limit: int | None = None, offset: int | None = None) -> FakeResponse:
+            assert content_type_id == "ct-1"
+            return FakeResponse([{"_id": "field-1", "mname": "field_file", "type": "file"}])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_file_upload_to_field(
+            "content-1",
+            "field_file",
+            "demo.txt",
+            text="demo",
+            expected_content_type_id="ct-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "file_upload"
+    assert result["response"]["file"]["field_id"] == "field-1"
+    assert result["response"]["file"]["size"] == 4
+    assert result["response"]["existing_file_value_count"] == 0
+
+
+def test_file_upload_to_field_execution_uploads_saves_and_reads_back_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.saved_value: list[object] | None = None
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            fields = {"field_file": self.saved_value or []}
+            return FakeResponse({"_id": content_id, "contentTypeId": "ct-1", "name": "Row", "fields": fields})
+
+        def list_fields(self, *, content_type_id: str, field_id: str | None = None, limit: int | None = None, offset: int | None = None) -> FakeResponse:
+            return FakeResponse([{"_id": "field-1", "mname": "field_file", "type": "file"}])
+
+        def upload_file_to_field(
+            self,
+            data: bytes,
+            *,
+            filename: str,
+            content_type_id: str,
+            field_id: str,
+            mime_type: str | None = None,
+        ) -> FakeResponse:
+            assert data == b"demo"
+            assert filename == "demo.txt"
+            assert content_type_id == "ct-1"
+            assert field_id == "field-1"
+            return FakeResponse({"_id": "file-1", "filename": "demo.txt", "mimeType": "text/plain", "size": 4})
+
+        def update_content_fields(
+            self,
+            content_id: str,
+            field_values: dict[str, object],
+            *,
+            content_type_id: str | None = None,
+            groups_ids: list[str] | None = None,
+            name: str | None = None,
+        ) -> FakeResponse:
+            self.saved_value = field_values["field_file"]  # type: ignore[assignment]
+            return FakeResponse({"_id": content_id, "updated": True})
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            assert file_ids == ["file-1"]
+            return FakeResponse([{"_id": "file-1", "filename": "demo.txt"}])
+
+    fake_client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=fake_client),
+    ):
+        result = server.alterios_file_upload_to_field(
+            "content-1",
+            "field_file",
+            "demo.txt",
+            text="demo",
+            expected_content_type_id="ct-1",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["uploaded"]["body"]["_id"] == "file-1"
+    assert result["response"]["file_metadata"]["body"] == [{"_id": "file-1", "filename": "demo.txt"}]
+    assert result["response"]["readback"]["body"]["fields"]["field_file"][0]["id"] == "file-1"
+
+
 def test_server_lists_configured_profiles_without_secrets() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",
