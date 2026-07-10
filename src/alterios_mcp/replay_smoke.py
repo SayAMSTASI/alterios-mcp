@@ -30,7 +30,7 @@ def run_replay_smoke(
     profile: str | None = None,
     project_id: str | None = None,
     include_live: bool = False,
-    expected_tool_count_min: int = 74,
+    expected_tool_count_min: int = 75,
     artifacts_dir: str | None = None,
 ) -> dict[str, Any]:
     """Run a reproducible read-only/local smoke suite for MCP updates."""
@@ -327,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", help="Alterios profile for local target labels and optional live discovery.")
     parser.add_argument("--project-id", help="Alterios project id for local target labels and optional live discovery.")
     parser.add_argument("--include-live", action="store_true", help="Also run read-only Alterios discovery.")
-    parser.add_argument("--expected-tool-count-min", type=int, default=74)
+    parser.add_argument("--expected-tool-count-min", type=int, default=75)
     parser.add_argument("--artifacts-dir", help="Directory for temporary write-plan smoke artifacts.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of Markdown.")
     args = parser.parse_args(argv)

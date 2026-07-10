@@ -28,6 +28,7 @@ alterios-deep-inventory = "alterios_mcp.deep_inventory:main"
 alterios-ui-flow = "alterios_mcp.ui_flow:main"
 alterios-profile-smoke = "alterios_mcp.profile_smoke:main"
 alterios-replay-smoke = "alterios_mcp.replay_smoke:main"
+alterios-project-health = "alterios_mcp.project_health:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

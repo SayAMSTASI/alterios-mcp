@@ -127,17 +127,25 @@ read-only live discovery.
 
 ## Этап 18. Inventory optimization
 
-Что сделать:
+Статус: выполнен в суженном write-preflight объеме.
+
+Что сделано:
 
 1. Кеш inventory в `artifacts/inventories/<profile>/<project_id>/`.
-2. Diff-only scan по последнему snapshot.
-3. Health summary:
+2. Diff scan по последнему snapshot.
+3. Health summary через `alterios-project-health` / `alterios_project_health`:
    - broken forms;
    - broken views/view fields;
    - missing script refs;
    - BPMN formKey errors;
-   - report source/layout/render risks.
+   - report source/layout risks.
 4. CLI/MCP read-only tool для быстрого health summary.
+
+Осталось за пределами этого среза:
+
+1. Render/PDF/image validation отчетов остается в отложенном stage 17.
+2. Полностью инкрементальный backend diff без чтения проекта зависит от
+   доступности reliable updatedAt/version по всем сущностям.
 
 ## Рабочий порядок
 
@@ -146,4 +154,4 @@ read-only live discovery.
 3. Сделать `alterios_create_report_tab`. Готово.
 4. Сделать `alterios_create_process_flow`. Готово.
 5. Stage 17 пропущен по решению пользователя; viewer/render diagnostics остается deferred.
-6. Следующий активный шаг - stage 18: inventory cache/diff health.
+6. Stage 18 закрыт как read-only write-preflight: cache/diff/project health.

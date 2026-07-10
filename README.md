@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **74 инструмента**, из них **35 write-like инструментов**.
+Текущая поверхность MCP: **75 инструментов**, из них **35 write-like инструментов**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -60,6 +60,8 @@ MCP умеет собирать состав проекта:
 Для глубоких срезов есть отдельные CLI:
 
 - `alterios-deep-inventory` - формы, скрипты, BPMN-связи и иконки;
+- `alterios-project-health` - быстрый read-only preflight перед записью:
+  cache inventory, diff с прошлым snapshot и health по forms/views/scripts/BPMN/reports;
 - `alterios-form-surface-check` - проверка формы на layout/F-pattern,
   источники данных, роли, стили и действия;
 - `alterios-stimulsoft-layout-check` - статическая проверка Stimulsoft layout
@@ -264,6 +266,12 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 
 ```powershell
 .\.venv\Scripts\python.exe -m alterios_mcp.replay_smoke --json --profile artx --project-id <sandbox-project-id>
+```
+
+Быстрая проверка проекта перед записью с локальным cache:
+
+```powershell
+.\.venv\Scripts\alterios-project-health.exe --profile artx --project-id <sandbox-project-id> --refresh --json --pretty
 ```
 
 Минимальная локальная проверка конфигурации без записи:

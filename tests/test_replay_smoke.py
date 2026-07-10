@@ -15,7 +15,7 @@ def test_replay_smoke_runs_local_contract_checks_without_live_network(tmp_path) 
 
     checks = {check["name"]: check for check in result["checks"]}
     assert result["summary"]["ok"] is True
-    assert checks["mcp_tool_registry"]["tool_count"] >= 74
+    assert checks["mcp_tool_registry"]["tool_count"] >= 75
     assert checks["write_gate_and_plan"]["gate_blocked_without_env"] is True
     assert checks["write_gate_and_plan"]["plan_mismatch_blocked"] is True
     assert checks["write_gate_and_plan"]["sensitive_values_are_redacted"] is True

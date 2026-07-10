@@ -25,6 +25,7 @@ from .client import (
 from .discovery import discover_readonly, list_objects, list_projects
 from .form_surface import analyze_form_surface
 from .profile_smoke import run_profile_smoke
+from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
@@ -5325,7 +5326,7 @@ def alterios_replay_smoke(
     profile: str | None = None,
     project_id: str | None = None,
     include_live: bool = False,
-    expected_tool_count_min: int = 74,
+    expected_tool_count_min: int = 75,
 ) -> dict[str, Any]:
     """Run local/read-only MCP replay smoke checks after an update."""
     if expected_tool_count_min < 1:
@@ -5335,6 +5336,28 @@ def alterios_replay_smoke(
         project_id=project_id,
         include_live=include_live,
         expected_tool_count_min=expected_tool_count_min,
+    )
+
+
+@mcp.tool()
+def alterios_project_health(
+    profile: str | None = None,
+    project_id: str | None = None,
+    refresh: bool = False,
+    use_cache: bool = True,
+    write_cache: bool = True,
+    include_processes: bool = True,
+    include_report_templates: bool = False,
+) -> dict[str, Any]:
+    """Return a read-only health summary for forms/views/scripts/BPMN/reports before writes."""
+    return run_project_health(
+        profile=profile,
+        project_id=project_id,
+        refresh=refresh,
+        use_cache=use_cache,
+        write_cache=write_cache,
+        include_processes=include_processes,
+        include_report_templates=include_report_templates,
     )
 
 

@@ -15,7 +15,7 @@ workflow, files, comments, users и reports. Sandbox practice script
 а также comments, file-field upload, saved manual script, BPMN process/task и
 dashboard report create/update/full-readback.
 
-Покрытие методов ведется явно: 74 MCP tools, 14 runtime services, 15 live
+Покрытие методов ведется явно: 75 MCP tools, 14 runtime services, 15 live
 read-only route probes, 78 REST route/method patterns и 13 классов операций.
 После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
 текущая write-поверхность составляет 35 write-like tools. Последний
@@ -100,6 +100,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | Build. Process-flow scenario tool | Added `alterios_create_process_flow` for task-form/BPMN/script-ref/process smoke composition with saved `plan_id` apply enforcement, generated BPMN formKey support, task form surface validation, diagram readback, and optional task completion. | current | Targeted `tests/test_write_control.py -k "create_process_flow or create_report_tab or create_material_module"`: 10 passed; full `pytest`: 138 passed; `py_compile` and `git diff --check` OK; no live write executed. |
 | Build. Replay smoke command | Added `alterios-replay-smoke` CLI and read-only MCP tool `alterios_replay_smoke` for post-update checks: MCP tool count, write-gate blocking, dry-run `plan_id` creation/match/mismatch, redaction, form-surface validation, Stimulsoft layout validation, risk classification, and optional read-only live discovery. | current | Local CLI smoke returned 6 checks, 0 failed; `tests/test_replay_smoke.py`: 3 passed; no live write executed. |
 | Security. Address redaction and stage-17 skip | Removed hardcoded real workspace ids/base URLs from README/docs/sandbox script, added tracked-file sensitive-address regression test, and marked stage 17 skipped/deferred with stage 18 as next. | current | Real Alterios domain scan: none; known workspace-id scan: none; secret-pattern scan: none; `pytest`: 143 passed; `git diff --check` OK; local replay smoke: 6 checks, 0 failed. |
+| Build. Project health preflight | Added `alterios-project-health` CLI and read-only MCP tool `alterios_project_health` with local inventory cache, snapshot diff, and health summary for forms/views/scripts/BPMN/reports before writes. | current | `pytest`: 146 passed; `py_compile` OK; local replay smoke: 75 tools, 6 checks, 0 failed; CLI `--help` OK; real-domain/workspace-id/secret scan clean; no live write executed. |
 
 ## Активный этап
 
@@ -107,7 +108,8 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 |---|---|---|---|
 | 16. Scenario tools | Done | Lead Engineer + Write Tools + Form/View + Script/BPMN + Report | `alterios_create_material_module`, `alterios_create_report_tab`, and `alterios_create_process_flow` implemented with saved `plan_id` workflow and no-network unit coverage. |
 | 17. UI/report validation and replay smoke | Skipped / Deferred | Lead Engineer + Report + Safety Verifier | Skipped by user decision on 2026-07-10. Replay/smoke command is implemented; empty Stimulsoft viewer/render validation and extended form listener/bulk UI coverage remain deferred. |
-| 18. Inventory optimization | Next | Lead Engineer + Project Base Inventory + Safety Verifier | Add cached inventory in `artifacts/inventories/<profile>/<project_id>/`, diff-only scan, fast health summary for forms/views/scripts/BPMN/reports, and read-only CLI/MCP health tool. |
+| 18. Inventory optimization | Done | Lead Engineer + Project Base Inventory + Safety Verifier | `alterios-project-health` / `alterios_project_health` provide cached inventory, snapshot diff, and fast health summary for forms/views/scripts/BPMN/reports before writes. |
+| 19. Live scenario preflight and apply | Next | Lead Engineer + Write Tools + Safety Verifier | Use project health before live `create_material_module`, `create_report_tab`, `create_process_flow`, or content-type transfer applies; block or repair if health returns errors. |
 
 ## Бэклог
 
