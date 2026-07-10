@@ -295,6 +295,76 @@ def test_detailed_inventory_routes_are_built_without_network() -> None:
     ]
 
 
+def test_view_and_form_listandcount_by_id_use_id_filter_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+    responses = [
+        AlteriosResponse(200, "application/json", [[{"_id": "view-1", "name": "View"}], 1]),
+        AlteriosResponse(200, "application/json", [[{"_id": "form-1", "name": "Form"}], 1]),
+    ]
+
+    with patch.object(client, "_send", side_effect=responses) as send:
+        assert client.view_by_id("view-1").body == {"_id": "view-1", "name": "View"}
+        assert client.form_by_id("form-1").body == {"_id": "form-1", "name": "Form"}
+
+    urls = [call.args[0].url for call in send.call_args_list]
+    assert urls == [
+        "https://alterios.example/api/views/listandcount?_id=view-1&limit=1&offset=0",
+        "https://alterios.example/api/forms/listandcount?_id=form-1&limit=1&offset=0",
+    ]
+
+
+def test_save_resource_create_and_update_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.save_view({"_id": "view 1", "name": "View", "author": {"_id": "user-1"}})
+        client.save_form({"name": "Form"})
+
+    update_request = send.call_args_list[0].args[0]
+    create_request = send.call_args_list[1].args[0]
+    assert update_request.method == "PATCH"
+    assert update_request.url == "https://alterios.example/api/views/view%201"
+    assert update_request.body == {"_id": "view 1", "name": "View"}
+    assert create_request.method == "POST"
+    assert create_request.url == "https://alterios.example/api/forms"
+    assert create_request.body == {"name": "Form"}
+
+
+def test_view_entity_and_field_write_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.save_view_entity({"_id": "entity-1", "name": "Entity", "updatedBy": "ignored"})
+        client.add_view_entity_field("entity-1", content_type_field_id="field-1")
+        client.save_view_field({"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}})
+
+    requests = [call.args[0] for call in send.call_args_list]
+    assert requests[0].method == "PATCH"
+    assert requests[0].url == "https://alterios.example/api/view-entities/entity-1"
+    assert requests[0].body == {"_id": "entity-1", "name": "Entity"}
+    assert requests[1].method == "POST"
+    assert requests[1].url == "https://alterios.example/api/view-entities/add-one-field"
+    assert requests[1].body == {"entityId": "entity-1", "contentTypeFieldId": "field-1"}
+    assert requests[2].method == "POST"
+    assert requests[2].url == "https://alterios.example/api/view-fields/save"
+    assert requests[2].body == {"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}}
+
+
 def test_list_fields_builds_expected_query_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

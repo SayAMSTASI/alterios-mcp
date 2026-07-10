@@ -26,10 +26,10 @@ Method coverage is now tracked explicitly: 25 MCP tools, 14 runtime services,
 classes.
 Reinventory on 2026-07-10 confirmed the main product gap: ART X project base
 has live evidence for views, forms, scripts, BPMN/process/task side effects,
-files, comments, and reports. The first typed-write expansion moved the MCP
-server from 4 write-like tools out of 23 total tools to 6 write-like tools out
-of 25 total tools. The current build stage remains typed write expansion rather
-than more generic REST access.
+files, comments, and reports. Typed-write expansion moved the MCP server from
+4 write-like tools out of 23 total tools to 12 write-like tools out of 31 total
+tools. The current build stage remains typed write expansion rather than more
+generic REST access.
 
 ## Completed
 
@@ -51,6 +51,7 @@ than more generic REST access.
 | Practice. ARTX file/script/BPMN/report sandbox | Extended `scripts/artx_practice_metadata.py` to cover file-field upload, manual script creation/execution, BPMN diagram/process/task side effects, and dashboard report create/update/readback. | `12b8eb0` | Created file field `ea8d3e8c-b0cb-4eb8-9bb7-ad85acd8d7f2`; uploaded `mcp-practice-upload.txt` as file `c3cae956-296c-4f36-a966-cf5c0f3fc433`; created manual script `804e613a-19dd-4ea6-a0fc-a8fc118f6140` and executed it; created BPMN diagram `8ecdd2a7-23d4-40b2-b883-eb7c2ca19011`, started process `56051aa8-07a7-473d-a8ec-7c3a6beb26c0`, completed task `c989aa11-52bc-4f56-bb56-24f4a82afbf1`; created report `86ad4189-deaf-4744-96d5-6b1d22e73468` with Stimulsoft dashboard full readback; final dry-run was idempotent and browser main form showed `ФАЙЛ`, the sandbox row, and `MCP Practice sandbox report`. |
 | Analysis. ARTX reinventory and MCP startup correction | Rechecked project base totals, MCP tool surface, startup shape, typed-write gaps, and agents/skills plan. Added `docs/reinventory-2026-07-10.md` and `docs/agents-and-skills.md`; updated README startup guidance to prefer `alterios-mcp.exe`. | `b1141bc` | Live profile smoke OK for `artx` and `vniimt`; live read-only discovery 15/15 OK for ART X project; project totals: 14 content types, 2529 fields, 22 views, 40 forms, 12 scripts, 4 diagrams, 145 contents, 17 processes, 1 report; MCP surface: 23 tools, 4 write-like tools. |
 | Build. Typed content/file tools | Added `alterios_update_content_fields` and `alterios_file_upload_to_field` with preflight, dry-run diff, expected target checks, write gate, execution, file metadata readback, and content readback. | `aa06edb` | Unit tests for client/server write paths passed; ART X dry-run resolved sandbox content and file field; live `PATCH /api/contents/save` returned 200 and readback `field_test__mcp_practice_mcp_practice_verified=[true]`; live `/api/file/upload/field` returned 201 with file `5d3697d2-3bbb-48c4-960e-e1b312651978`; `/api/file/list` and practice dry-run confirmed `mcp-practice-upload.txt`. |
+| Build. Typed view/form tools | Added `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, and `alterios_patch_form_tabs` with managed-marker guard, dry-run diff, write gate, execution, and readback. | `TBD-TYPED-VIEW-FORM-COMMIT` | Unit tests for client/server write paths passed; `artx` profile check OK; live `dry_run=false` verified sandbox view `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`, entity `f3e71cac-475a-479b-9242-d129b04e9746`, view field `b1a18bb6-12d9-4657-92d2-e4b0668cc065`, and form `3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`; `get-data-simplified` returned `rows_len=1`; practice dry-run remained idempotent with view field count 8 and report/process/file checks still OK. |
 
 ## Active Stage
 
@@ -63,7 +64,7 @@ than more generic REST access.
 | Priority | Task | Status | Notes |
 |---:|---|---|---|
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
-| 1 | Add typed view/form tools. | Next | Cover `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, and narrow form action patches. |
+| 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Next | Cover script upsert, manual script execution preflight, BPMN diagram upsert, process start/task complete, report upsert, and Project Database validation. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; remaining capture priority is destructive/security flows and UI proof for production-grade typed writes. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
@@ -79,20 +80,18 @@ than more generic REST access.
 |---|---|
 | Runtime service endpoint compatibility is blocked in the current `vniimt` config because the endpoint template is `/api/scripts/execute-manual`. | Keep runtime service names cataloged only; do not treat them as executable through manual-script UUID endpoint. |
 | Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; use typed tools with readback for production workflows. |
-| Current write MCP surface is still too small for full operational use. | Content/files now have typed tools; continue typed entity tools for views/forms, scripts, BPMN/process/tasks, and reports. |
+| Current write MCP surface is still too small for full operational use. | Content/files and views/forms now have typed tools; continue typed entity tools for scripts, BPMN/process/tasks, and reports. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
 | Generic REST write can create live UI objects but does not yet provide typed preflight semantics. | Use the ARTX help sandbox result to design narrow typed write tools with explicit allowed fields, dry-run diffs, and readback checks. |
 
 ## Next Concrete Actions
 
-1. Add typed view/form tools, then verify with `MCP Practice. Список` and the
-   three MCP Practice forms.
-2. Add script/BPMN/report typed tools and verify against the already-created
+1. Add script/BPMN/report typed tools and verify against the already-created
    manual script, BPMN process/task chain, and Project Database dashboard.
-3. Add repo-owned skill folders only after each workflow has verified code and
+2. Add repo-owned skill folders only after each workflow has verified code and
    readback evidence.
-4. Keep destructive/security flows out of normal write tools until a separate
+3. Keep destructive/security flows out of normal write tools until a separate
    sandbox scenario and destructive gate are implemented.
 
 ## PM Update Checklist

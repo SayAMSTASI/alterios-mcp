@@ -14,6 +14,8 @@ from .client import (
     configured_profiles,
     normalize_content_field_value,
     looks_like_uuid,
+    listandcount_items,
+    strip_alterios_metadata,
 )
 from .discovery import discover_readonly, list_objects, list_projects
 from .services import get_service, list_services, service_to_dict
@@ -253,6 +255,155 @@ def _file_values(value: Any) -> list[Any]:
     if value is None:
         return []
     return value if isinstance(value, list) else [value]
+
+
+MANAGED_MARKER = "Codex-managed"
+
+
+def _resource_operation(
+    *,
+    name: str,
+    kind: str,
+    method: str,
+    path: str,
+    summary: str,
+    request: dict[str, Any],
+) -> WriteOperation:
+    return WriteOperation(
+        name=name,
+        kind=kind,
+        risk_level="write",
+        summary=summary,
+        method=method,
+        path=path,
+        target_ids=collect_target_ids(request),
+        request=request,
+    )
+
+
+def _assert_managed_or_allowed(resource: dict[str, Any], *, kind: str, allow_unmanaged_update: bool) -> None:
+    if allow_unmanaged_update:
+        return
+    if MANAGED_MARKER in str(resource.get("description") or ""):
+        return
+    raise ValueError(f"{kind} {resource.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
+
+
+def _resource_diff(existing: dict[str, Any] | None, payload: dict[str, Any], keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    diff = []
+    for key in keys:
+        before = existing.get(key) if existing else None
+        after = payload.get(key)
+        diff.append({"field": key, "before": before, "after": after, "changed": before != after})
+    return diff
+
+
+def _resource_summary(resource: dict[str, Any] | None) -> dict[str, Any] | None:
+    if resource is None:
+        return None
+    return {
+        "_id": resource.get("_id"),
+        "name": resource.get("name"),
+        "description": resource.get("description"),
+        "projectId": resource.get("projectId"),
+    }
+
+
+def _find_named_resource(items: Any, name: str) -> dict[str, Any] | None:
+    for item in listandcount_items(items):
+        if item.get("name") == name:
+            return item
+    return None
+
+
+def _find_view(
+    client: AlteriosClient,
+    *,
+    view_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if view_id:
+        body = client.view_by_id(view_id).body
+        if not isinstance(body, dict):
+            raise ValueError("View readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_views(limit=5000).body, name)
+    return None
+
+
+def _find_form(
+    client: AlteriosClient,
+    *,
+    form_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if form_id:
+        body = client.form_by_id(form_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Form readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_forms(limit=5000).body, name)
+    return None
+
+
+def _view_entities_body(client: AlteriosClient, view_id: str) -> list[dict[str, Any]]:
+    body = client.view_entities(view_id).body
+    if not isinstance(body, list):
+        raise ValueError("View entities readback returned unexpected payload.")
+    return [item for item in body if isinstance(item, dict)]
+
+
+def _view_fields_body(client: AlteriosClient, view_id: str) -> list[dict[str, Any]]:
+    body = client.view_fields_populated(view_id).body
+    if not isinstance(body, list):
+        raise ValueError("View fields readback returned unexpected payload.")
+    return [item for item in body if isinstance(item, dict)]
+
+
+def _find_view_entity(
+    client: AlteriosClient,
+    *,
+    view_id: str,
+    entity_id: str | None = None,
+    name: str | None = None,
+    entity_type: str | None = None,
+) -> dict[str, Any] | None:
+    for entity in _view_entities_body(client, view_id):
+        if entity_id and entity.get("_id") == entity_id:
+            return entity
+        if name and entity.get("name") == name and (entity_type is None or entity.get("type") == entity_type):
+            return entity
+    return None
+
+
+def _find_view_field(
+    client: AlteriosClient,
+    *,
+    view_id: str,
+    view_field_id: str | None = None,
+    entity_id: str | None = None,
+    attribute: str | None = None,
+    content_type_field_id: str | None = None,
+) -> dict[str, Any] | None:
+    for field in _view_fields_body(client, view_id):
+        if view_field_id and field.get("_id") == view_field_id:
+            return field
+        if entity_id and field.get("entityId") != entity_id:
+            continue
+        if content_type_field_id and field.get("contentTypeFieldId") == content_type_field_id:
+            return field
+        if attribute and (field.get("attribute") == attribute or field.get("mname") == attribute):
+            return field
+    return None
+
+
+def _view_field_save_payload(field: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(strip_alterios_metadata(field))
+    for key in ("contentType", "contentTypeField", "relatedViewField", "diagramsNames"):
+        payload.pop(key, None)
+    return payload
 
 
 @mcp.tool()
@@ -656,6 +807,356 @@ def alterios_file_upload_to_field(
         }
     )
     return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_view(
+    name: str,
+    view_id: str | None = None,
+    description: str | None = None,
+    format: str | None = None,
+    settings: dict[str, Any] | None = None,
+    strict: bool | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios view. Execution requires explicit write gates."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_view(client, view_id=view_id, name=name)
+    if existing:
+        _assert_managed_or_allowed(existing, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp view.",
+        "format": format if format is not None else (existing or {}).get("format") or "table",
+        "settings": settings if settings is not None else (existing or {}).get("settings") or {},
+        "strict": strict if strict is not None else (existing or {}).get("strict") or False,
+    }
+    operation = _resource_operation(
+        name=("PATCH /api/views/{id}" if existing else "POST /api/views"),
+        kind="view",
+        method="PATCH" if existing else "POST",
+        path=f"/api/views/{existing.get('_id')}" if existing else "/api/views",
+        summary="Create or update an Alterios view with preflight and readback.",
+        request={"_id": payload.get("_id"), "name": name},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    diff = _resource_diff(existing, payload, ("name", "description", "format", "settings", "strict"))
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": diff,
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_view(payload).as_dict()
+    saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
+    readback_body = client.view_by_id(saved_id).as_dict() if saved_id else {"body": _find_view(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback_body})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_view_entity(
+    view_id: str,
+    name: str,
+    entity_type: str | None = None,
+    config: dict[str, Any] | None = None,
+    joins: list[dict[str, Any]] | None = None,
+    entity_id: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios view entity. Execution requires explicit write gates."""
+    if not view_id.strip():
+        raise ValueError("view_id must not be empty.")
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    view = _find_view(client, view_id=view_id)
+    if not view:
+        raise ValueError(f"View {view_id!r} was not found.")
+    _assert_managed_or_allowed(view, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+    existing = _find_view_entity(client, view_id=view_id, entity_id=entity_id, name=name, entity_type=entity_type)
+    if not existing and config is None:
+        raise ValueError("config is required when creating a new view entity.")
+    effective_entity_type = entity_type or (existing or {}).get("type") or "content"
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "type": effective_entity_type,
+        "viewId": view_id,
+        "config": config if config is not None else (existing or {}).get("config") or {},
+        "joins": joins if joins is not None else (existing or {}).get("joins") or [],
+    }
+    operation = _resource_operation(
+        name=("PATCH /api/view-entities/{id}" if existing else "POST /api/view-entities"),
+        kind="view_entity",
+        method="PATCH" if existing else "POST",
+        path=f"/api/view-entities/{existing.get('_id')}" if existing else "/api/view-entities",
+        summary="Create or update an Alterios view entity with parent view guard and readback.",
+        request={"_id": payload.get("_id"), "viewId": view_id, "name": name, "type": effective_entity_type},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "view": _resource_summary(view),
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(existing, payload, ("name", "type", "viewId", "config", "joins")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_view_entity(payload).as_dict()
+    readback = _find_view_entity(client, view_id=view_id, entity_id=(existing or {}).get("_id"), name=name, entity_type=effective_entity_type)
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_view_field(
+    view_id: str,
+    entity_id: str,
+    view_field_id: str | None = None,
+    attribute: str | None = None,
+    content_type_field_id: str | None = None,
+    alias: str | None = None,
+    mname: str | None = None,
+    order: int | None = None,
+    settings: dict[str, Any] | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or add/update an Alterios view field. Execution requires explicit write gates."""
+    if not view_id.strip():
+        raise ValueError("view_id must not be empty.")
+    if not entity_id.strip():
+        raise ValueError("entity_id must not be empty.")
+    if not view_field_id and bool(attribute) == bool(content_type_field_id):
+        raise ValueError("Pass exactly one of attribute or content_type_field_id when view_field_id is not provided.")
+    client = _client(profile, project_id)
+    view = _find_view(client, view_id=view_id)
+    if not view:
+        raise ValueError(f"View {view_id!r} was not found.")
+    _assert_managed_or_allowed(view, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+    existing = _find_view_field(
+        client,
+        view_id=view_id,
+        view_field_id=view_field_id,
+        entity_id=entity_id,
+        attribute=attribute,
+        content_type_field_id=content_type_field_id,
+    )
+    add_request = {"entityId": entity_id, "attribute": attribute, "contentTypeFieldId": content_type_field_id}
+    payload = dict(existing or {})
+    if existing:
+        if alias is not None:
+            payload["alias"] = alias
+        if mname is not None:
+            payload["mname"] = mname
+        if order is not None:
+            payload["order"] = order
+        if settings is not None:
+            payload["settings"] = settings
+    operation = _resource_operation(
+        name="POST /api/view-entities/add-one-field + POST /api/view-fields/save",
+        kind="view_field",
+        method="POST",
+        path="/api/view-entities/add-one-field",
+        summary="Add a field to a view entity when missing and update its view-field configuration.",
+        request={**add_request, "viewFieldId": view_field_id, "alias": alias, "mname": mname, "order": order, "settings": settings},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "view": _resource_summary(view),
+        "preflight": _resource_summary(existing),
+        "will_add_field": existing is None,
+        "add_request": {key: value for key, value in add_request.items() if value is not None},
+        "diff": _resource_diff(existing, payload, ("alias", "mname", "order", "settings")) if existing else [],
+        "planned_payload": _view_field_save_payload(payload) if existing else None,
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    add_response = None
+    if existing is None:
+        add_response = client.add_view_entity_field(
+            entity_id,
+            attribute=attribute,
+            content_type_field_id=content_type_field_id,
+        ).as_dict()
+        existing = _find_view_field(
+            client,
+            view_id=view_id,
+            entity_id=entity_id,
+            attribute=attribute,
+            content_type_field_id=content_type_field_id,
+        )
+        if existing is None:
+            raise ValueError("Created view field was not visible on readback.")
+        payload = dict(existing)
+    if alias is not None:
+        payload["alias"] = alias
+    if mname is not None:
+        payload["mname"] = mname
+    if order is not None:
+        payload["order"] = order
+    if settings is not None:
+        payload["settings"] = settings
+    saved = client.save_view_field(_view_field_save_payload(payload)).as_dict()
+    readback = _find_view_field(client, view_id=view_id, view_field_id=payload.get("_id"))
+    response_payload.update({"added": add_response, "saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_form(
+    name: str,
+    form_id: str | None = None,
+    page_title: str | None = None,
+    tabs: list[dict[str, Any]] | None = None,
+    form_action_containers: list[dict[str, Any]] | None = None,
+    description: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios form. Execution requires explicit write gates."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_form(client, form_id=form_id, name=name)
+    if existing:
+        _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+    elif tabs is None:
+        raise ValueError("tabs is required when creating a new form.")
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "pageTitle": page_title if page_title is not None else (existing or {}).get("pageTitle") or name,
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp form.",
+        "tabs": tabs if tabs is not None else (existing or {}).get("tabs") or [],
+        "formActionContainers": (
+            form_action_containers
+            if form_action_containers is not None
+            else (existing or {}).get("formActionContainers") or []
+        ),
+    }
+    operation = _resource_operation(
+        name=("PATCH /api/forms/{id}" if existing else "POST /api/forms"),
+        kind="form",
+        method="PATCH" if existing else "POST",
+        path=f"/api/forms/{existing.get('_id')}" if existing else "/api/forms",
+        summary="Create or update an Alterios form with managed-object guard and readback.",
+        request={"_id": payload.get("_id"), "name": name},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(existing, payload, ("name", "pageTitle", "description", "tabs", "formActionContainers")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_form(payload).as_dict()
+    saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
+    readback_body = client.form_by_id(saved_id).as_dict() if saved_id else {"body": _find_form(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback_body})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_patch_form_actions(
+    form_id: str,
+    form_action_containers: list[dict[str, Any]],
+    expected_name: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or replace only formActionContainers on an Alterios form."""
+    client = _client(profile, project_id)
+    existing = _find_form(client, form_id=form_id)
+    if not existing:
+        raise ValueError(f"Form {form_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Form name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+    return alterios_upsert_form(
+        str(existing.get("name") or ""),
+        form_id=form_id,
+        form_action_containers=form_action_containers,
+        allow_unmanaged_update=True,
+        dry_run=dry_run,
+        profile=profile,
+        project_id=project_id,
+    )
+
+
+@mcp.tool()
+def alterios_patch_form_tabs(
+    form_id: str,
+    tabs: list[dict[str, Any]],
+    expected_name: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or replace only tabs on an Alterios form."""
+    client = _client(profile, project_id)
+    existing = _find_form(client, form_id=form_id)
+    if not existing:
+        raise ValueError(f"Form {form_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Form name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+    return alterios_upsert_form(
+        str(existing.get("name") or ""),
+        form_id=form_id,
+        tabs=tabs,
+        allow_unmanaged_update=True,
+        dry_run=dry_run,
+        profile=profile,
+        project_id=project_id,
+    )
 
 
 @mcp.tool()

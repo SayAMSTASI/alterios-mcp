@@ -242,11 +242,51 @@ class AlteriosClient:
     def form_full(self, form_id: str) -> AlteriosResponse:
         return self.request("GET", f"/api/forms/{path_segment(form_id)}")
 
+    def list_views(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/views/listandcount", params={"limit": limit, "offset": offset})
+
+    def list_forms(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/forms/listandcount", params={"limit": limit, "offset": offset})
+
+    def view_by_id(self, view_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/views/listandcount", view_id, "View")
+
+    def form_by_id(self, form_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/forms/listandcount", form_id, "Form")
+
     def view_entities(self, view_id: str) -> AlteriosResponse:
         return self.request("GET", f"/api/view-entities/by-view/{path_segment(view_id)}")
 
     def view_fields_populated(self, view_id: str) -> AlteriosResponse:
         return self.request("GET", f"/api/view-fields/populated/{path_segment(view_id)}")
+
+    def save_view(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("views", payload)
+
+    def save_form(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("forms", payload)
+
+    def save_view_entity(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("view-entities", payload)
+
+    def add_view_entity_field(
+        self,
+        entity_id: str,
+        *,
+        attribute: str | None = None,
+        content_type_field_id: str | None = None,
+    ) -> AlteriosResponse:
+        if bool(attribute) == bool(content_type_field_id):
+            raise ValueError("Pass exactly one of attribute or content_type_field_id.")
+        body: dict[str, Any] = {"entityId": entity_id}
+        if attribute:
+            body["attribute"] = attribute
+        if content_type_field_id:
+            body["contentTypeFieldId"] = content_type_field_id
+        return self.request("POST", "/api/view-entities/add-one-field", body=body)
+
+    def save_view_field(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.request("POST", "/api/view-fields/save", body=strip_alterios_metadata(payload))
 
     def list_fields(
         self,
@@ -429,6 +469,34 @@ class AlteriosClient:
         if not base_url:
             raise AlteriosConfigError("ALTERIOS_BASE_URL is required for a relative endpoint template")
         return f"{base_url}/{rendered.lstrip('/')}"
+
+    def save_resource(self, collection: str, payload: dict[str, Any]) -> AlteriosResponse:
+        body = strip_alterios_metadata(payload)
+        resource_id = body.get("_id")
+        if not resource_id:
+            return self.request("POST", f"/api/{collection}", body=body)
+
+        errors: list[str] = []
+        for method, path in (
+            ("PATCH", f"/api/{collection}/{path_segment(str(resource_id))}"),
+            ("PUT", f"/api/{collection}/{path_segment(str(resource_id))}"),
+            ("PUT", f"/api/{collection}"),
+            ("POST", f"/api/{collection}"),
+        ):
+            try:
+                return self.request(method, path, body=body)
+            except AlteriosRequestError as exc:
+                errors.append(str(exc))
+        raise AlteriosRequestError(f"Update /api/{collection}/{resource_id} failed: {'; '.join(errors)}")
+
+    def _listandcount_item_by_id(self, path: str, item_id: str, label: str) -> AlteriosResponse:
+        if not item_id.strip():
+            raise ValueError("item_id must not be empty")
+        response = self.request("GET", path, params={"_id": item_id, "limit": 1, "offset": 0})
+        items = listandcount_items(response.body)
+        if not items:
+            raise AlteriosRequestError(f"{label} {item_id!r} was not found.")
+        return AlteriosResponse(response.status_code, response.content_type, items[0])
 
     def _headers(self) -> dict[str, str]:
         headers = {
@@ -750,6 +818,28 @@ def content_update_payload(
     if resolved_name is not None:
         payload["name"] = resolved_name
     return payload
+
+
+def strip_alterios_metadata(value: Any) -> Any:
+    metadata_keys = {
+        "apiKey",
+        "author",
+        "authorId",
+        "authorName",
+        "createdAt",
+        "emailConfirmationCode",
+        "lastUpdate",
+        "password",
+        "passwordRecoverCode",
+        "token",
+        "updatedBy",
+        "version",
+    }
+    if isinstance(value, dict):
+        return {key: strip_alterios_metadata(item) for key, item in value.items() if key not in metadata_keys}
+    if isinstance(value, list):
+        return [strip_alterios_metadata(item) for item in value]
+    return value
 
 
 def normalize_content_field_value(value: Any) -> list[Any]:

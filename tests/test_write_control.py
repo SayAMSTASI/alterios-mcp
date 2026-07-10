@@ -335,6 +335,211 @@ def test_file_upload_to_field_execution_uploads_saves_and_reads_back_without_rea
     assert result["response"]["readback"]["body"]["fields"]["field_file"][0]["id"] == "file-1"
 
 
+def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse(
+                [
+                    [
+                        {
+                            "_id": "view-1",
+                            "name": "View",
+                            "description": "Codex-managed: existing",
+                            "format": "cards",
+                            "settings": {},
+                            "strict": True,
+                        }
+                    ],
+                    1,
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view(
+            "View",
+            settings={"engineVersion": "v2"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "view"
+    assert result["audit"]["operation"]["target_ids"] == ["view-1"]
+    assert result["audit"]["operation"]["request"] == {"_id": "view-1", "name": "View"}
+    assert result["response"]["preflight"]["_id"] == "view-1"
+    assert {"field": "settings", "before": {}, "after": {"engineVersion": "v2"}, "changed": True} in result["response"]["diff"]
+    assert {"field": "format", "before": "cards", "after": "cards", "changed": False} in result["response"]["diff"]
+    assert {"field": "strict", "before": True, "after": True, "changed": False} in result["response"]["diff"]
+
+
+def test_upsert_view_rejects_unmanaged_existing_object_without_flag() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[{"_id": "view-1", "name": "View", "description": "manual"}], 1])
+
+    with patch.object(server, "_client", return_value=FakeClient()), pytest.raises(ValueError, match="not marked"):
+        server.alterios_upsert_view("View", profile="vniimt", project_id="project-1")
+
+
+def test_upsert_form_execution_saves_and_reads_back_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def form_by_id(self, form_id: str) -> FakeResponse:
+            return FakeResponse(
+                {
+                    "_id": form_id,
+                    "name": "Form",
+                    "description": "Codex-managed: existing",
+                    "pageTitle": "Form",
+                    "tabs": [],
+                    "formActionContainers": [],
+                }
+            )
+
+        def save_form(self, payload: dict[str, object]) -> FakeResponse:
+            assert payload["_id"] == "form-1"
+            assert payload["tabs"] == [{"name": None, "rows": []}]
+            return FakeResponse({"_id": "form-1", "saved": True})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_form(
+            "Form",
+            form_id="form-1",
+            tabs=[{"name": None, "rows": []}],
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["saved"]["body"] == {"_id": "form-1", "saved": True}
+    assert result["response"]["readback"]["body"]["_id"] == "form-1"
+
+
+def test_upsert_view_entity_dry_run_uses_parent_view_guard_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse({"_id": view_id, "name": "View", "description": "Codex-managed: view"})
+
+        def view_entities(self, view_id: str) -> FakeResponse:
+            return FakeResponse([{"_id": "entity-1", "name": "Entity", "type": "content", "config": {}, "joins": []}])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view_entity(
+            "view-1",
+            "Entity",
+            config={"main": True},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "view_entity"
+    assert result["audit"]["operation"]["target_ids"] == ["entity-1", "view-1"]
+    assert result["response"]["preflight"]["_id"] == "entity-1"
+    assert {"field": "config", "before": {}, "after": {"main": True}, "changed": True} in result["response"]["diff"]
+
+
+def test_upsert_view_field_execution_adds_then_saves_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.added = False
+
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse({"_id": view_id, "name": "View", "description": "Codex-managed: view"})
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            if not self.added:
+                return FakeResponse([])
+            return FakeResponse(
+                [
+                    {
+                        "_id": "vf-1",
+                        "entityId": "entity-1",
+                        "contentTypeFieldId": "field-1",
+                        "alias": "Old",
+                        "mname": "old",
+                        "order": 99,
+                    }
+                ]
+            )
+
+        def add_view_entity_field(
+            self,
+            entity_id: str,
+            *,
+            attribute: str | None = None,
+            content_type_field_id: str | None = None,
+        ) -> FakeResponse:
+            assert entity_id == "entity-1"
+            assert content_type_field_id == "field-1"
+            self.added = True
+            return FakeResponse({"_id": "vf-1"})
+
+        def save_view_field(self, payload: dict[str, object]) -> FakeResponse:
+            assert payload["_id"] == "vf-1"
+            assert payload["alias"] == "Title"
+            assert payload["mname"] == "title"
+            assert payload["order"] == 1
+            return FakeResponse({"_id": "vf-1", "saved": True})
+
+    fake_client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=fake_client),
+    ):
+        result = server.alterios_upsert_view_field(
+            "view-1",
+            "entity-1",
+            content_type_field_id="field-1",
+            alias="Title",
+            mname="title",
+            order=1,
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["added"]["body"] == {"_id": "vf-1"}
+    assert result["response"]["saved"]["body"] == {"_id": "vf-1", "saved": True}
+    assert result["response"]["readback"]["_id"] == "vf-1"
+
+
 def test_server_lists_configured_profiles_without_secrets() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",

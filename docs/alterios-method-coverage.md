@@ -16,8 +16,8 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 25 | Публичные callable tools в `src/alterios_mcp/server.py`. |
-| Write-like MCP tools | 6 | `alterios_add_comment`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_call_write_service`, `alterios_execute_manual_script`, `alterios_rest_write`. |
+| MCP tools | 31 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 12 | `alterios_add_comment`, `alterios_update_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_call_write_service`, `alterios_execute_manual_script`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 57 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
@@ -47,7 +47,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/roles deferred as security workflow. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 25
+## MCP Tools: 31
 
 | Tool | Вид |
 |---|---|
@@ -71,6 +71,12 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_add_comment` | Controlled comment write |
 | `alterios_update_content_fields` | Controlled typed content field update |
 | `alterios_file_upload_to_field` | Controlled typed file-field upload and content save |
+| `alterios_upsert_view` | Controlled typed view create/update |
+| `alterios_upsert_view_entity` | Controlled typed view entity create/update |
+| `alterios_upsert_view_field` | Controlled typed view field attach/update |
+| `alterios_upsert_form` | Controlled typed form create/update |
+| `alterios_patch_form_actions` | Controlled typed form actions patch |
+| `alterios_patch_form_tabs` | Controlled typed form tabs patch |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
 | `alterios_call_write_service` | Controlled runtime write/service call |
@@ -80,32 +86,33 @@ browser/HAR capture и sandbox write-практику.
 ## 2026-07-10 Reinventory Note
 
 The 2026-07-10 reinventory initially found 23 MCP tools and only 4 write-like
-tools. The first typed-write expansion added `alterios_update_content_fields`
-and `alterios_file_upload_to_field`, bringing the surface to 25 tools and 6
-write-like tools.
+tools. The typed-write expansion added content/file and view/form tools,
+bringing the surface to 31 tools and 12 write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 6 tools are
+does **not** mean the MCP operator surface is complete. Today 12 tools are
 write-like, and 3 of them are still either generic or narrow:
 
 - `alterios_add_comment` is typed but only covers comments;
 - `alterios_update_content_fields` and `alterios_file_upload_to_field` now cover
   the first typed content/file slice;
+- `alterios_upsert_view`, `alterios_upsert_view_entity`,
+  `alterios_upsert_view_field`, `alterios_upsert_form`,
+  `alterios_patch_form_actions`, and `alterios_patch_form_tabs` now cover the
+  first typed view/form slice;
 - `alterios_execute_manual_script` executes an existing script UUID but does not
   create or update scripts;
 - `alterios_call_write_service` and `alterios_rest_write` are broad escape
   hatches, not production-grade entity tools.
 
-Next coverage work must therefore add typed write tools for the verified
-project-base surfaces:
+Next coverage work must therefore add typed write tools for the remaining
+verified project-base surfaces:
 
-1. content fields and file-field upload;
-2. views, view entities, and view fields;
-3. forms, tabs, components, and actions;
-4. manual/event/diagram scripts;
-5. BPMN diagrams, process start, task reads, task completion;
-6. reports with Stimulsoft Project Database datasource validation.
+1. manual/event/diagram scripts;
+2. BPMN diagrams, process start, task reads, task completion;
+3. reports with Stimulsoft Project Database datasource validation;
+4. security/destructive flows only after a dedicated sandbox scenario.
 
 ## Runtime Services: 14
 
