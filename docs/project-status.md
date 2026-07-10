@@ -46,8 +46,8 @@ read-only geometry validator for template overlaps, page overflow, and
 dynamic-height risks before saving or rendering reports.
 Deep inventory now has reproducible scanners and live ART X matrices for
 forms, form actions, scripts, BPMN links, process/task readback counts, and
-iconId usage. Repo-owned skills are intentionally deferred until these matrices
-are used as their evidence base.
+iconId usage. The first repo-owned skill set now exists in `skills/` and uses
+these matrices, docs, tools, tests, and live sandbox evidence as its source map.
 The multi-agent operating contract now has a detailed task matrix for PM,
 project-base inventory, material/data modeling, view building, form surfaces,
 UI icons/actions, script/BPMN flows, Stimulsoft reports, write tools, safety
@@ -83,12 +83,13 @@ verification, and skill curation.
 | Build. Form surface UX guardrails | Added `alterios_analyze_form_surface`, `alterios-form-surface-check`, and `docs/form-surface-ux-and-icons.md`. The premature repo-owned skill was removed until deep inventory evidence is complete. | `cd09639` | Unit tests cover clean view row, empty slot/source errors, row action order, missing icons, roles, styles, and report source inventory. |
 | Research. Form + Script/BPMN + Icons deep inventory | Added `alterios-deep-inventory`, live ART X form matrix, script/BPMN linkage matrix, icon usage matrix, and UTF-8 icon standard copy. | `fb98c14` | Live read-only run on `artx` project found 40 forms, 47 cells, 74 actions, 12 scripts, 4 diagrams, 8 BPMN form links, 7 form-script links, and 121 icon usages; read errors: 0. |
 | Design. Agent task matrix | Expanded `docs/agents-and-skills.md` into a concrete multi-agent task contract and synced `docs/roadmap.md` with the expanded role set. | `703e593` | `pytest`: 95 passed; `git diff --check` OK; docs secret scan found only public write-gate variable names. |
+| Build. Repo-owned skill set | Added the first 8 repo-owned Alterios skills under `skills/`, each with `SKILL.md`, `agents/openai.yaml`, and `references/source-map.md`; added structure tests and documented the set in README/agents docs. | `d664588` | Skill Creator `quick_validate`: 8/8 valid; `pytest`: 97 passed; `git diff --check` OK; skills/docs secret scan clean; two read-only subagents reviewed references, required rules, duplication risks, and acceptance checks. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 7. Repo-owned skills from verified matrices | In Progress | Lead Engineer + PM/Explorer/Verifier agents | Use the expanded agent task matrix; create the first 8 repo-owned skills only from verified scanners, matrices, tools, and live sandbox evidence. |
+| 8. Skill forward-test and install path | In Progress | Lead Engineer + Skill Curator + Safety Verifier | Forward-test the 8 skills on realistic Alterios tasks, document how to install or load them from the repo, and keep duplication or stale-reference risks visible. |
 
 ## Backlog
 
@@ -100,7 +101,7 @@ verification, and skill curation.
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
-| 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Next | Follow `docs/agents-and-skills.md`; first pass is limited to 8 skills and should not duplicate responsibilities. |
+| 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Done | First pass created 8 skills with source maps, OpenAI metadata, structure tests, and Skill Creator validation. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
@@ -121,10 +122,11 @@ verification, and skill curation.
 
 ## Next Concrete Actions
 
-1. Add repo-owned skill folders only after each workflow has verified code and
-   readback evidence.
-2. Add profile-level smoke matrix across configured Alterios instances.
-3. Keep destructive/security flows out of normal write tools until a separate
+1. Forward-test the 8 repo-owned skills on realistic project-base, form, BPMN,
+   report, write-tool, safety, and PM tasks.
+2. Document the install/load path for repo-owned skills.
+3. Add profile-level smoke matrix across configured Alterios instances.
+4. Keep destructive/security flows out of normal write tools until a separate
    sandbox scenario and destructive gate are implemented.
 
 ## PM Update Checklist
