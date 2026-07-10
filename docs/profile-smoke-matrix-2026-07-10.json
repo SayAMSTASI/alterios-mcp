@@ -1,0 +1,1156 @@
+{
+  "kind": "alterios_profile_smoke_matrix",
+  "generated_at": "2026-07-10T09:30:23+00:00",
+  "readonly": true,
+  "write_gate_enabled": false,
+  "selected_profile": null,
+  "profile_count": 2,
+  "project_limit": 100,
+  "include_project_ids": false,
+  "include_project_names": false,
+  "profiles": [
+    {
+      "profile": "artx",
+      "profile_argument": "artx",
+      "selected": false,
+      "config": {
+        "profile": "artx",
+        "base_url": "<set>",
+        "api_token": "<set>",
+        "project_id": "<set>",
+        "endpoint_template": "<set>",
+        "body_style": "rpc",
+        "auth_header": "x-api-key",
+        "auth_scheme": "",
+        "timeout_seconds": 20.0
+      },
+      "missing_for_instance_call": [],
+      "missing_for_project_call": [],
+      "has_project_default": true,
+      "instance_project_list": {
+        "ok": true,
+        "skipped": false,
+        "status_code": 200,
+        "content_type": "application/json; charset=utf-8",
+        "shape": {
+          "type": "list",
+          "length": 2,
+          "first": {
+            "type": "list",
+            "length": 35,
+            "first": {
+              "type": "dict",
+              "keys": [
+                "_id",
+                "authorId",
+                "authorName",
+                "center",
+                "createdAt",
+                "description",
+                "fieldNamePrefix",
+                "iconId",
+                "lastUpdate",
+                "name",
+                "organization",
+                "organizationId",
+                "participantsIds",
+                "public",
+                "telegramSupportGroupIds",
+                "telegramSupportGroups",
+                "updatedBy",
+                "version",
+                "zoom"
+              ]
+            }
+          }
+        },
+        "returned_count": 35,
+        "project_count": 35,
+        "sample_projects": []
+      },
+      "default_project_discovery": {
+        "ok": true,
+        "skipped": false,
+        "project_id": "<set>",
+        "route_count": 15,
+        "ok_route_count": 15,
+        "failed_route_count": 0,
+        "failed_routes": [],
+        "routes": [
+          {
+            "name": "projects",
+            "method": "GET",
+            "path": "/api/projects/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorId",
+                    "authorName",
+                    "center",
+                    "createdAt",
+                    "description",
+                    "fieldNamePrefix",
+                    "iconId",
+                    "lastUpdate",
+                    "name",
+                    "organization",
+                    "organizationId",
+                    "participantsIds",
+                    "public",
+                    "telegramSupportGroupIds",
+                    "telegramSupportGroups",
+                    "updatedBy",
+                    "version",
+                    "zoom"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "content_types",
+            "method": "GET",
+            "path": "/api/content-types/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorId",
+                    "authorName",
+                    "contentNameTemplate",
+                    "createdAt",
+                    "description",
+                    "fieldNamePrefix",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "settings",
+                    "share",
+                    "shareCreating",
+                    "shareDeleting",
+                    "shareEditing",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "fields",
+            "method": "GET",
+            "path": "/api/fields",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2529,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "contentTypeId",
+                  "createdAt",
+                  "defaultValue",
+                  "description",
+                  "formDisplay",
+                  "help",
+                  "lastUpdate",
+                  "mname",
+                  "name",
+                  "order",
+                  "projectId",
+                  "required",
+                  "settings",
+                  "tooltip",
+                  "type",
+                  "updatedBy",
+                  "version"
+                ]
+              }
+            }
+          },
+          {
+            "name": "views",
+            "method": "GET",
+            "path": "/api/views/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "description",
+                    "format",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "settings",
+                    "strict",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "forms",
+            "method": "GET",
+            "path": "/api/forms/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "description",
+                    "formActionContainers",
+                    "lastUpdate",
+                    "name",
+                    "pageTitle",
+                    "projectId",
+                    "tabs",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "scripts",
+            "method": "GET",
+            "path": "/api/scripts/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "active",
+                    "apiKey",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "body",
+                    "config",
+                    "createdAt",
+                    "description",
+                    "lastUpdate",
+                    "librariesIds",
+                    "name",
+                    "projectId",
+                    "share",
+                    "type",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "diagrams",
+            "method": "GET",
+            "path": "/api/diagrams/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "contentType",
+                    "contentTypeId",
+                    "createOnStart",
+                    "createdAt",
+                    "delayedStart",
+                    "description",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "updatedBy",
+                    "value",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "contents",
+            "method": "GET",
+            "path": "/api/contents/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "dict",
+              "keys": [
+                "total",
+                "values"
+              ]
+            }
+          },
+          {
+            "name": "tasks",
+            "method": "GET",
+            "path": "/api/tasks/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "assignee",
+                    "assigneeId",
+                    "authorId",
+                    "candidatesGroupsIds",
+                    "candidatesIds",
+                    "contentId",
+                    "createdAt",
+                    "diagramId",
+                    "executionId",
+                    "formId",
+                    "isStart",
+                    "lastUpdate",
+                    "name",
+                    "process",
+                    "processId",
+                    "projectId",
+                    "settings",
+                    "taskId",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "processes",
+            "method": "GET",
+            "path": "/api/processes/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorName",
+                    "completed",
+                    "completedAt",
+                    "content",
+                    "contentId",
+                    "createdAt",
+                    "diagramId",
+                    "diagramName",
+                    "error",
+                    "name",
+                    "parentId",
+                    "projectId",
+                    "stages",
+                    "status",
+                    "stopped"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "reports",
+            "method": "GET",
+            "path": "/api/reports/listandcount/%7B%7D",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "type",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "user_groups",
+            "method": "GET",
+            "path": "/api/user-groups/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "description",
+                    "lastUpdate",
+                    "membersCount",
+                    "name",
+                    "projectId",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "users",
+            "method": "GET",
+            "path": "/api/users/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "avatarId",
+                    "createdAt",
+                    "email",
+                    "emailConfirmed",
+                    "firstName",
+                    "isActive",
+                    "language",
+                    "lastLoginAt",
+                    "lastName",
+                    "lastUpdate",
+                    "notificationLevel",
+                    "owner",
+                    "ownerId",
+                    "projectsIds",
+                    "roles",
+                    "settings",
+                    "superuser",
+                    "telegramId",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "groups",
+            "method": "GET",
+            "path": "/api/groups",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 11,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "children",
+                  "createdAt",
+                  "description",
+                  "formId",
+                  "iconId",
+                  "lastUpdate",
+                  "name",
+                  "order",
+                  "parentGroupId",
+                  "projectId",
+                  "publish",
+                  "root",
+                  "updatedBy",
+                  "version"
+                ]
+              }
+            }
+          },
+          {
+            "name": "helps",
+            "method": "GET",
+            "path": "/api/helps",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "createdAt",
+                  "lastUpdate",
+                  "name",
+                  "projectId",
+                  "updatedBy",
+                  "value",
+                  "version"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "profile": "vniimt",
+      "profile_argument": "vniimt",
+      "selected": false,
+      "config": {
+        "profile": "vniimt",
+        "base_url": "<set>",
+        "api_token": "<set>",
+        "project_id": "<set>",
+        "endpoint_template": "<set>",
+        "body_style": "rpc",
+        "auth_header": "x-api-key",
+        "auth_scheme": "",
+        "timeout_seconds": 20.0
+      },
+      "missing_for_instance_call": [],
+      "missing_for_project_call": [],
+      "has_project_default": true,
+      "instance_project_list": {
+        "ok": true,
+        "skipped": false,
+        "status_code": 200,
+        "content_type": "application/json; charset=utf-8",
+        "shape": {
+          "type": "list",
+          "length": 2,
+          "first": {
+            "type": "list",
+            "length": 18,
+            "first": {
+              "type": "dict",
+              "keys": [
+                "_id",
+                "authorId",
+                "authorName",
+                "center",
+                "createdAt",
+                "description",
+                "fieldNamePrefix",
+                "iconId",
+                "lastUpdate",
+                "name",
+                "organization",
+                "organizationId",
+                "participantsIds",
+                "public",
+                "telegramSupportGroupIds",
+                "telegramSupportGroups",
+                "updatedBy",
+                "version",
+                "zoom"
+              ]
+            }
+          }
+        },
+        "returned_count": 18,
+        "project_count": 18,
+        "sample_projects": []
+      },
+      "default_project_discovery": {
+        "ok": true,
+        "skipped": false,
+        "project_id": "<set>",
+        "route_count": 15,
+        "ok_route_count": 15,
+        "failed_route_count": 0,
+        "failed_routes": [],
+        "routes": [
+          {
+            "name": "projects",
+            "method": "GET",
+            "path": "/api/projects/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorId",
+                    "authorName",
+                    "center",
+                    "createdAt",
+                    "description",
+                    "fieldNamePrefix",
+                    "iconId",
+                    "lastUpdate",
+                    "name",
+                    "organization",
+                    "organizationId",
+                    "participantsIds",
+                    "public",
+                    "telegramSupportGroupIds",
+                    "telegramSupportGroups",
+                    "updatedBy",
+                    "version",
+                    "zoom"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "content_types",
+            "method": "GET",
+            "path": "/api/content-types/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorId",
+                    "authorName",
+                    "contentNameTemplate",
+                    "createdAt",
+                    "description",
+                    "fieldNamePrefix",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "settings",
+                    "share",
+                    "shareCreating",
+                    "shareDeleting",
+                    "shareEditing",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "fields",
+            "method": "GET",
+            "path": "/api/fields",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2032,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "contentTypeId",
+                  "createdAt",
+                  "defaultValue",
+                  "description",
+                  "formDisplay",
+                  "help",
+                  "lastUpdate",
+                  "mname",
+                  "name",
+                  "order",
+                  "projectId",
+                  "required",
+                  "settings",
+                  "tooltip",
+                  "type",
+                  "updatedBy",
+                  "version"
+                ]
+              }
+            }
+          },
+          {
+            "name": "views",
+            "method": "GET",
+            "path": "/api/views/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "description",
+                    "format",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "settings",
+                    "strict",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "forms",
+            "method": "GET",
+            "path": "/api/forms/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "description",
+                    "formActionContainers",
+                    "lastUpdate",
+                    "name",
+                    "pageTitle",
+                    "projectId",
+                    "tabs",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "scripts",
+            "method": "GET",
+            "path": "/api/scripts/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "active",
+                    "apiKey",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "body",
+                    "config",
+                    "createdAt",
+                    "description",
+                    "lastUpdate",
+                    "librariesIds",
+                    "name",
+                    "projectId",
+                    "share",
+                    "type",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "diagrams",
+            "method": "GET",
+            "path": "/api/diagrams/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "contentType",
+                    "contentTypeId",
+                    "createOnStart",
+                    "createdAt",
+                    "delayedStart",
+                    "description",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "updatedBy",
+                    "value",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "contents",
+            "method": "GET",
+            "path": "/api/contents/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "dict",
+              "keys": [
+                "total",
+                "values"
+              ]
+            }
+          },
+          {
+            "name": "tasks",
+            "method": "GET",
+            "path": "/api/tasks/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "assignee",
+                    "assigneeId",
+                    "authorId",
+                    "candidatesGroupsIds",
+                    "candidatesIds",
+                    "contentId",
+                    "createdAt",
+                    "diagramId",
+                    "executionId",
+                    "formId",
+                    "isStart",
+                    "lastUpdate",
+                    "name",
+                    "process",
+                    "processId",
+                    "projectId",
+                    "settings",
+                    "taskId",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "processes",
+            "method": "GET",
+            "path": "/api/processes/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "authorName",
+                    "completed",
+                    "completedAt",
+                    "content",
+                    "contentId",
+                    "createdAt",
+                    "diagramId",
+                    "diagramName",
+                    "error",
+                    "name",
+                    "parentId",
+                    "projectId",
+                    "stages",
+                    "status",
+                    "stopped"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "reports",
+            "method": "GET",
+            "path": "/api/reports/listandcount/%7B%7D",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "author",
+                    "authorId",
+                    "authorName",
+                    "createdAt",
+                    "lastUpdate",
+                    "name",
+                    "projectId",
+                    "type",
+                    "updatedBy",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "user_groups",
+            "method": "GET",
+            "path": "/api/user-groups/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 0,
+                "first": null
+              }
+            }
+          },
+          {
+            "name": "users",
+            "method": "GET",
+            "path": "/api/users/listandcount",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "list",
+                "length": 1,
+                "first": {
+                  "type": "dict",
+                  "keys": [
+                    "_id",
+                    "avatarId",
+                    "createdAt",
+                    "email",
+                    "emailConfirmed",
+                    "firstName",
+                    "isActive",
+                    "language",
+                    "lastLoginAt",
+                    "lastName",
+                    "lastUpdate",
+                    "notificationLevel",
+                    "owner",
+                    "ownerId",
+                    "projectsIds",
+                    "roles",
+                    "settings",
+                    "superuser",
+                    "telegramId",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "groups",
+            "method": "GET",
+            "path": "/api/groups",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 23,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "children",
+                  "createdAt",
+                  "description",
+                  "formId",
+                  "iconId",
+                  "lastUpdate",
+                  "name",
+                  "order",
+                  "parentGroupId",
+                  "projectId",
+                  "publish",
+                  "root",
+                  "updatedBy",
+                  "version"
+                ]
+              }
+            }
+          },
+          {
+            "name": "helps",
+            "method": "GET",
+            "path": "/api/helps",
+            "ok": true,
+            "status_code": 200,
+            "shape": {
+              "type": "list",
+              "length": 2,
+              "first": {
+                "type": "dict",
+                "keys": [
+                  "_id",
+                  "authorId",
+                  "createdAt",
+                  "lastUpdate",
+                  "name",
+                  "projectId",
+                  "updatedBy",
+                  "value",
+                  "version"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "profiles_total": 2,
+    "instance_project_list_ok": 2,
+    "default_project_discovery_ok": 2,
+    "default_project_discovery_skipped": 0,
+    "project_count_total": 53,
+    "all_instance_project_lists_ok": true,
+    "all_default_project_discovery_ok_or_skipped": true
+  }
+}

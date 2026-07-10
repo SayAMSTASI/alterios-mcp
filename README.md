@@ -25,6 +25,9 @@
   редактированием секретов, выбранным профилем и missing-check по каждому
   профилю.
 - `alterios_list_projects` - инвентаризация проектов на уровне экземпляра.
+- `alterios_profile_smoke_matrix` - read-only матрица по всем профилям:
+  локальный конфиг, список проектов и проверка маршрутов проекта по default
+  `project_id`, если он настроен.
 - `alterios_service_catalog` - каталог известных script-service функций с
   метками чтения/записи, уровнями риска, подсказками по аргументам и примерами.
 - `alterios_call_readonly_service` - защищенные вызовы известных
@@ -223,6 +226,15 @@ ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 
 ```powershell
 python -m alterios_mcp.discovery --profile primary --projects --json
+```
+
+Read-only smoke по всем настроенным профилям без раскрытия токенов и URL:
+
+```powershell
+$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
+alterios-profile-smoke `
+  --out-json docs\profile-smoke-matrix-2026-07-10.json `
+  --out-md docs\profile-smoke-matrix-2026-07-10.md
 ```
 
 Проверка конкретного проекта с явным `project_id`:

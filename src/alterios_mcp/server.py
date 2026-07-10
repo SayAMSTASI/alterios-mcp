@@ -22,6 +22,7 @@ from .client import (
 )
 from .discovery import discover_readonly, list_objects, list_projects
 from .form_surface import analyze_form_surface
+from .profile_smoke import run_profile_smoke
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
@@ -1925,6 +1926,24 @@ def alterios_discover_readonly(
 ) -> dict[str, Any]:
     """Probe the known safe read-only Alterios REST routes."""
     return discover_readonly(_client(profile, project_id))
+
+
+@mcp.tool()
+def alterios_profile_smoke_matrix(
+    profile: str | None = None,
+    project_limit: int = 100,
+    include_project_discovery: bool = True,
+    include_project_ids: bool = False,
+    include_project_names: bool = False,
+) -> dict[str, Any]:
+    """Run read-only project-list and default-project route smoke across configured profiles."""
+    return run_profile_smoke(
+        selected_profile=profile,
+        project_limit=project_limit,
+        include_project_discovery=include_project_discovery,
+        include_project_ids=include_project_ids,
+        include_project_names=include_project_names,
+    )
 
 
 @mcp.tool()
