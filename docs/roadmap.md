@@ -54,6 +54,10 @@ work is to make coverage complete, safety explicit, and releases repeatable.
 - Require explicit `project_id`, verified profile output, and narrow target
   arguments for write tools.
 - Prefer typed write tools with validation over broad generic write endpoints.
+- Treat generic `alterios_rest_write` as a research/emergency layer, not the
+  normal operator interface.
+- Expand typed writes by entity family: content/files, views/forms,
+  scripts, BPMN/process/tasks, reports, then security/destructive flows.
 - Add dry-run validation where Alterios supports it, plus request summaries and
   redacted audit records.
 - Validate writes through API readback and, when relevant, UI-visible behavior.
@@ -70,6 +74,8 @@ work is to make coverage complete, safety explicit, and releases repeatable.
 ## 6. Release Packaging
 
 - Provide packaged console entry points and MCP server configuration examples.
+- Prefer the installed `alterios-mcp` console script in MCP client configs;
+  keep `python -m alterios_mcp.server` as a fallback.
 - Document private configuration via environment variables and
   `ALTERIOS_DOTENV_PATH`; do not ship or copy secrets into the repo.
 - Add release smoke tests for config, readonly inventory, project override, and
@@ -78,3 +84,15 @@ work is to make coverage complete, safety explicit, and releases repeatable.
   discovery outputs.
 - Keep docs aligned with implemented tools so production operators can tell what
   is shipped, experimental, or planned.
+
+## 7. Agents And Skills
+
+- Keep agent roles as a project control layer: PM, Project Base Explorer,
+  Write Tool Engineer, Safety Verifier, Report/Dashboard Specialist, and Skill
+  Curator.
+- Store the operating contract in `docs/agents-and-skills.md`.
+- Add repo-owned skills only after the relevant workflow is implemented and
+  verified through tests or live sandbox readback.
+- Start with skills for project base inventory, typed write tools,
+  form/view surfaces, BPMN task flow, and Stimulsoft Project Database reports.
+- Do not let skills encode unverified API behavior as fact.

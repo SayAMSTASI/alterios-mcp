@@ -17,6 +17,7 @@
 | Уровень | Количество | Что считается |
 |---|---:|---|
 | MCP tools | 23 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 4 | `alterios_add_comment`, `alterios_call_write_service`, `alterios_execute_manual_script`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 57 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
@@ -73,6 +74,29 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_call_write_service` | Controlled runtime write/service call |
 | `alterios_execute_manual_script` | Controlled manual script execution |
 | `alterios_rest_write` | Controlled generic REST write |
+
+## 2026-07-10 Reinventory Note
+
+Live ART X practice proves that Alterios accepts write routes for content,
+files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
+does **not** mean the MCP operator surface is complete. Today only 4 tools are
+write-like, and 3 of them are either generic or narrow:
+
+- `alterios_add_comment` is typed but only covers comments;
+- `alterios_execute_manual_script` executes an existing script UUID but does not
+  create or update scripts;
+- `alterios_call_write_service` and `alterios_rest_write` are broad escape
+  hatches, not production-grade entity tools.
+
+Next coverage work must therefore add typed write tools for the verified
+project-base surfaces:
+
+1. content fields and file-field upload;
+2. views, view entities, and view fields;
+3. forms, tabs, components, and actions;
+4. manual/event/diagram scripts;
+5. BPMN diagrams, process start, task reads, task completion;
+6. reports with Stimulsoft Project Database datasource validation.
 
 ## Runtime Services: 14
 

@@ -150,14 +150,27 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 python -m alterios_mcp.discovery --profile primary --projects --json
 ```
 
-В конфиг Codex MCP можно передать тот же путь к приватному dotenv:
+В конфиг Codex MCP лучше передавать уже установленный console script
+`alterios-mcp.exe` и тот же путь к приватному dotenv. Это исключает путаницу
+с рабочей директорией и импортом модуля:
+
+```toml
+[mcp_servers.alterios]
+command = "C:\\path\\to\\alterios-mcp\\.venv\\Scripts\\alterios-mcp.exe"
+args = []
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+
+[mcp_servers.alterios.env]
+ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
+```
+
+Эквивалентный fallback через Python-модуль:
 
 ```toml
 [mcp_servers.alterios]
 command = "C:\\path\\to\\alterios-mcp\\.venv\\Scripts\\python.exe"
 args = ["-m", "alterios_mcp.server"]
-startup_timeout_sec = 60
-tool_timeout_sec = 120
 
 [mcp_servers.alterios.env]
 ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
@@ -231,7 +244,16 @@ alterios-ui-flow .\capture.har --scenario content-form-open --json
 ## Запуск MCP-Сервера
 
 ```powershell
-python -m alterios_mcp.server
+.\.venv\Scripts\alterios-mcp.exe
+```
+
+Это stdio MCP-сервер: при ручном запуске он не печатает обычный CLI-отчет, а
+ждет JSON-RPC сообщения от MCP-клиента. Для проверки конфигурации запускайте
+не сервер, а discovery-smoke:
+
+```powershell
+$env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
+.\.venv\Scripts\alterios-discover.exe --profiles --profile primary --json
 ```
 
 Включайте режим записи только для проверенного безопасного профиля и проекта:
@@ -257,13 +279,17 @@ write-capable tool-а нужно одновременно:
 
 Управление проектом ведется в [docs/project-status.md](docs/project-status.md).
 Правила мультиагентной работы и контрольные точки PM описаны в
-[docs/project-management.md](docs/project-management.md). Каталог runtime-сервисов
+[docs/project-management.md](docs/project-management.md). Контракт будущих
+агентов и skill-пакетов описан в
+[docs/agents-and-skills.md](docs/agents-and-skills.md). Каталог runtime-сервисов
 скриптов описан в
 [docs/script-runtime-catalog.md](docs/script-runtime-catalog.md).
 Карта сущностей Alterios, возможных обращений, настроек и порядка write-практики
 описана в [docs/alterios-entity-surface-catalog.md](docs/alterios-entity-surface-catalog.md).
 Количество покрытых методов, route/method patterns и статусы live/cataloged
 ведутся в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
+Текущая реинвентаризация write-surface и project base:
+[docs/reinventory-2026-07-10.md](docs/reinventory-2026-07-10.md).
 
 ## Practice-Сценарии
 
