@@ -22,6 +22,8 @@ Lead Engineer отвечает за итоговое состояние репо
 ## Контрольные артефакты
 
 - `docs/project-status.md` - текущая status board.
+- `docs/git-team-workflow.md` - правила веток, push и разграничения reusable
+  repo changes от внутренних business task artifacts.
 - `docs/roadmap.md` - durable delivery roadmap.
 - `docs/discovery-plan.md` - стратегия endpoint discovery и inventory.
 - `docs/gost-documentation-scribe-agent.md` - локальный playbook для

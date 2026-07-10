@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
@@ -9,3 +11,8 @@ dist/
 build/
 *.egg-info/
 artifacts/
+local-artifacts/
+private-artifacts/
+work-notes/
+*.har
+*.har.json
