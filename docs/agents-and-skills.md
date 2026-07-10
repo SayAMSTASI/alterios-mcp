@@ -29,6 +29,7 @@
 | UI Icons & Actions Reviewer | Перед сохранением форм, строковых действий, меню, process actions | Проверить Google Fonts Icons, `size=16`, `color=#4B77D1`, `iconId`, порядок действий `edit/view/delete`, меню с троеточием, смысл действия, когда не менять существующую иконку | Form/action matrix, icon standard, icon usage matrix | Icon/action review, список исправлений, validation notes | Нет |
 | Script/BPMN Flow Integrator | При manual/event/diagram scripts, form actions, BPMN/process/task side effects | Картировать scripts -> forms -> BPMN: args actions, `scriptTask`, listeners, service tasks, `camunda:formKey`, userTask forms, process start/task complete, data side effects | Script/BPMN linkage JSON, scripts, diagrams | Flow map, side-effect table, test scenario | Да, scoped |
 | Report/Stimulsoft Specialist | При отчетах, печатных формах, dashboards, report tabs | Настроить Project Database datasource, view binding, openId report tabs, filters, dashboard widgets, printable layout, geometry/dynamic-height checks | View spec, report JSON, layout playbook | Report spec/template patch, layout validation, readback | Да, scoped |
+| Documentation Scribe / Писарь | При инструкциях пользователя, администратора, эксплуатационных разделах и ГОСТ/ЕСПД оформлении | Выбрать ГОСТ 19 / ГОСТ 34 / ГОСТ Р 5979x базис, собрать карту разделов, оформить пользовательские и администраторские процедуры, зафиксировать недостающие источники и скриншоты | Verified docs, inventory matrices, UI/HAR evidence, screenshots, `gost-documentation-builder`, `docs/gost-documentation-scribe-agent.md` | Draft/fill map инструкции, список gaps, screenshot plan, compliance notes | Только docs |
 | Write Tool Engineer | Когда повторяемое действие должно стать MCP tool | Реализовать typed write tool, schema, dry-run diff, write gate, target-id checks, readback, unit tests, CLI/MCP exposure | Verified workflow, route contract, safety rules | Код tool, tests, docs, examples | Да |
 | Safety Verifier | Перед признанием результата verified | Проверить profile/project, secret redaction, no leaked tokens, dry-run/write gate, unit tests, diff check, live readback, UI/HAR evidence где нужно | Патчи, команды, live target, expected result | Verification report, residual risks, fail/pass | Нет |
 | Skill Curator | После того как workflow доказан кодом или live sandbox | Создать/обновить repo-owned skill: triggers, workflow, safety rules, references, examples; убрать дублирование с другими skills | Проверенные docs/tools/matrices | `skills/<name>/SKILL.md`, refs, agent config | Да, scoped |
@@ -180,6 +181,38 @@ Done:
 - layout validator не находит критичных пересечений;
 - для UI-critical отчета есть браузерная или render-проверка, либо риск открыт.
 
+### Documentation Scribe / Писарь
+
+Задачи:
+
+- оформлять инструкции пользователя, администратора, эксплуатационные разделы и
+  help/reference материалы на базе проверенных источников;
+- выбирать стандартный базис: ГОСТ 19 для программных документов, ГОСТ 34 /
+  ГОСТ Р 5979x для автоматизированной системы и эксплуатационного контура;
+- использовать `gost-documentation-builder` как основной ГОСТ/ЕСПД skill и
+  `docs/gost-documentation-scribe-agent.md` как локальный Alterios playbook;
+- не начинать финальную редакцию без source map: README, controlled writes,
+  project-status, inventory matrices, UI/HAR evidence, screenshots, договор/ТЗ
+  или шаблон заказчика, если он есть;
+- для инструкции пользователя описывать реальные рабочие сценарии: цель,
+  предусловия, шаги, ожидаемый результат, сообщения и ошибки;
+- для инструкции администратора описывать установку, запуск MCP, профили,
+  `ALTERIOS_DOTENV_PATH`, write gates, диагностику, backup/recovery и
+  эксплуатационные ограничения;
+- делать fill map: раздел, источник, статус, вопрос, риск;
+- помечать неизвестные факты как `Требует уточнения`, а не заменять их общими
+  формулировками.
+
+Done:
+
+- выбран ГОСТ/ЕСПД или ГОСТ 34 базис и объяснено, почему он применим;
+- есть структура документа и карта источников по разделам;
+- пользовательская и администраторская инструкции разделены по аудитории;
+- screenshots нужны только там, где они подтверждают действие, и список
+  недостающих скриншотов явно указан;
+- документ не содержит выдуманных ролей, URL, прав, сообщений, сроков,
+  требований безопасности или приемочных критериев.
+
 ### Write Tool Engineer
 
 Задачи:
@@ -259,6 +292,19 @@ Done:
 3. Safety Verifier проверяет `report/full`, source rows, layout validator и UI/render evidence.
 4. Skill Curator обновляет `alterios-stimulsoft-project-db` после проверки.
 
+### Инструкции Администратора И Пользователя
+
+1. PM Control Loop фиксирует аудиторию, тип документа и acceptance criteria.
+2. Project Base Explorer и профильные агенты передают проверенные источники:
+   tools, routes, forms, scripts, BPMN, reports, screenshots и ограничения.
+3. Documentation Scribe / Писарь выбирает ГОСТ 19 / ГОСТ 34 базис, составляет
+   fill map и draft инструкции.
+4. Safety Verifier проверяет, что документ не содержит секретов, неподтвержденных
+   фактов, нечитабельных screenshots и смешения пользовательских/админских
+   процедур.
+5. Lead Engineer интегрирует документ в репозиторий, запускает проверки и
+   обновляет статус.
+
 ### Новый MCP Tool
 
 1. PM Control Loop фиксирует, зачем tool нужен и какую ручную рутину снимает.
@@ -287,6 +333,13 @@ docs, JSON-матрицы, тесты и кодовые области.
 | `alterios-stimulsoft-project-db` | После report/source validation tools | Report/Stimulsoft Specialist | Stimulsoft JSON, Project Database datasource, report_full readback, layout checks |
 | `alterios-safety-verifier` | После scanner/test/readback workflow стабилизации | Safety Verifier | Tests, secret redaction, dry-run/write-gate, UI/HAR evidence |
 | `alterios-pm-control-loop` | После стабилизации `project-status` и stage format | PM Control Loop | Stage control, acceptance criteria, risks, next steps |
+
+Documentation Scribe / Писарь на первом проходе не требует отдельного
+repo-owned skill: он использует установленный `gost-documentation-builder` и
+локальный playbook `docs/gost-documentation-scribe-agent.md`. Отдельный skill
+`alterios-gost-documentation-scribe` стоит создавать только после того, как
+будут подготовлены и проверены реальные инструкции администратора и
+пользователя для Alterios MCP.
 
 Формат каждого skill folder:
 

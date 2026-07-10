@@ -12,6 +12,7 @@ visible, reviewable, and tied to verified outcomes.
 | Explorer Agent | Answers bounded codebase/API questions with evidence and file references. | No |
 | Worker Agent | Implements a bounded task with an explicit file ownership scope. | Yes |
 | Verifier Agent | Runs independent checks, reviews risk areas, and reports gaps. | No |
+| Documentation Scribe Agent | Prepares administrator/user instructions and ГОСТ/ЕСПД documentation from verified sources. | No |
 
 The Lead Engineer is accountable for the final repository state. Subagents can
 recommend or patch, but their work is integrated only after review and checks.
@@ -21,6 +22,8 @@ recommend or patch, but their work is integrated only after review and checks.
 - `docs/project-status.md` is the single current status board.
 - `docs/roadmap.md` is the durable delivery roadmap.
 - `docs/discovery-plan.md` is the endpoint and inventory strategy.
+- `docs/gost-documentation-scribe-agent.md` is the local playbook for
+  administrator/user instructions and ГОСТ-oriented documentation.
 - Commit messages mark completed slices.
 - Verification evidence is summarized in status updates and final answers.
 
