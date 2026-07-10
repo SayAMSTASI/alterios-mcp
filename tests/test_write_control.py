@@ -156,8 +156,8 @@ def test_collect_target_ids_finds_common_id_shapes() -> None:
     ) == ("content-1", "content-2", "task_1", "process-1")
 
 
-def test_rest_write_defaults_to_dry_run_without_network() -> None:
-    with patch.dict("os.environ", {}, clear=True):
+def test_rest_write_defaults_to_dry_run_without_network(tmp_path) -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
         result = server.alterios_rest_write(
             "PATCH",
             "/api/reports",
@@ -172,6 +172,8 @@ def test_rest_write_defaults_to_dry_run_without_network() -> None:
     assert result["audit"]["dangerous_write_enabled"] is False
     assert result["audit"]["operation"]["method"] == "PATCH"
     assert result["audit"]["operation"]["target_ids"] == ["report-1"]
+    assert result["plan"]["plan_id"].startswith("wp_")
+    assert (tmp_path / result["plan"]["path"]).exists()
 
 
 def test_add_comment_defaults_to_dry_run_without_network() -> None:
@@ -1188,7 +1190,7 @@ def test_manual_script_dry_run_requires_uuid() -> None:
         )
 
 
-def test_rest_write_execution_returns_audit_and_response_without_real_network() -> None:
+def test_rest_write_execution_returns_audit_and_response_without_real_network(tmp_path) -> None:
     class FakeResponse:
         def as_dict(self) -> dict[str, object]:
             return {
@@ -1205,8 +1207,21 @@ def test_rest_write_execution_returns_audit_and_response_without_real_network() 
             assert body == {"_id": "report-1"}
             return FakeResponse()
 
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run = server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
     with (
-        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
         patch.object(server, "_client", return_value=FakeClient()),
     ):
         result = server.alterios_rest_write(
@@ -1214,6 +1229,7 @@ def test_rest_write_execution_returns_audit_and_response_without_real_network() 
             "/api/reports",
             {"_id": "report-1"},
             dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
             project_id="project-1",
         )
@@ -1222,6 +1238,57 @@ def test_rest_write_execution_returns_audit_and_response_without_real_network() 
     assert result["audit"]["status"] == "ready_to_execute"
     assert result["audit"]["write_enabled"] is True
     assert result["response"]["body"] == {"ok": True, "token": "<redacted>"}
+    assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_rest_write_execution_rejects_changed_payload_plan_without_real_network(tmp_path) -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run = server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1", "name": "Original"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        pytest.raises(ValueError, match="operation does not match"),
+    ):
+        server.alterios_rest_write(
+            "PUT",
+            "/api/reports",
+            {"_id": "report-1", "name": "Changed"},
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_write_plan_reader_tools_return_stored_plan_and_journal_without_network(tmp_path) -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run = server.alterios_rest_write(
+            "PATCH",
+            "/api/reports",
+            {"_id": "report-1", "name": "Report"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+        plan_id = dry_run["plan"]["plan_id"]
+        plans = server.alterios_list_write_plans(profile="vniimt", project_id="project-1")
+        plan = server.alterios_get_write_plan(plan_id, profile="vniimt", project_id="project-1")
+        journal = server.alterios_write_journal(profile="vniimt", project_id="project-1")
+
+    assert plans["plans"][0]["plan_id"] == plan_id
+    assert plan["plan_id"] == plan_id
+    assert plan["audit"]["operation"]["path"] == "/api/reports"
+    assert journal["entries"][0]["event"] == "plan_created"
+    assert journal["entries"][0]["payload"]["plan_id"] == plan_id
 
 
 def test_add_comment_execution_returns_created_comment_and_readback_without_real_network() -> None:

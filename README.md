@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **67 инструментов**, из них **32 write-like инструмента**.
+Текущая поверхность MCP: **70 инструментов**, из них **32 write-like инструмента**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -101,6 +101,9 @@ MCP умеет собирать состав проекта:
 Есть generic-инструменты `alterios_rest_write` и `alterios_call_write_service`,
 но для штатной работы предпочтительны типизированные инструменты: они знают контекст,
 проверяют цель, формируют dry-run audit и делают readback там, где API это позволяет.
+Dry-run write tools сохраняют проверяемый `plan_id` в `artifacts/write-plans`,
+а execution events пишутся в `artifacts/write-journal`; generic
+`alterios_rest_write` при `dry_run=false` требует совпадающий `plan_id`.
 
 ### Формы и пользовательский UI
 
@@ -369,6 +372,9 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   расширенные сценарии: диаграммы, представления, группы, пользователи, роли,
   включения, файлы, действия, listeners, множественный выбор, отчеты, скрипты и
   публикация типов материалов.
+- [docs/optimization-plan.md](docs/optimization-plan.md) - план оптимизации:
+  сценарные tools, UI/report validation, write workflow и inventory cache/diff
+  health.
 - [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md) - матрица
   инструментов, route patterns и operation classes.
 - [docs/live-write-evidence-2026-07-10.md](docs/live-write-evidence-2026-07-10.md) -

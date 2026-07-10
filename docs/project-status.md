@@ -15,11 +15,12 @@ workflow, files, comments, users и reports. Sandbox practice script
 а также comments, file-field upload, saved manual script, BPMN process/task и
 dashboard report create/update/full-readback.
 
-Покрытие методов ведется явно: 67 MCP tools, 14 runtime services, 15 live
+Покрытие методов ведется явно: 70 MCP tools, 14 runtime services, 15 live
 read-only route probes, 78 REST route/method patterns и 13 классов операций.
 После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
 текущая write-поверхность составляет 32 write-like tools. Последний UI/HAR
-evidence pass добавил `alterios_clone_shared_content_type`.
+evidence pass добавил `alterios_clone_shared_content_type`. Этап оптимизации
+добавил read-only tools для write plans и write journal.
 
 По script/diagram/report research зафиксированы все наблюдаемые типы scripts,
 все BPMN task-like nodes проекта ART X и правила Project Database source
@@ -94,12 +95,13 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | Build. Typed security/form-listener/bulk tools | Added typed users/user-groups/roles read/upsert/delete tools, `alterios_patch_form_cell_listeners`, `alterios_bulk_update_selected_content_fields`, and `alterios_plan_content_type_publish`. | `805b405` | `pytest`: 121 passed; `py_compile` for client/server OK; no-network tests cover security classification, dangerous gate enforcement, delete path audit, listener patching, bulk selected-row diff, and native publish blocking without UI/HAR evidence. No live security/delete write executed. |
 | Practice. Live security/delete and publish evidence | Verified sandbox content type publication flags, role create/update/delete, user-group create/update/delete, cleanup readback, and documented the remaining user-create backend contract gap. Also fixed redaction for `repassword`-style fields and stripped readback metadata from security audit target IDs. | `63b5d08` | Live `artx` writes: `/api/content-types/save` status `201`, final flags `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false`; `/api/roles` create `201`, update `200`, delete `200`, remaining roles `0`; `/api/user-groups` create `201`, update `200`, delete `200`, remaining groups `0`; user create attempts returned backend `HTTP 500` and cleanup scan found `0` sandbox users. Targeted tests for redaction/audit fixes passed. Evidence: `docs/live-write-evidence-2026-07-10.md`. |
 | Practice. UI user/delete and content-type transfer evidence | Captured UI-visible disposable user create/delete flow, API cleanup readback, frontend route evidence for user routes, and native content-type shared-list/clone route evidence. Translated key docs to Russian and documented multi-instance applicability. | `f2a762a` | UI live: user form required `ownerId`; selecting `ArtX` created disabled user `47ac9730-2fa6-4cd2-8078-780f66bd009b`; row menu delete confirmed and cleanup `GET /api/users/listandcount` returned `remaining_matches=0`. Content-type transfer evidence: `GET /api/content-types?share=true` shows the published sandbox type and frontend service calls `POST /api/content-types/clone`; live clone not executed without a target sandbox project. Tests: targeted 83 passed, full 126 passed, py_compile OK, diff/secret checks clean. |
+| Build. Write workflow plan/journal foundation | Added automatic `plan_id` storage for dry-run write results, write plan/journal artifacts, read-only MCP tools for plan/journal inspection, and `plan_id` enforcement for generic `alterios_rest_write` execution. Added `docs/optimization-plan.md`. | pending | Targeted `tests/test_write_control.py`: 50 passed; full `pytest`: 128 passed; `py_compile` OK; `git diff --check` OK; secret scan clean. |
 
 ## Активный этап
 
 | Этап | Статус | Ответственный | Критерии приемки |
 |---|---|---|---|
-| 14. UI/HAR write evidence and Russian docs | Done | Lead Engineer + Safety Verifier | Disposable user create/delete is UI/API verified; content-type cross-project transfer route evidence is documented; Markdown docs are Russian-facing; tests, secret scan and commit are complete. Push tracked in the final closeout. |
+| 15. Write workflow optimization foundation | In Progress | Lead Engineer + Safety Verifier | Dry-run write tools return stored `plan_id`; generic REST write apply requires matching `plan_id`; write journal is readable; docs and tests are updated. |
 
 ## Бэклог
 
@@ -127,6 +129,10 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
+| 1 | Add write `plan_id`, write journal, and replay/smoke foundation. | In Progress | First slice stores dry-run plans, exposes plan/journal readers, and enforces `plan_id` for generic REST write. Replay/smoke command remains next. |
+| 1 | Add scenario tool `alterios_create_material_module`. | Next | Should compose content type, fields, view, forms, group, readback, and UI/menu checks using saved `plan_id`. |
+| 1 | Add scenario tool `alterios_create_report_tab`. | Next | Should compose source view, report template, form tab, `openId`, `dataId` check, layout validation, and render evidence. |
+| 1 | Add scenario tool `alterios_create_process_flow`. | Next | Should compose task form, script refs, BPMN XML, process start/task readback, and side-effect validation. |
 
 ## Текущие риски
 
@@ -146,19 +152,18 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 перевода Markdown-документации на русский и добавления native clone tool.
 Следующая разработка требует отдельного решения о рестарте работ.
 
-Deferred candidates:
+Отложенные кандидаты:
 
-1. Create or designate a dedicated target sandbox project for live
-   `POST /api/content-types/clone` verification and cleanup/readback.
-2. Export true HAR from DevTools for user create/delete and content-type clone
-   if raw HAR artifacts are required; the current connector provided UI/route/API
-   evidence but not raw network stream.
-3. Expand form-listener coverage only after additional listener event shapes and
-   payloads are inventoried from live forms.
-4. Expand Stimulsoft validator with rendered PDF/image comparison once export
-   or render tooling is available.
-5. Start release packaging and changelog process if the repository is prepared
-   for a tagged release.
+1. Создать или выделить dedicated target sandbox project для live-проверки
+   `POST /api/content-types/clone` и cleanup/readback.
+2. Экспортировать true HAR из DevTools для user create/delete и content-type
+   clone, если raw HAR artifacts станут обязательным критерием.
+3. Расширять form-listener coverage только после инвентаризации дополнительных
+   event shapes и payloads из live forms.
+4. Расширить Stimulsoft validator rendered PDF/image comparison, когда будет
+   доступен export/render tooling.
+5. Начать release packaging и changelog process, когда репозиторий будет готов
+   к tagged release.
 
 ## Чек-лист обновления PM
 

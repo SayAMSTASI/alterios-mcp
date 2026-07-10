@@ -35,6 +35,7 @@ from .write_control import (
     controlled_write_result,
     is_dangerous_write_risk,
 )
+from .write_plan import assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
 
 mcp = FastMCP("alterios")
 
@@ -932,6 +933,38 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
 def alterios_list_profiles(profile: str | None = None) -> dict[str, Any]:
     """Return configured Alterios instance profiles with redacted settings and missing values."""
     return configured_profiles(selected_profile=profile)
+
+
+@mcp.tool()
+def alterios_list_write_plans(profile: str, project_id: str, limit: int = 20) -> dict[str, Any]:
+    """List stored dry-run write plans for a profile/project target."""
+    if limit < 1 or limit > 200:
+        raise ValueError("limit must be between 1 and 200.")
+    return {
+        "profile": profile,
+        "project_id": project_id,
+        "plans": list_write_plans(profile=profile, project_id=project_id, limit=limit),
+    }
+
+
+@mcp.tool()
+def alterios_get_write_plan(plan_id: str, profile: str, project_id: str) -> dict[str, Any]:
+    """Read one stored dry-run write plan by plan_id."""
+    if not plan_id.strip():
+        raise ValueError("plan_id must not be empty.")
+    return load_write_plan(plan_id=plan_id, profile=profile, project_id=project_id)
+
+
+@mcp.tool()
+def alterios_write_journal(profile: str, project_id: str, limit: int = 50) -> dict[str, Any]:
+    """Read recent write-plan and write-execution journal entries."""
+    if limit < 1 or limit > 500:
+        raise ValueError("limit must be between 1 and 500.")
+    return {
+        "profile": profile,
+        "project_id": project_id,
+        "entries": list_write_journal(profile=profile, project_id=project_id, limit=limit),
+    }
 
 
 @mcp.tool()
@@ -3494,6 +3527,7 @@ def alterios_rest_write(
     body: dict[str, Any],
     params: dict[str, Any] | None = None,
     dry_run: bool = True,
+    plan_id: str | None = None,
     allow_destructive: bool = False,
     profile: str | None = None,
     project_id: str | None = None,
@@ -3524,8 +3558,11 @@ def alterios_rest_write(
         dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_rest_write.")
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
     response = _client(profile, project_id).request(method, path, params=request_params, body=body).as_dict()
-    return controlled_write_result(audit=audit, response=response)
+    return controlled_write_result(audit=audit, response=response, plan_id=plan_id)
 
 
 def main() -> None:

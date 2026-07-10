@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import redact_sensitive
+from .write_plan import append_execution_journal, save_write_plan
 
 
 class ControlledWriteError(RuntimeError):
@@ -169,8 +170,20 @@ def build_write_audit(
     )
 
 
-def controlled_write_result(*, audit: WriteAudit, response: dict[str, Any] | None = None) -> dict[str, Any]:
-    return {"dry_run": audit.dry_run, "audit": audit.as_dict(), "response": redact_sensitive(response)}
+def controlled_write_result(
+    *,
+    audit: WriteAudit,
+    response: dict[str, Any] | None = None,
+    plan_id: str | None = None,
+) -> dict[str, Any]:
+    audit_dict = audit.as_dict()
+    redacted_response = redact_sensitive(response)
+    result: dict[str, Any] = {"dry_run": audit.dry_run, "audit": audit_dict, "response": redacted_response}
+    if audit.dry_run:
+        result["plan"] = save_write_plan(audit=audit_dict, response=redacted_response)
+    else:
+        result["journal"] = append_execution_journal(audit=audit_dict, response=redacted_response, plan_id=plan_id)
+    return result
 
 
 def collect_target_ids(value: Any) -> tuple[str, ...]:
