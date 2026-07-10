@@ -1,13 +1,13 @@
-# Stimulsoft report layout and analytics playbook
+# Stimulsoft: раскладка отчетов и аналитика
 
-Date: 2026-07-10
-Scope: Alterios/LIMS reports stored through `/api/reports` with Stimulsoft
-templates.
+Дата: 2026-07-10
+Scope: Alterios/LIMS reports, которые сохраняются через `/api/reports` со
+Stimulsoft templates.
 
-This document is the working checklist for building printable forms, embedded
-reports, and analytics dashboards without layout drift.
+Это рабочий checklist для построения печатных форм, embedded reports и
+analytics dashboards без съезда layout.
 
-## Source references
+## Источники Stimulsoft
 
 - Stimulsoft report component properties:
   https://www.stimulsoft.com/documentation/en/user-manual/report_internals_components_image.htm
@@ -20,42 +20,41 @@ reports, and analytics dashboards without layout drift.
 - Stimulsoft dashboard filter groups:
   https://www.stimulsoft.com/en/blog/articles/elements-of-data-filtering-in-dashboards
 
-## Alterios source rules
+## Правила источников Alterios
 
-Use the same data-source discipline for printable forms and dashboards:
+Для printable forms и dashboards используется одна discipline по источникам:
 
-1. Build the data in Alterios first: content types, fields, views, joins, and
+1. Сначала построить данные в Alterios: content types, fields, views, joins и
    filters.
-2. Verify source rows through:
+2. Проверить source rows:
 
 ```http
 POST /api/views/v2/get-data-simplified
 {"viewId":"<view-id>","limit":50,"offset":0}
 ```
 
-3. For current-record context in embedded report/list scenarios, verify
-   `POST /api/views/v2/get-data` with top-level `dataId: ["<openId>"]`.
-   In the current ART X sandbox, `contentId` alone does not scope the view.
-4. In the Stimulsoft template, bind Alterios views through the Project Database
-   custom source. The saved template must contain:
+3. Для current-record context в embedded report/list scenarios проверить
+   `POST /api/views/v2/get-data` с top-level `dataId: ["<openId>"]`. В текущем
+   ART X sandbox один `contentId` не ограничивает view.
+4. В Stimulsoft template привязывать Alterios views через Project Database
+   custom source. Saved template должен содержать:
    - `Dictionary.Databases[*].ServiceName = "Project Database"`;
-   - a connection string with `{"type":"view-data-v2","filter":{"viewId":"..."}}`;
-   - data-source columns matching the current view fields.
-5. If view fields or joins change, refresh or rebuild the Stimulsoft
-   dictionary data source. Do not trust old cached columns.
+   - connection string с `{"type":"view-data-v2","filter":{"viewId":"..."}}`;
+   - data-source columns, соответствующие текущим view fields.
+5. Если view fields или joins изменились, refresh или rebuild Stimulsoft
+   dictionary data source. Не доверять старым cached columns.
 
-## Choosing report type
+## Выбор типа отчета
 
-Use a printable report when the output must become a stable document: акт,
-protocol, certificate, invoice, registry, route sheet, or PDF. Use bands and
-fixed page geometry.
+Printable report используйте, когда output должен стать стабильным документом:
+акт, протокол, сертификат, счет, реестр, маршрутный лист или PDF. Для этого
+нужны bands и fixed page geometry.
 
-Use a dashboard when the output is interactive analytics: filters, charts,
-indicators, tables, gauges, drill-like inspection, or embedded operational
-summary.
+Dashboard используйте для interactive analytics: filters, charts, indicators,
+tables, gauges, drill-like inspection или embedded operational summary.
 
-Use an embedded report tab when the form needs the current record context.
-The form cell shape is:
+Embedded report tab используйте, когда форме нужен контекст текущей записи.
+Форма cell:
 
 ```json
 {
@@ -68,120 +67,113 @@ The form cell shape is:
 }
 ```
 
-## Layout rules for printable forms
+## Правила layout для печатных форм
 
-1. Set page size and margins first. Every component must fit inside the page
-   printable area before dynamic behavior is enabled.
-2. Use bands for vertical flow:
-   - `ReportTitleBand` for one-time title;
-   - `PageHeaderBand` for repeated column headers;
-   - `GroupHeaderBand` for grouping keys;
-   - `DataBand` for repeated rows;
-   - `GroupFooterBand` for group totals;
-   - `ReportSummaryBand` for final totals;
-   - `PageFooterBand` for page numbers and signatures that must stay at the
-     bottom of each page.
-3. Do not stack unrelated components at absolute coordinates below a dynamic
-   text field. Put them in the next band or set explicit `ShiftMode`.
-4. For table rows, all visible cells in one logical row must share the same
-   `Top` and `Height`. If one cell can grow, the row design must treat the
-   whole row as dynamic: text cells use compatible `CanGrow`/`CanShrink`, and
-   borders/backgrounds use `GrowToHeight`.
-5. Avoid overlapping visible components in the same parent container. If a
-   background rectangle is needed, make it a background/shape element behind
-   text, not another text component.
-6. Use `CanGrow` only for text that can really wrap. Pair it with `WordWrap`
-   and enough width.
-7. Use `CanShrink` for optional blocks and empty detail areas, but verify that
-   lower components shift and the containing band also shrinks.
-8. Use `CanBreak` only for long text/detail blocks that may split between
-   pages. For signatures, stamps, short totals, and table headers, keep the
-   block together.
-9. Use `KeepHeaderTogether`, `KeepDetailsTogether`, `KeepFooterTogether`, and
-   `KeepGroupTogether` for groups where a header/footer separated from its
-   rows would make the printed form invalid.
-10. Use `DockStyle`/`Anchor` for components that must follow the owner
-    container or page edge. Do not emulate right/bottom anchoring with magic
-    absolute coordinates.
-11. Do not place totals in the middle of the detail row just because the
-    expression works there. Put group totals into group footers and final
-    totals into report summary/footer bands unless there is a deliberate
-    visual reason.
-12. For signatures, stamps, QR/barcodes, and images, reserve a fixed frame and
-    use predictable scaling. Do not let an image grow into adjacent text.
+1. Сначала задать page size и margins. Каждый component должен помещаться в
+   printable area до включения dynamic behavior.
+2. Использовать bands для vertical flow:
+   - `ReportTitleBand` - одноразовый title;
+   - `PageHeaderBand` - повторяемые column headers;
+   - `GroupHeaderBand` - grouping keys;
+   - `DataBand` - repeated rows;
+   - `GroupFooterBand` - group totals;
+   - `ReportSummaryBand` - final totals;
+   - `PageFooterBand` - page numbers/signatures внизу страницы.
+3. Не ставить unrelated components абсолютными координатами под dynamic text
+   field. Перенесите их в следующий band или задайте явный `ShiftMode`.
+4. Для table rows все visible cells одной логической строки должны иметь один
+   `Top` и `Height`. Если одна cell может расти, весь row должен быть dynamic:
+   text cells используют compatible `CanGrow`/`CanShrink`, а borders/backgrounds
+   используют `GrowToHeight`.
+5. Не допускать пересечения visible components в одном parent container. Если
+   нужен background rectangle, делайте его background/shape element за text.
+6. `CanGrow` использовать только для текста, который реально может переноситься.
+   Добавлять `WordWrap` и достаточную width.
+7. `CanShrink` использовать для optional blocks и пустых detail areas, но
+   проверять, что lower components сдвигаются и containing band тоже shrinking.
+8. `CanBreak` использовать только для длинных text/detail blocks, которые могут
+   делиться между pages. Signatures, stamps, short totals и table headers
+   держать together.
+9. `KeepHeaderTogether`, `KeepDetailsTogether`, `KeepFooterTogether` и
+   `KeepGroupTogether` включать там, где separation header/footer от rows
+   делает printed form некорректной.
+10. `DockStyle`/`Anchor` использовать для components, которые должны следовать
+    owner container или page edge. Не имитировать right/bottom anchoring
+    магическими absolute coordinates.
+11. Totals размещать в group footers или report summary/footer bands, а не в
+    середине detail row только потому, что expression там работает.
+12. Для signatures, stamps, QR/barcodes и images резервировать fixed frame и
+    predictable scaling. Image не должен расти в соседний text.
 
-## Layout rules for dashboards
+## Правила layout для dashboards
 
-1. Treat each dashboard component as a fixed card in page coordinates. Define a
-   grid before placing elements.
-2. Keep filters in one top row or side column and give charts/tables their own
-   non-overlapping rectangles.
-3. When a filter should affect only some elements, set matching `Group`
-   properties. By default dashboard filters can affect all components.
-4. Do not use DatePicker for exact snapshot equality until the source date is a
-   real DateTime column and UI behavior is visually verified.
-5. For current-state snapshots, prefer precomputed source rows or technical
-   snapshot fields over complex dashboard-only expressions.
+1. Считать каждый dashboard component fixed card в page coordinates. Сначала
+   задать grid.
+2. Filters держать в одном top row или side column; charts/tables получают
+   свои non-overlapping rectangles.
+3. Если filter должен влиять только на часть elements, задавать matching
+   `Group` properties. По умолчанию dashboard filters могут влиять на все
+   components.
+4. Не использовать DatePicker для exact snapshot equality, пока source date не
+   является реальным DateTime column и UI behavior не проверен визуально.
+5. Для current-state snapshots предпочитать precomputed source rows или
+   technical snapshot fields, а не complex dashboard-only expressions.
 
-## Analytics capabilities to use
+## Возможности аналитики
 
-Stimulsoft can cover several analytics layers before custom code is needed:
-
-| Need | Stimulsoft capability | Alterios rule |
+| Потребность | Stimulsoft capability | Правило Alterios |
 |---|---|---|
-| Simple totals | `Sum`, `Count`, `Avg`, `Max`, `Min`, `First`, `Last` expressions | Use for display totals after source rows are verified. |
-| Group totals | Group headers/footers and aggregate expressions | Group in report when grouping is presentation-specific. |
-| Running totals | Running total in dashboard data transformation or report expressions | Use only when sort order is explicit. |
-| Percent of total | Data transformation "Show percentage" or expressions | Verify denominator against source view. |
-| Top N / pagination-like analysis | Data transformation skip/limit | Good for dashboard cards, not for regulatory print totals. |
-| Value normalization | Data transformation replace values | Use for labels; permanent business mapping should live in Alterios data. |
-| Interactive filters | Combo Box, Date Picker, List Box, Tree View filters | Keep filter `Group` explicit when multiple independent charts exist. |
-| Parameterized output | Report variables/dialog forms | Good for date ranges, organization, signatory, and current-record variants. |
-| Master-detail print | Relations plus master/detail DataBands | Verify relation; without it, all details can print for every master row. |
-| Charts/indicators | Dashboard charts, indicators, gauges, tables | Use for management analytics, not for strict print layout. |
+| Simple totals | `Sum`, `Count`, `Avg`, `Max`, `Min`, `First`, `Last` expressions | Использовать после проверки source rows. |
+| Group totals | Group headers/footers и aggregate expressions | Группировать в report, если grouping презентационный. |
+| Running totals | Running total в dashboard data transformation или report expressions | Использовать только при явном sort order. |
+| Percent of total | Data transformation "Show percentage" или expressions | Проверять denominator against source view. |
+| Top N / pagination-like analysis | Data transformation skip/limit | Хорошо для dashboard cards, не для regulatory print totals. |
+| Value normalization | Data transformation replace values | Для labels; permanent business mapping держать в Alterios data. |
+| Interactive filters | Combo Box, Date Picker, List Box, Tree View filters | Явно задавать filter `Group`, если charts независимы. |
+| Parameterized output | Report variables/dialog forms | Для date ranges, organization, signatory и current-record variants. |
+| Master-detail print | Relations плюс master/detail DataBands | Проверять relation; без нее все details могут печататься для каждого master row. |
+| Charts/indicators | Dashboard charts, indicators, gauges, tables | Для management analytics, не для strict print layout. |
 
 ## Static validation
 
-Use the built-in checker before saving or after reading a template:
+Перед сохранением или после чтения template используйте checker:
 
 ```powershell
 alterios-stimulsoft-layout-check .\report-template.json --strict
 ```
 
-Or through MCP:
+Или через MCP:
 
 ```text
 alterios_validate_stimulsoft_layout(report_id="<report-id>", profile="artx", project_id="<project-id>")
 ```
 
-The checker currently flags:
+Checker сейчас находит:
 
-- visible component overlap in the same parent container;
-- component overflow beyond page width/height;
-- zero or negative component sizes;
-- growing/shrinking components with lower siblings that lack explicit
-  `ShiftMode`;
-- rows that mix dynamic and fixed-height behavior.
+- пересечения visible components в одном parent container;
+- component overflow за page width/height;
+- zero или negative component sizes;
+- growing/shrinking components с lower siblings без explicit `ShiftMode`;
+- rows, где смешаны dynamic и fixed-height behavior.
 
-It is intentionally a preflight check. Final acceptance still requires render
-verification: Stimulsoft preview/export or browser viewer plus source-data
-comparison.
+Это preflight check. Final acceptance все равно требует render verification:
+Stimulsoft preview/export или browser viewer плюс comparison с source data.
 
-## Verification sequence
+## Последовательность проверки
 
-1. Read the current full report:
+1. Прочитать текущий full report:
 
 ```http
 GET /api/reports/full/{encode_filter({"_id":"<report-id>"})}
 ```
 
-2. Save a local backup of the full report/template JSON.
-3. Verify source rows with `get-data-simplified`.
-4. Run `alterios-stimulsoft-layout-check`.
-5. Save through `POST /api/reports` or `PUT /api/reports`.
-6. Read the full report back and rerun the layout check on the saved template.
-7. Open the UI/report viewer and verify the exact output scenario.
-8. For printable forms, export/preview a representative page set:
+2. Сохранить local backup full report/template JSON.
+3. Проверить source rows через `get-data-simplified`.
+4. Запустить `alterios-stimulsoft-layout-check`.
+5. Сохранить через `POST /api/reports` или `PUT /api/reports`.
+6. Прочитать full report обратно и повторить layout check на saved template.
+7. Открыть UI/report viewer и проверить exact output scenario.
+8. Для printable forms сделать export/preview representative page set:
    - short row;
    - long text row;
    - empty optional block;
@@ -189,13 +181,13 @@ GET /api/reports/full/{encode_filter({"_id":"<report-id>"})}
    - group with one row;
    - group crossing a page boundary.
 
-## Common failure modes
+## Частые отказы
 
-| Symptom | Likely cause | Fix |
+| Симптом | Вероятная причина | Исправление |
 |---|---|---|
-| Text overlaps the next block after long values | `CanGrow` without sibling shift or separate band | Move lower block to another band or set explicit `ShiftMode`. |
-| Table row borders no longer match row text height | One cell grows while borders/siblings stay fixed | Make all row cells compatible and use `GrowToHeight` for visual frames. |
-| Header is printed at page bottom without rows | Missing keep-together settings | Set header/detail/footer keep-together rules on the band/group. |
-| Report shows stale/missing fields | Stimulsoft datasource was not refreshed after view change | Rebuild dictionary columns from the Alterios view. |
+| Text overlaps next block after long values | `CanGrow` без sibling shift или separate band | Перенести lower block в другой band или задать explicit `ShiftMode`. |
+| Table row borders no longer match row text height | One cell grows while borders/siblings stay fixed | Сделать все row cells compatible и использовать `GrowToHeight` для visual frames. |
+| Header printed at page bottom without rows | Missing keep-together settings | Включить header/detail/footer keep-together rules на band/group. |
+| Report shows stale/missing fields | Stimulsoft datasource was not refreshed after view change | Rebuild dictionary columns from Alterios view. |
 | Dashboard DatePicker gives unexpected totals | Source date type/filter semantics are not exact | Verify source DateTime and compare UI to API counts. |
-| Embedded report ignores current record | Form cell lacks `openId=true` or verification used `contentId` | Add `openId=true` and verify with top-level `dataId: [openId]`. |
+| Embedded report ignores current record | Form cell lacks `openId=true` или verification used `contentId` | Add `openId=true` and verify with top-level `dataId: [openId]`. |

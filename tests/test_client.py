@@ -366,6 +366,46 @@ def test_save_resource_create_and_update_routes_without_network() -> None:
     assert create_request.body == {"name": "Form"}
 
 
+def test_delete_user_uses_ui_observed_body_route_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.delete_user("user 1")
+
+    request = send.call_args.args[0]
+    assert request.method == "DELETE"
+    assert request.url == "https://alterios.example/api/users"
+    assert request.body == {"_id": "user 1"}
+    assert request.headers["projectid"] == "project-1"
+
+
+def test_shared_content_type_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="target-project",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", [])) as send:
+        client.list_shared_content_types()
+        client.clone_content_type("source-type")
+
+    shared_request = send.call_args_list[0].args[0]
+    clone_request = send.call_args_list[1].args[0]
+    assert shared_request.method == "GET"
+    assert shared_request.url == "https://alterios.example/api/content-types?share=true"
+    assert clone_request.method == "POST"
+    assert clone_request.url == "https://alterios.example/api/content-types/clone"
+    assert clone_request.body == {"id": "source-type"}
+    assert clone_request.headers["projectid"] == "target-project"
+
+
 def test_view_entity_and_field_write_routes_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

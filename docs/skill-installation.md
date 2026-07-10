@@ -1,38 +1,38 @@
-# Repo-Owned Skills Installation
+# Установка repo-owned skills
 
-The repository keeps its project skills under `skills/`. To make them available
-to Codex as local/global skills, install them into `$CODEX_HOME/skills` or
-`~/.codex/skills`.
+Репозиторий хранит проектные skills в папке `skills/`. Чтобы они стали
+доступны Codex как local/global skills, установите их в `$CODEX_HOME/skills`
+или `~/.codex/skills`.
 
-## Dry Run
+## Dry-run
 
 ```powershell
 .\.venv\Scripts\python scripts\install_repo_skills.py --json
 ```
 
-The command reports `install`, `skip`, or `replace` for each skill and does not
-copy files unless `--execute` is passed.
+Команда показывает `install`, `skip` или `replace` для каждого skill и ничего
+не копирует, пока не передан `--execute`.
 
-## Install
+## Установка
 
 ```powershell
 .\.venv\Scripts\python scripts\install_repo_skills.py --execute --json
 ```
 
-If a target skill already exists, the installer skips it. Use `--replace` only
-when the repo copy should overwrite the installed copy:
+Если target skill уже существует, installer его пропускает. Используйте
+`--replace` только когда repo copy должна перезаписать установленную версию:
 
 ```powershell
 .\.venv\Scripts\python scripts\install_repo_skills.py --replace --execute --json
 ```
 
-## Path Handling
+## Обработка путей
 
-When skills are copied out of the repo, `references/source-map.md` is rewritten
-to absolute paths pointing back to this repository. This keeps references to
-`docs/`, `src/`, and `tests/` valid after installation.
+При копировании skills из репозитория `references/source-map.md`
+переписывается на абсолютные пути обратно в этот репозиторий. Так ссылки на
+`docs/`, `src/` и `tests/` остаются рабочими после установки.
 
-## Validation
+## Проверка
 
 ```powershell
 Get-ChildItem -Directory C:\Users\admin\.codex\skills\alterios-* |
@@ -41,5 +41,5 @@ Get-ChildItem -Directory C:\Users\admin\.codex\skills\alterios-* |
   }
 ```
 
-After installation, start a new Codex session to load the newly installed skills
-into the available-skill list.
+После установки откройте новую Codex-сессию, чтобы newly installed skills
+появились в списке доступных skills.

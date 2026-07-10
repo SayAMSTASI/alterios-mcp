@@ -1,104 +1,104 @@
-# Alterios MCP Roadmap
+# Дорожная карта Alterios MCP
 
-The roadmap targets a production-oriented Alterios MCP that can safely inspect,
-operate, and validate real Alterios instances with many projects. The current
-code already has read-only discovery and guarded generic writes; the remaining
-work is to make coverage complete, safety explicit, and releases repeatable.
+Roadmap ведет к production-oriented Alterios MCP, который безопасно
+инвентаризирует, изменяет и проверяет реальные Alterios instances с множеством
+проектов. Текущий код уже содержит read-only discovery и guarded generic
+writes; оставшаяся работа - довести coverage, safety и release-процесс до
+повторяемого состояния.
 
-## 1. Foundation And Safety
+## 1. Foundation and safety
 
-- Keep the profile model instance-scoped: one profile equals one Alterios
-  instance, not one project.
-- Keep profile registry extensible through `ALTERIOS_PROFILES` and
+- Держать profile model на уровне instance: один profile равен одному Alterios
+  instance, а не одному project.
+- Расширять profile registry через `ALTERIOS_PROFILES` и
   `ALTERIOS_<PROFILE>_*` auto-discovery.
-- Require project-scoped tools to accept explicit `project_id`.
-- Use `ALTERIOS_<PROFILE>_PROJECT_ID` only as an optional default for local
-  convenience.
-- Keep `ALTERIOS_DOTENV_PATH` as the supported way to reuse private dotenv files
-  without copying secrets into this repository.
-- Redact tokens, auth headers, passwords, cookies, and API keys from all tool
-  responses and errors.
-- Maintain read-only defaults; keep writes behind `ALTERIOS_MCP_ALLOW_WRITE=1`
-  and destructive/security writes behind `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`.
-- Add smoke checks for config loading, profile isolation, project override, and
-  secret redaction.
+- Требовать, чтобы project-scoped tools принимали явный `project_id`.
+- Использовать `ALTERIOS_<PROFILE>_PROJECT_ID` только как optional default для
+  local convenience.
+- Поддерживать `ALTERIOS_DOTENV_PATH` как основной способ подключить private
+  dotenv без копирования secrets в репозиторий.
+- Скрывать tokens, auth headers, passwords, cookies и API keys во всех tool
+  responses и errors.
+- Держать read-only defaults; writes - за `ALTERIOS_MCP_ALLOW_WRITE=1`,
+  destructive/security writes - за `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`.
+- Поддерживать smoke checks для config loading, profile isolation, project
+  override и secret redaction.
 
-## 2. Complete Read-Only Inventory
+## 2. Complete read-only inventory
 
-- Inventory instance-level projects first.
-- Inventory project-level objects across content types, fields, views, forms,
-  scripts, diagrams, contents, tasks, processes, reports, files, users/groups if
-  available, and view data.
-- Normalize route metadata: scope, method, path, required params, pagination,
-  filters, response shape, and common errors.
-- Add stable MCP tools for common inventory tasks instead of relying only on
-  generic REST calls.
-- Save reproducible JSON artifacts that identify profile and project context but
-  exclude secrets.
+- Сначала inventory instance-level projects.
+- Затем inventory project-level objects: content types, fields, views, forms,
+  scripts, diagrams, contents, tasks, processes, reports, files, users/groups и
+  view data.
+- Нормализовать route metadata: scope, method, path, required params,
+  pagination, filters, response shape и common errors.
+- Добавлять stable MCP tools для common inventory tasks, а не полагаться только
+  на generic REST calls.
+- Сохранять reproducible JSON artifacts с profile/project context без secrets.
 
-## 3. Script Runtime Catalog
+## 3. Каталог runtime-сервисов скриптов
 
-- Expand the known script-service catalog with categories, arguments,
-  permissions, read/write labels, and examples.
-- Probe read-only services by profile and project to capture body style,
-  endpoint template behavior, and response shape.
-- Keep runtime service names separate from `/api/scripts/execute-manual`, which
-  executes saved scripts by UUID.
-- Classify mutating services by risk and required safeguards.
-- Add typed wrappers for safe high-value services after their payload contracts
-  are verified.
+- Расширять known script-service catalog: categories, arguments, permissions,
+  read/write labels и examples.
+- Probe read-only services по profile/project для body style, endpoint template
+  behavior и response shape.
+- Держать runtime service names отдельно от `/api/scripts/execute-manual`,
+  который выполняет saved scripts by UUID.
+- Классифицировать mutating services по risk и safeguards.
+- Добавлять typed wrappers для high-value services только после проверки
+  payload contracts.
 
-## 4. Controlled Writes
+## 4. Управляемая запись
 
-- Keep generic writes disabled by default and gated by
+- Держать generic writes disabled by default и включать только через
   `ALTERIOS_MCP_ALLOW_WRITE=1`.
-- Keep destructive/security generic writes behind the additional
-  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` gate and `allow_destructive=true`.
-- Require explicit `project_id`, verified profile output, and narrow target
-  arguments for write tools.
-- Prefer typed write tools with validation over broad generic write endpoints.
-- Treat generic `alterios_rest_write` as a research/emergency layer, not the
-  normal operator interface.
-- Run `alterios_write_safety_preflight` before any generic REST route that is
-  not already modeled as a typed tool.
-- Expand typed writes by entity family: content/files, views/forms,
-  scripts, BPMN/process/tasks, reports, then security/destructive flows.
-- Add dry-run validation where Alterios supports it, plus request summaries and
-  redacted audit records.
-- Validate writes through API readback and, when relevant, UI-visible behavior.
+- Держать destructive/security generic writes за дополнительным
+  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и `allow_destructive=true`.
+- Требовать явный `project_id`, verified profile output и narrow target
+  arguments.
+- Предпочитать typed write tools с validation, а не broad generic endpoints.
+- Считать `alterios_rest_write` research/emergency layer, а не штатным
+  operator interface.
+- Запускать `alterios_write_safety_preflight` перед generic REST route, который
+  еще не modeled typed tool.
+- Расширять typed writes по entity family: content/files, views/forms,
+  scripts, BPMN/process/tasks, reports, затем security/destructive flows.
+- Добавлять dry-run validation, request summaries и redacted audit records.
+- Подтверждать writes через API readback и, где нужно, UI-visible behavior.
 
-## 5. Browser/UI Discovery
+## 5. Browser/UI discovery
 
-- Capture real UI network flows for list pages, forms, task screens, process
-  actions, reports, dashboards, file fields, and permissions-sensitive flows.
-- Map UI actions to REST endpoints and script-service calls.
-- Use UI discovery to find missing request headers, route variants, encoded
-  filters, and project-context behavior.
-- Verify that API changes match what operators see in the Alterios UI.
+- Снимать реальные UI network flows для list pages, forms, task screens,
+  process actions, reports, dashboards, file fields и permission-sensitive
+  flows.
+- Маппить UI actions на REST endpoints и script-service calls.
+- Использовать UI discovery для missing headers, route variants, encoded
+  filters и project-context behavior.
+- Проверять, что API changes совпадают с тем, что оператор видит в UI.
 
-## 6. Release Packaging
+## 6. Release packaging
 
-- Provide packaged console entry points and MCP server configuration examples.
-- Prefer the installed `alterios-mcp` console script in MCP client configs;
-  keep `python -m alterios_mcp.server` as a fallback.
-- Document private configuration via environment variables and
-  `ALTERIOS_DOTENV_PATH`; do not ship or copy secrets into the repo.
-- Add release smoke tests for config, readonly inventory, project override, and
-  write-gate behavior.
-- Publish versioned artifacts, changelog notes, compatibility notes, and example
-  discovery outputs.
-- Keep docs aligned with implemented tools so production operators can tell what
-  is shipped, experimental, or planned.
+- Дать packaged console entry points и MCP server configuration examples.
+- В MCP client configs предпочитать установленный `alterios-mcp` console
+  script; `python -m alterios_mcp.server` держать как fallback.
+- Документировать private configuration через environment variables и
+  `ALTERIOS_DOTENV_PATH`; secrets не хранить и не копировать в repo.
+- Добавить release smoke tests для config, readonly inventory, project override
+  и write-gate behavior.
+- Публиковать versioned artifacts, changelog notes, compatibility notes и
+  example discovery outputs.
+- Держать docs aligned с implemented tools, чтобы production operators видели,
+  что shipped, experimental или planned.
 
-## 7. Agents And Skills
+## 7. Агенты и skills
 
-- Keep agent roles as a project control layer: PM, Project Base Explorer,
+- Держать agent roles как project control layer: PM, Project Base Explorer,
   Data Model Engineer, View Builder, Form Surface Engineer, UI Icons & Actions
   Reviewer, Script/BPMN Flow Integrator, Report/Stimulsoft Specialist, Write
-  Tool Engineer, Safety Verifier, and Skill Curator.
-- Store the operating contract in `docs/agents-and-skills.md`.
-- Add repo-owned skills only after the relevant workflow is implemented and
-  verified through tests or live sandbox readback.
-- Start with skills for project base inventory, typed write tools,
-  form/view surfaces, BPMN task flow, and Stimulsoft Project Database reports.
-- Do not let skills encode unverified API behavior as fact.
+  Tool Engineer, Safety Verifier и Skill Curator.
+- Хранить operating contract в `docs/agents-and-skills.md`.
+- Добавлять repo-owned skills только после реализации workflow и проверки
+  через tests или live sandbox readback.
+- Стартовый набор skills: project base inventory, typed write tools,
+  form/view surfaces, BPMN task flow и Stimulsoft Project Database reports.
+- Не кодировать в skills непроверенное API behavior как факт.

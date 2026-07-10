@@ -1,11 +1,11 @@
-# Browser/UI Network Flow Discovery
+# Обнаружение UI/HAR-сценариев Alterios
 
-Stage 5 records how the Alterios web UI actually talks to the backend before
-typed write tools are built. The first delivered slice is a local analyzer for
-HAR or JSON network dumps. It is read-only tooling: it does not open a browser,
-does not call Alterios, and does not execute any write.
+Этап 5 фиксирует, как веб-интерфейс Alterios реально обращается к backend до
+добавления новых typed write tools. Первый готовый слой - локальный анализатор
+HAR или JSON-снимков сетевых вызовов. Это read-only инструмент: он сам не
+открывает браузер, не вызывает Alterios и не выполняет запись.
 
-## Command
+## Команда
 
 ```powershell
 python -m alterios_mcp.ui_flow .\capture.har `
@@ -15,106 +15,116 @@ python -m alterios_mcp.ui_flow .\capture.har `
   --json > artifacts\alterios-mcp\ui-flow-content-form-open.json
 ```
 
-The installed console entrypoint is equivalent:
+Установленный console entrypoint делает то же самое:
 
 ```powershell
 alterios-ui-flow .\capture.har --scenario content-form-open --json
 ```
 
-## Supported Inputs
+## Поддерживаемые входные данные
 
-- Browser HAR exports with `log.entries`.
-- Plain JSON event lists with `method`, `url`, optional `headers`, `body`,
-  `status`, and `response_body`.
-- Single JSON event objects for small smoke checks.
+- browser HAR exports с `log.entries`;
+- обычные JSON-списки событий с `method`, `url`, опциональными `headers`,
+  `body`, `status` и `response_body`;
+- один JSON-объект события для малых smoke-check.
 
-Only `/api/...` routes are included in the output. Static assets and other
-browser noise are counted as dropped non-API events.
+В результат попадают только маршруты `/api/...`. Статические assets и другой
+шум браузера считаются отброшенными non-API events.
 
-## Output Contract
+## Контракт результата
 
-The analyzer writes one JSON object:
+Анализатор пишет один JSON-объект:
 
-- `context` - profile, project id, scenario, and source path supplied by the
-  operator.
-- `flows` - ordered route evidence: method, path, query keys, sanitized URL,
-  status, content type, classification, target id placeholders, request body
-  shape, and response shape.
-- `summary` - read route count, write-gated route count, unknown write-like
-  routes, and successful write-like route count.
-- `redaction_report` - counts of redacted headers, redacted fields, redacted
-  query values, omitted bodies, dropped non-API events, and stable placeholder
-  IDs.
+- `context` - профиль, project id, сценарий и путь к исходному файлу;
+- `flows` - упорядоченные route evidence: method, path, query keys,
+  sanitized URL, status, content type, classification, target id placeholders,
+  форма request body и форма response;
+- `summary` - число read route, write-gated route, неизвестных write-like
+  route и успешных write-like route;
+- `redaction_report` - счетчики скрытых headers, fields, query values,
+  пропущенных bodies, отброшенных non-API events и стабильных placeholders.
 
-Target identifiers are replaced with stable placeholders such as `<id:1>` so a
-scenario can still be traced without preserving raw production IDs.
+Целевые идентификаторы заменяются на стабильные placeholders вида `<id:1>`,
+чтобы сценарий оставался трассируемым без сохранения production ID.
 
-## Classification Rules
+## Правила классификации
 
-The classifier is fail-closed for mutating HTTP methods.
+Классификатор fail-closed для мутирующих HTTP-методов.
 
-Confirmed read-only routes:
+Подтвержденные read-only routes:
 
-- `GET|POST /api/*/listandcount`
-- `GET /api/contents...`
-- `POST /api/views/v2/get-data`
-- `POST /api/views/v2/get-data-simplified`
-- `GET /api/file/list`
-- `GET /api/v1/comments`
-- generic `GET`, `HEAD`, and `OPTIONS` calls
+- `GET|POST /api/*/listandcount`;
+- `GET /api/contents...`;
+- `POST /api/views/v2/get-data`;
+- `POST /api/views/v2/get-data-simplified`;
+- `GET /api/file/list`;
+- `GET /api/v1/comments`;
+- generic `GET`, `HEAD` и `OPTIONS`.
 
 Write-gated routes:
 
-- `POST|PATCH|PUT /api/contents/save`
-- `POST /api/file/upload/field`
-- `POST /api/v1/comments`
-- `POST /api/scripts/execute-manual`
-- mutating `/api/tasks`, `/api/processes`, and `/api/diagrams` routes
-- mutating admin/config routes under `/api/forms`, `/api/views`,
-  `/api/scripts`, `/api/reports`, `/api/helps`, `/api/view-fields`, and
-  `/api/view-entities`
-- any unknown `POST`, `PUT`, `PATCH`, or `DELETE`
+- `POST|PATCH|PUT /api/contents/save`;
+- `POST /api/file/upload/field`;
+- `POST /api/v1/comments`;
+- `POST /api/scripts/execute-manual`;
+- мутирующие маршруты `/api/tasks`, `/api/processes` и `/api/diagrams`;
+- мутирующие admin/config routes под `/api/forms`, `/api/views`,
+  `/api/scripts`, `/api/reports`, `/api/helps`, `/api/view-fields` и
+  `/api/view-entities`;
+- любой неизвестный `POST`, `PUT`, `PATCH` или `DELETE`.
 
-`DELETE /api/tasks/complete` is classified as a workflow side effect, not as a
-generic delete, because it advances an operator task/process.
+`DELETE /api/tasks/complete` классифицируется как workflow side effect, а не
+как обычное удаление, потому что он продвигает задачу или процесс оператора.
 
-## Redaction Rules
+## Правила редактирования секретов
 
-The analyzer removes or replaces:
+Анализатор удаляет или заменяет:
 
-- `Authorization`, `Cookie`, `Set-Cookie`, `x-api-key`, and proxy auth headers;
-- query/body keys such as token, password, secret, api key, and authorization;
-- UI content values such as `fields`, comments, rich text, names, titles,
-  filenames, and free text;
+- `Authorization`, `Cookie`, `Set-Cookie`, `x-api-key` и proxy auth headers;
+- query/body keys со словами token, password, secret, api key,
+  authorization;
+- UI content values: `fields`, comments, rich text, names, titles, filenames
+  и свободный текст;
 - multipart upload bodies.
 
-It preserves route order, method/path, query key names, body structure, response
-shape, status code, content type, classification, and stable placeholder IDs.
+Он сохраняет порядок route, method/path, имена query keys, структуру body,
+форму response, status code, content type, classification и стабильные
+placeholders.
 
-## Required Stage 5 Scenarios
+## Обязательные сценарии
 
-Capture each scenario in a scratch/test project first:
+Каждый сценарий сначала снимается в scratch/test project:
 
-1. Open a list and a content form without saving.
-2. Save one scratch content record and read it back.
-3. Upload a small test file through a file field and read metadata back.
-4. Add and delete a scratch comment.
-5. Execute a form action that calls a manual script in dry/test context.
-6. Complete or route a scratch workflow task, with before/after task/process
-   readbacks.
+1. Открыть список и форму content без сохранения.
+2. Сохранить одну scratch content record и прочитать ее обратно.
+3. Загрузить маленький тестовый файл через file field и прочитать metadata.
+4. Добавить и удалить scratch comment.
+5. Выполнить form action, который вызывает manual script в test context.
+6. Завершить или маршрутизировать scratch workflow task с before/after
+   readback по task/process.
+7. Проверить disposable user create/delete только в sandbox, с immediate
+   cleanup и API readback.
+8. Проверить cross-project content type transfer только при наличии
+   согласованного target sandbox project.
 
-For each scenario, keep the raw HAR private, commit only sanitized JSON if it is
-needed as evidence, and ensure `successful_write_like_route_count` matches the
-approved scenario. For read-only scenarios it must be `0`.
+Raw HAR остается приватным. В репозиторий можно коммитить только sanitized
+JSON, если он нужен как evidence. Для read-only scenarios
+`successful_write_like_route_count` должен быть `0`; для write-сценария он
+должен совпадать с заранее одобренным действием.
 
-## Next Typed Write Input
+## Вход для typed write tool
 
-The first production-oriented typed write should be based on sanitized evidence
-for `PATCH /api/contents/save` and should include:
+Production-oriented typed write строится только по sanitized evidence и должен
+содержать:
 
-- preflight read of the target content record;
-- explicit `profile` and `project_id`;
-- content type and field allowlist;
+- preflight read целевого объекта;
+- явные `profile` и `project_id`;
+- content type и field allowlist;
 - dry-run diff;
-- existing controlled write gate;
-- readback verification after execution.
+- controlled write gate;
+- readback verification после выполнения.
+
+Текущий in-app browser connector не отдает raw HAR/network stream напрямую.
+Когда HAR недоступен, evidence фиксируется как UI-visible flow + route snippets
+из frontend bundle + API readback. True HAR в таком случае нужно экспортировать
+из DevTools или отдельного сетевого capture.

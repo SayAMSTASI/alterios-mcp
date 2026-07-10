@@ -1,34 +1,37 @@
-# Profile Smoke Matrix
+# Матрица smoke-проверки профилей
 
-- Generated at: `2026-07-10T09:30:23+00:00`
+- Сформировано: `2026-07-10T09:30:23+00:00`
 - Read-only run: `True`
-- Write gate enabled in environment: `False`
-- Project IDs included: `False`
-- Project names included: `False`
+- Write gate включен в окружении: `False`
+- Project IDs включены: `False`
+- Project names включены: `False`
 
-## Summary
+## Сводка
 
-| Metric | Value |
+| Метрика | Значение |
 |---|---:|
-| Profiles total | 2 |
+| Всего профилей | 2 |
 | Instance project lists OK | 2 |
 | Default project discovery OK | 2 |
 | Default project discovery skipped | 0 |
-| Projects discovered total | 53 |
+| Всего найдено проектов | 53 |
 
-## Profiles
+## Профили
 
 | Profile | Token | Base URL | Default project | Projects | Default route smoke |
 |---|---|---|---|---:|---|
 | artx | <set> | <set> | <set> | 35 | 15/15 OK |
 | vniimt | <set> | <set> | <set> | 18 | 15/15 OK |
 
-## Failures And Skips
+## Ошибки и пропуски
 
-- No failed checks. Some project-scoped discovery may still be skipped when a profile has no default project id.
+- Failed checks нет. Project-scoped discovery может быть пропущен, если у
+  профиля не задан default project id.
 
-## Notes
+## Примечания
 
-- This runner calls only read-only inventory routes.
-- Tokens, auth headers, private dotenv contents, and base URLs are not written to this artifact.
-- Project IDs and names are omitted unless the runner is called with `--include-project-ids` or `--include-project-names`.
+- Runner вызывает только read-only inventory routes.
+- Tokens, auth headers, private dotenv contents и base URLs не записываются в
+  этот artifact.
+- Project IDs и names не включаются, пока runner не вызван с
+  `--include-project-ids` или `--include-project-names`.

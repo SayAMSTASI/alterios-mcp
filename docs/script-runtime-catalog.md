@@ -1,66 +1,66 @@
-# Script Runtime Catalog
+# Каталог runtime-сервисов скриптов
 
-Stage 3 turns script-service names into an explicit runtime catalog. The goal is
-to make every service visible by purpose, arguments, risk, and probe safety
-before any write-capable wrapper is added.
+Этап 3 превращает имена script-service в явный runtime catalog. Цель - сделать
+каждый service видимым по назначению, аргументам, риску и безопасности probe
+до добавления write-capable wrapper.
 
-## Runtime Services Vs Manual Scripts
+## Runtime services и manual scripts
 
-Runtime service names such as `getTasks` and `createContent` are not script
-UUIDs. They must not be sent to `/api/scripts/execute-manual`.
+Runtime service names, например `getTasks` и `createContent`, не являются
+script UUID. Их нельзя отправлять в `/api/scripts/execute-manual`.
 
-`/api/scripts/execute-manual` executes saved Alterios scripts by UUID. The MCP
-client rejects non-UUID runtime service names when the configured endpoint is
-`/api/scripts/execute-manual`.
+`/api/scripts/execute-manual` выполняет сохраненные Alterios scripts по UUID.
+MCP client отклоняет non-UUID runtime service names, если configured endpoint
+указывает на `/api/scripts/execute-manual`.
 
-## Risk Levels
+## Уровни риска
 
-| Risk Level | Meaning |
+| Risk level | Значение |
 |---|---|
-| `read` | Read-only when called through a compatible runtime endpoint. |
-| `write` | Creates or updates Alterios data. Requires write gate and readback verification. |
-| `destructive` | Deletes data. Requires a separate dry-run and explicit target review before any typed tool is added. |
-| `workflow_side_effect` | Starts, advances, or reassigns workflow activity. Requires UI/API verification. |
-| `external_side_effect` | Sends user-visible notifications or other external effects. |
-| `audit_side_effect` | Writes operational logs or other audit-like state. |
+| `read` | Read-only при вызове через совместимый runtime endpoint. |
+| `write` | Создает или обновляет данные Alterios. Требует write gate и readback verification. |
+| `destructive` | Удаляет данные. Требует отдельный dry-run и явный target review до добавления typed tool. |
+| `workflow_side_effect` | Запускает, продвигает или переназначает workflow activity. Требует UI/API verification. |
+| `external_side_effect` | Отправляет видимые пользователю notifications или другие внешние effects. |
+| `audit_side_effect` | Пишет operational logs или похожее audit state. |
 
-## Confirmed Catalog
+## Подтвержденный каталог
 
-| Service | Category | Mutates | Risk | Safe To Probe | Key Args |
+| Service | Категория | Меняет данные | Risk | Safe to probe | Key args |
 |---|---|---:|---|---:|---|
-| `getContents` | contents | No | `read` | Yes | `query` |
-| `getDependentContents` | contents | No | `read` | Yes | `query` |
-| `getTasks` | tasks | No | `read` | Yes | `query` |
-| `getViewData` | views | No | `read` | Yes | `query` |
-| `createContent` | contents | Yes | `write` | No | `content` |
-| `updateContent` | contents | Yes | `write` | No | `content` |
-| `deleteManyContents` | contents | Yes | `destructive` | No | `args` |
-| `createDependentContent` | contents | Yes | `write` | No | `content`, `relatedContentId`, `relatedFieldId` |
-| `startProcess` | processes | Yes | `workflow_side_effect` | No | `diagramId`, `name`, `content`, `startMessageId`, `responseMessageId`, `params`, `contents` |
-| `reassignTask` | tasks | Yes | `workflow_side_effect` | No | `query` |
-| `messageToAnotherProcess` | processes | Yes | `workflow_side_effect` | No | `messageEventsIds`, `processesIds`, `diagramsIds`, `safeMode` |
-| `uploadFile` | files | Yes | `write` | No | `data`, `filename`, `fieldId`, `signal` |
-| `notify` | notifications | Yes | `external_side_effect` | No | `notification` |
-| `writeLog` | logs | Yes | `audit_side_effect` | No | `data`, `severity` |
+| `getContents` | contents | Нет | `read` | Да | `query` |
+| `getDependentContents` | contents | Нет | `read` | Да | `query` |
+| `getTasks` | tasks | Нет | `read` | Да | `query` |
+| `getViewData` | views | Нет | `read` | Да | `query` |
+| `createContent` | contents | Да | `write` | Нет | `content` |
+| `updateContent` | contents | Да | `write` | Нет | `content` |
+| `deleteManyContents` | contents | Да | `destructive` | Нет | `args` |
+| `createDependentContent` | contents | Да | `write` | Нет | `content`, `relatedContentId`, `relatedFieldId` |
+| `startProcess` | processes | Да | `workflow_side_effect` | Нет | `diagramId`, `name`, `content`, `startMessageId`, `responseMessageId`, `params`, `contents` |
+| `reassignTask` | tasks | Да | `workflow_side_effect` | Нет | `query` |
+| `messageToAnotherProcess` | processes | Да | `workflow_side_effect` | Нет | `messageEventsIds`, `processesIds`, `diagramsIds`, `safeMode` |
+| `uploadFile` | files | Да | `write` | Нет | `data`, `filename`, `fieldId`, `signal` |
+| `notify` | notifications | Да | `external_side_effect` | Нет | `notification` |
+| `writeLog` | logs | Да | `audit_side_effect` | Нет | `data`, `severity` |
 
-## Probe Policy
+## Probe policy
 
-Read-only runtime services may be probed only when:
+Read-only runtime services можно probe только если:
 
-- `alterios_config` shows a compatible runtime endpoint template;
-- the selected profile and explicit `project_id` are verified;
-- the request body uses the documented body style for that endpoint;
-- probe arguments are bounded by low limits and do not include writes.
+- `alterios_config` показывает compatible runtime endpoint template;
+- выбранный profile и явный `project_id` проверены;
+- request body использует documented body style для этого endpoint;
+- probe arguments ограничены малыми limits и не содержат writes.
 
-When the endpoint template is `/api/scripts/execute-manual`, runtime service
-probing is considered blocked by configuration, not failed API behavior.
+Если endpoint template равен `/api/scripts/execute-manual`, runtime service
+probing считается blocked by configuration, а не failed API behavior.
 
-## Static Scan Notes
+## Заметки static scan
 
-`alterios-static-scan` detects known services and likely service-like strings.
-Likely strings can include variable names such as `startPayload` or
-`uploadResponse`; do not promote them into the catalog until they are confirmed
-as real runtime services.
+`alterios-static-scan` находит known services и likely service-like strings.
+Likely strings могут быть переменными вроде `startPayload` или
+`uploadResponse`; не переносите их в catalog, пока они не подтверждены как
+реальные runtime services.
 
-The catalog in `src/alterios_mcp/services.py` is the source of truth for known
-runtime services exposed by `alterios_service_catalog`.
+Каталог в `src/alterios_mcp/services.py` - source of truth для known runtime
+services, которые показывает `alterios_service_catalog`.

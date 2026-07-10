@@ -1,48 +1,48 @@
-# Scripts, BPMN diagrams, and report source rules
+# Скрипты, BPMN-диаграммы и правила источников отчетов
 
-Date: 2026-07-10
+Дата: 2026-07-10
 Profile: `artx`
 Project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`
 Base URL: `https://lims.artx.ru`
 
-This is a live research note for the ART X sandbox project. Secrets were not
-printed or stored. The created report is a Codex-managed sandbox object.
+Это live research note по ART X sandbox project. Secrets не печатались и не
+сохранялись. Созданный report - Codex-managed sandbox object.
 
-## Script types
+## Типы скриптов
 
 Live inventory route: `GET /api/scripts/listandcount`.
 
-Observed in this project: 12 scripts.
+В проекте найдено 12 scripts.
 
-| Type | Count | Purpose | Main calls |
+| Type | Count | Назначение | Основные calls |
 |---|---:|---|---|
-| `manual` | 9 | Saved scripts that can be executed explicitly by UUID. | `POST /api/scripts`, `PUT /api/scripts`, `POST /api/scripts/execute-manual` |
-| `event` | 2 | Saved event handlers. They are stored as scripts, but execution is driven by Alterios event bindings, not by runtime service names. | `POST /api/scripts`, `PUT /api/scripts` |
-| `diagram` | 1 | Script used from BPMN/diagram runtime, for example a script task. | `POST /api/scripts`, `PUT /api/scripts` |
+| `manual` | 9 | Saved scripts, которые можно запускать явно по UUID. | `POST /api/scripts`, `PUT /api/scripts`, `POST /api/scripts/execute-manual` |
+| `event` | 2 | Saved event handlers. Хранятся как scripts, но execution идет через Alterios event bindings. | `POST /api/scripts`, `PUT /api/scripts` |
+| `diagram` | 1 | Script для BPMN/diagram runtime, например script task. | `POST /api/scripts`, `PUT /api/scripts` |
 
-Common saved script fields observed for all three types:
+Общие поля saved script для всех трех типов:
 
 - `_id`, `name`, `description`, `type`, `active`, `body`, `share`,
   `config`, `librariesIds`, `projectId`, `version`;
-- `body` is stored as a string;
-- `config` can contain `cron` and, for event/diagram examples, `arguments`;
-- all observed scripts were active.
+- `body` хранится строкой;
+- `config` может содержать `cron`, а для event/diagram примеров - `arguments`;
+- все наблюдаемые scripts были active.
 
-Important split:
+Важное разделение:
 
-- `manual` script execution uses a saved script UUID:
-  `POST /api/scripts/execute-manual` with body
+- `manual` script execution использует saved script UUID:
+  `POST /api/scripts/execute-manual` с body
   `{"_id": "<script-id>", "args": {...}}`;
-- runtime service names such as `getTasks`, `getContents`, `startProcess` are
-  not saved script UUIDs and must not be sent to `/api/scripts/execute-manual`;
-- `event` and `diagram` scripts should be written and validated as metadata,
-  then checked through the event/BPMN flow that invokes them.
+- runtime service names вроде `getTasks`, `getContents`, `startProcess` не
+  являются saved script UUID и не отправляются в `/api/scripts/execute-manual`;
+- `event` и `diagram` scripts нужно писать и валидировать как metadata, а
+  затем проверять через event/BPMN flow, который их вызывает.
 
-## BPMN diagram task inventory
+## Inventory BPMN task nodes
 
 Live inventory route: `GET /api/diagrams/listandcount`.
 
-Observed in this project: 4 diagrams. Parsed BPMN node totals:
+В проекте найдено 4 diagrams. Parsed BPMN node totals:
 
 | BPMN node | Count |
 |---|---:|
@@ -52,29 +52,28 @@ Observed in this project: 4 diagrams. Parsed BPMN node totals:
 | `scriptTask` | 1 |
 | `sequenceFlow` | 12 |
 
-Task-like nodes observed across all diagrams:
+Task-like nodes по всем diagrams:
 
 | Diagram | Task type | Task id | Name | Form key | Outgoing flows |
 |---|---|---|---|---|---|
 | `MCP Practice. BPMN Sandbox` | `userTask` | `Activity_mcp_practice_task` | `MCP Practice task` | `15f5fb26-5db4-4153-8131-23a54411cd63` | `Flow_to_end` / `Complete sandbox task` |
-| `Выбор оборудования` | - | - | No task nodes; start event routes directly to end events. | - | `Flow_1q6pfjy`, `Flow_09534ll` |
+| `Выбор оборудования` | - | - | Нет task nodes; start event идет напрямую к end events. | - | `Flow_1q6pfjy`, `Flow_09534ll` |
 | `Демо HR-маршрутизация. Процесс` | `userTask` | `Activity_stage_1` | `1. Первичная задача` | `a4ceb740-b6bc-462d-9420-a0c374f356a1` | `Flow_to_stage_2` / `Уточнить подразделение` |
 | `Демо HR-маршрутизация. Процесс` | `userTask` | `Activity_stage_2` | `2. Уточнить подразделение` | `a4ceb740-b6bc-462d-9420-a0c374f356a1` | `Flow_to_stage_3` / `Создать задачу МОЛ` |
 | `Демо HR-маршрутизация. Процесс` | `userTask` | `Activity_stage_3` | `3. Выполнение МОЛ` | `a4ceb740-b6bc-462d-9420-a0c374f356a1` | `Flow_stage_3_done` / `Завершить` |
 | `Демо HR-маршрутизация. Процесс` | `scriptTask` | `Activity_complete` | `Отметить завершение` | - | `Flow_to_end` |
 | `Статус согласования отчета` | `userTask` | `Activity_0houqkq` | `Согласование` | `24e1a9c8-552b-4f83-9f56-32e3145db0a6` | `Flow_1brkl7b` / `Согласовано`; `Flow_1acuodu` / `Не согласовано` |
 
-User-task settings observed in XML:
+Observed user-task XML settings:
 
-- `camunda:formKey` links a task to the form opened for work;
-- `camunda:savable="true"` is present on user tasks;
-- `camunda:candidateUsers` and `camunda:candidateGroups` can be empty strings;
-- task completion needs a task id and usually the selected outgoing
-  `nextFlowId`;
-- after `POST /api/processes`, check active tasks through `GET /api/tasks/`
-  and process state through `GET /api/processes/listandcount`.
+- `camunda:formKey` связывает task с form, которая открывается для работы;
+- `camunda:savable="true"` есть на user tasks;
+- `camunda:candidateUsers` и `camunda:candidateGroups` могут быть пустыми;
+- task completion требует task id и обычно selected outgoing `nextFlowId`;
+- после `POST /api/processes` проверять active tasks через `GET /api/tasks/`
+  и process state через `GET /api/processes/listandcount`.
 
-Current typed MCP coverage:
+Текущее typed MCP coverage:
 
 - create/update diagram: `alterios_upsert_bpmn_diagram`;
 - start process: `alterios_start_process`;
@@ -82,9 +81,9 @@ Current typed MCP coverage:
 - complete task: `alterios_complete_task`;
 - validate side effects: `alterios_validate_process_result`.
 
-## Report creation test
+## Тест создания отчета
 
-Created a separate sandbox report:
+Создан отдельный sandbox report:
 
 | Field | Value |
 |---|---|
@@ -95,9 +94,9 @@ Created a separate sandbox report:
 | Source view id | `cfd46277-d8da-4b7d-ba0e-7c96ea85046e` |
 | Source view name | `MCP Practice. Список` |
 
-Validated after save:
+Проверено после save:
 
-| Check | Result |
+| Проверка | Результат |
 |---|---|
 | `/api/reports/full/{filter}` readback | OK |
 | Stimulsoft dashboard page exists | OK |
@@ -106,41 +105,35 @@ Validated after save:
 | Source view name exists in template | OK |
 | `POST /api/views/v2/get-data-simplified` source readback | OK, `row_count=1` |
 
-The source template was copied from the existing managed sandbox report and
-then narrowed to a new marker/report name. The original source report was not
-modified.
+Source template скопирован из существующего managed sandbox report и сужен до
+нового marker/report name. Исходный source report не менялся.
 
-## Report source binding rules
+## Правила подключения report source
 
-Use these rules when connecting an Alterios view as a report source.
-
-1. Treat the Alterios project as the data boundary. Always pass explicit
-   `profile` and `project_id`; do not rely on a stale default project from
-   `.env`.
-2. Verify the source view first:
-   `POST /api/views/v2/get-data-simplified` with
+1. Считать Alterios project границей данных. Всегда передавать явные `profile`
+   и `project_id`; не полагаться на stale default project из `.env`.
+2. Сначала проверять source view:
+   `POST /api/views/v2/get-data-simplified` с
    `{"viewId": "<view-id>", "limit": 5, "offset": 0}`.
-3. Save reports through `/api/reports`:
-   create with `POST /api/reports`, update with `PUT /api/reports`.
-4. Read full reports through:
+3. Сохранять reports через `/api/reports`: create через `POST /api/reports`,
+   update через `PUT /api/reports`.
+4. Читать full reports через:
    `GET /api/reports/full/{encode_filter({"_id": report_id})}`.
-5. Store Stimulsoft dashboard template as JSON in `template`; dashboard page
-   should contain `Pages/0/Ident = StiDashboard`.
-6. The Stimulsoft dictionary must contain a Project Database connection:
+5. Stimulsoft dashboard template хранить JSON в `template`; dashboard page
+   должна содержать `Pages/0/Ident = StiDashboard`.
+6. Stimulsoft dictionary должен содержать Project Database connection:
    `Dictionary.Databases[*].ServiceName = "Project Database"`.
-7. The data source must also reference Project Database and the source view:
+7. Data source тоже должен ссылаться на Project Database и source view:
    `Dictionary.DataSources[*].ServiceName = "Project Database"`,
-   `Alias` or `NameInSource` equal to the Alterios view name.
-8. Keep data source columns synchronized with the view fields. If the view
-   fields or joins change, rebuild or refresh the Stimulsoft data source; do
-   not assume old columns are still valid.
-9. Add a stable `CodexMarker` to the template and a `Codex-managed` marker to
-   the report description before allowing automated updates.
-10. After save, validate both layers: report template structure and live source
-    data via `get-data-simplified`.
+   `Alias` или `NameInSource` равен Alterios view name.
+8. Data source columns должны совпадать с view fields. Если fields или joins
+   изменились, перестройте или refresh Stimulsoft data source.
+9. Добавляйте stable `CodexMarker` в template и `Codex-managed` marker в
+   report description перед automated updates.
+10. После save проверяйте оба слоя: структуру report template и live source
+    data через `get-data-simplified`.
 
-PowerShell note: do not pass Cyrillic expected strings through a plain here
-string in this environment. Use Unicode escapes, for example
-`MCP Practice. \u0421\u043f\u0438\u0441\u043e\u043a`, or read the expected
-name from API data. Plain Cyrillic literals were converted to `??????` and
-caused a false negative in `view_name_matches`.
+PowerShell note: не передавайте Cyrillic expected strings через обычный here
+string в этой среде. Используйте Unicode escapes или читайте expected name из
+API data; plain Cyrillic literals могут превратиться в `??????` и дать false
+negative.

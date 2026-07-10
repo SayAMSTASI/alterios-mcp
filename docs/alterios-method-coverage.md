@@ -16,11 +16,11 @@
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 66 | Публичные callable tools в `src/alterios_mcp/server.py`. |
-| Write-like MCP tools | 31 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 67 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| Write-like MCP tools | 32 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
-| REST route/method patterns in coverage registry | 76 | Read/detail/runtime/write/workflow/file/comment/report/security patterns ниже. |
+| REST route/method patterns in coverage registry | 78 | Read/detail/runtime/write/workflow/file/comment/report/security/content-transfer patterns ниже. |
 | Виды обращений | 13 | Классы операций: от config/read до workflow, files, comments, security. |
 
 Это не означает, что в Alterios больше нет скрытых внутренних endpoint-ов.
@@ -44,10 +44,10 @@ browser/HAR capture и sandbox write-практику.
 | Workflow/process/task | Да | `POST /api/diagrams`, `POST /api/processes`, `GET /api/tasks/`, `DELETE /api/tasks/complete` | Dedicated sandbox BPMN created; process started; user task completed; process readback completed. |
 | Files | Да | `POST /api/file/upload/field`, `GET /api/file/list` | File-field created; multipart upload executed; content value patched; file metadata readback verified. |
 | Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
-| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; role and user-group create/update/delete live-verified in ART X sandbox; user create/delete remains blocked until `/api/users` UI/HAR contract is captured. |
+| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; role and user-group create/update/delete live-verified in ART X sandbox; disposable user create/delete UI/API-verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 66
+## MCP Tools: 67
 
 | Tool | Вид |
 |---|---|
@@ -83,7 +83,8 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_list_comments` | Comment read |
 | `alterios_add_comment` | Controlled comment write |
 | `alterios_upsert_content_type` | Controlled typed content type create/update |
-| `alterios_plan_content_type_publish` | Content type publish/transfer planner; native cross-project transfer blocked until UI/HAR evidence |
+| `alterios_plan_content_type_publish` | Content type publish/transfer planner and safety review with route evidence fields |
+| `alterios_clone_shared_content_type` | Controlled native clone of a shared content type into an explicit target project |
 | `alterios_upsert_field` | Controlled typed field create/update |
 | `alterios_create_content` | Controlled typed content create |
 | `alterios_upsert_group` | Controlled typed menu group create/update |
@@ -129,11 +130,13 @@ and 23 write-like tools. The security/destructive gate pass added
 keeping write-like tools at 23. The security/form/bulk expansion added typed
 read and write wrappers for users, user groups, roles, delete flows, form cell
 listeners, selected-content bulk updates, and content-type publish planning,
-bringing the surface to 66 tools and 31 write-like tools.
+bringing the surface to 66 tools and 31 write-like tools. The UI/HAR evidence
+pass added `alterios_clone_shared_content_type`, bringing the surface to 67
+tools and 32 write-like tools.
 
 Live ART X practice proves that Alterios accepts write routes for content,
 files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 31 tools are
+does **not** mean the MCP operator surface is complete. Today 32 tools are
 write-like, and 2 of them are still broad generic escape hatches:
 
 - `alterios_add_comment` is typed but only covers comments;
@@ -154,8 +157,8 @@ write-like, and 2 of them are still broad generic escape hatches:
   `alterios_delete_user`, `alterios_delete_user_group`, and
   `alterios_delete_role` cover the first typed security/destructive admin
   slice with dangerous gates. Role and user-group create/update/delete now have
-  live sandbox evidence; user create/delete still needs UI/HAR evidence because
-  live `POST /api/users` returns a backend key error;
+  live sandbox evidence; disposable user create/delete now has UI/API evidence,
+  including required `ownerId`, row-menu delete, and cleanup readback;
 - `alterios_upsert_script` and `alterios_execute_manual_script` now cover saved
   script upsert plus manual UUID execution;
 - `alterios_upsert_bpmn_diagram`, `alterios_start_process`,
@@ -167,12 +170,12 @@ write-like, and 2 of them are still broad generic escape hatches:
 - `alterios_call_write_service` and `alterios_rest_write` are broad escape
   hatches, not production-grade entity tools.
 
-Next coverage work must therefore focus on the remaining non-normal surfaces:
+Следующая работа по покрытию должна фокусироваться на оставшихся нетиповых поверхностях:
 
-1. UI/HAR evidence for user creation/deletion, including rollback and
-   user-visible readback;
-2. native cross-project content-type publish/transfer route evidence from UI/HAR
-   before adding an executing native transfer tool;
+1. a dedicated target sandbox project for live cross-project
+   `POST /api/content-types/clone` execution and cleanup/readback;
+2. true raw HAR export for user create/delete and content-type clone if raw
+   network artifacts are required beyond UI/route/API evidence;
 3. rendered Stimulsoft proof for report layouts where visual acceptance matters.
 
 ## Runtime Services: 14
@@ -189,7 +192,7 @@ Next coverage work must therefore focus on the remaining non-normal surfaces:
 Runtime service names are not manual script UUIDs. If the configured endpoint is
 `/api/scripts/execute-manual`, only saved script UUIDs can be executed there.
 
-## REST Route/Method Registry: 76
+## REST Route/Method Registry: 78
 
 Statuses:
 
@@ -283,11 +286,14 @@ Statuses:
 | 74 | PUT | `/api/roles` | Role update fallback variant | `typed_guarded`, `fallback_not_executed` |
 | 75 | DELETE | `/api/roles/{roleId}` | Role delete | `typed_guarded`, `live_write` |
 | 76 | DELETE | `/api/roles` | Role delete fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 77 | GET | `/api/content-types?share=true` | Shared content type visibility from target project | `live_read`, `route_evidence` |
+| 78 | POST | `/api/content-types/clone` | Native shared content type clone into target project | `typed_guarded`, `needs_sandbox_execution` |
 
-## What Counts As "All Types"
+## Что считается всеми видами обращений
 
-We treat coverage as complete by **operation class**, not by pretending to know
-every internal route in advance. A class is considered covered only when it has:
+Покрытие считается закрытым по **классу операции**, а не по предположению, что
+заранее известен каждый внутренний route. Класс считается покрытым только если
+есть:
 
 - at least one known route or service name;
 - risk classification;
@@ -296,12 +302,13 @@ every internal route in advance. A class is considered covered only when it has:
 - readback route;
 - UI verification rule when the result is user-facing.
 
-By that definition, all main operation classes are represented. The not-yet
-closed areas are:
+По этому определению все основные классы операций представлены. Еще не закрыты:
 
-- UI/HAR evidence for disposable user creation/deletion;
-- native cross-project content-type publish/transfer route and payload evidence;
+- raw HAR export for disposable user creation/deletion if raw network artifacts
+  are required beyond UI/API evidence;
+- live native cross-project content-type clone in a dedicated target sandbox
+  with cleanup/readback;
 - rendered Stimulsoft proof for report layouts where visual acceptance matters.
 
-These are deliberately not marked complete until each has a sandbox scenario,
-HAR/API evidence, execution gate, and readback/UI verification.
+Эти пункты намеренно не считаются завершенными, пока для каждого нет
+sandbox-сценария, HAR/API evidence, execution gate и readback/UI verification.

@@ -1,58 +1,67 @@
-# Live write evidence, 2026-07-10
+# Live evidence записи, 2026-07-10
 
 Цель: проверить, что write-first часть MCP реально умеет выполнять запись в
 Alterios, а не только строить dry-run. Проверка выполнялась в тестовом проекте
 ART X.
 
-## Target
+## Цель проверки
 
 - Profile: `artx`.
 - Project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 - Sandbox content type: `572aedf5-500f-4538-82be-ae2170ff174a`,
   `MCP Practice. Песочница`.
-- Write gates for normal writes: `ALTERIOS_MCP_ALLOW_WRITE=1`.
-- Write gates for security/destructive writes:
+- Write gate для обычных writes: `ALTERIOS_MCP_ALLOW_WRITE=1`.
+- Write gates для security/destructive writes:
   `ALTERIOS_MCP_ALLOW_WRITE=1`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`,
   `allow_destructive=true`.
 
-Секреты, токены, cookies, пароли и raw authorization headers в evidence не
+Secrets, tokens, cookies, passwords и raw authorization headers в evidence не
 сохраняются.
 
-## Content type publish flags
+## Publication flags типа материалов
 
-Native save route is verified through the typed tool
-`alterios_upsert_content_type` and API route `/api/content-types/save`.
+Native save route проверен через typed tool `alterios_upsert_content_type` и
+API route `/api/content-types/save`.
 
-Observed frontend bundle evidence:
+Frontend bundle evidence:
 
-- content type create: `POST /api/content-types/save`;
-- content type update: `PATCH /api/content-types/save`;
-- model fields include `share`, `shareCreating`, `shareEditing`,
-  `shareDeleting`;
-- UI toggles directly bind to `shareCreating`, `shareEditing`,
+- create content type: `POST /api/content-types/save`;
+- update content type: `PATCH /api/content-types/save`;
+- model fields: `share`, `shareCreating`, `shareEditing`, `shareDeleting`;
+- UI toggles напрямую bind к `shareCreating`, `shareEditing`,
   `shareDeleting`.
 
 Live execution:
 
-| Step | Result |
+| Шаг | Результат |
 |---|---|
-| Before readback | `share=false`, `shareCreating=false`, `shareEditing=false`, `shareDeleting=false` |
-| Dry-run | Planned only `share`, `shareCreating`, `shareEditing` changes |
+| Readback до записи | `share=false`, `shareCreating=false`, `shareEditing=false`, `shareDeleting=false` |
+| Dry-run | Запланированы только изменения `share`, `shareCreating`, `shareEditing` |
 | Live write | `POST /api/content-types/save`, status `201` |
-| Final readback | `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false` |
+| Финальный readback | `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false` |
 
-`shareDeleting` is intentionally left `false`: this confirms publication for
-visibility/create/edit without expanding destructive cross-project behavior.
+`shareDeleting` намеренно оставлен `false`: это подтверждает публикацию для
+видимости/create/edit без расширения destructive cross-project behavior.
 
-Windows/PowerShell note: one live attempt passed Cyrillic through a lossy
-console pipe and temporarily changed the name suffix to question marks. The
-same typed tool immediately restored the name using Unicode-safe input, and
-final readback confirms `MCP Practice. Песочница`.
+Это native content type flag publishing. Это не является отдельной командой
+копирования типа в другой проект.
 
-This is native content type flag publishing. It is not yet proof of a separate
-cross-project "publish/copy to project" command. The cross-project native flow
-still requires UI/HAR evidence for route, method, payload shape, and target
-readback.
+## Cross-project native transfer evidence
+
+Frontend bundle и API readback подтверждают следующую native-механику:
+
+| Слой | Evidence |
+|---|---|
+| Source publish | `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false` на sandbox type |
+| Shared list | `GET /api/content-types?share=true` возвращает опубликованный `MCP Practice. Песочница` |
+| UI/source route | project UI route для типов материалов: `/workspace/:id/content-types` |
+| Clone route | frontend service вызывает `POST /api/content-types/clone` с body `{id: <content-type-id>}` |
+| Display rule | `allContentTypes()` добавляет `projectName` к имени shared type, если source project отличается |
+
+Live clone в другой проект не выполнялся: в `artx` не найден отдельный проект с
+safe sandbox/test/MCP названием, отличный от исходного project. Клонирование
+создает реальный content type в target project, поэтому без согласованного
+target sandbox это остается gated operation.
 
 ## Role create/update/delete
 
@@ -63,7 +72,7 @@ Typed tools:
 
 Live cycle:
 
-| Step | Route | Status | Evidence |
+| Шаг | Route | Status | Evidence |
 |---|---|---:|---|
 | Create dry-run | `POST /api/roles` | n/a | `risk=security`, `kind=role` |
 | Create live | `POST /api/roles` | `201` | Created/read back `9619ddfd-3f39-48d7-bc3f-791f4149e900` |
@@ -82,7 +91,7 @@ Typed tools:
 
 Live cycle:
 
-| Step | Route | Status | Evidence |
+| Шаг | Route | Status | Evidence |
 |---|---|---:|---|
 | Create dry-run | `POST /api/user-groups` | n/a | `risk=security`, `kind=user_group` |
 | Create live | `POST /api/user-groups` | `201` | Created/read back `a4307928-fbe3-4447-89b2-889b884f7623` |
@@ -92,55 +101,58 @@ Live cycle:
 | Delete live | `DELETE /api/user-groups/a4307928-fbe3-4447-89b2-889b884f7623` | `200` | Delete readback: `deleted=true`, `body=null` |
 | Cleanup scan | `GET /api/user-groups/listandcount` | `200` | Remaining matching groups: `0` |
 
-## User create/delete status
+## User create/delete через UI
 
-Typed tools exist:
+Typed tools существуют:
 
 - `alterios_upsert_user`;
 - `alterios_delete_user`.
 
-Observed frontend bundle evidence:
+Frontend bundle evidence:
 
-- `createUser(a)` calls `POST /api/users`;
-- `updateUser(a)` calls update on `/api/users`;
-- `removeUser(a)` calls remove on `/api/users` with `_id`;
-- project invite uses a separate `POST /api/users/invite` route.
+- `createUser(a)` вызывает `POST /api/users`;
+- `updateUser(a)` вызывает update на `/api/users`;
+- `removeUser(a)` вызывает remove на `/api/users` с `_id`;
+- project invite использует отдельный `POST /api/users/invite`.
 
-Live attempts:
+UI evidence:
 
-| Payload class | Result |
+| Шаг | Результат |
 |---|---|
-| Basic disabled sandbox user without password | `HTTP 500`: key argument received `undefined` |
-| Disabled sandbox user with `password` and `repassword` | Same `HTTP 500` |
-| Cleanup scan by sandbox email prefix | Remaining matching users: `0` |
+| Открыт список | `/control/users`, title `Пользователи` |
+| Открыта форма | `/control/users/new?destination=%2Fcontrol%2Fusers`, поля: `owner`, `firstName`, `lastName`, `email`, `role`, `password`, `repassword`, `apiKey`, `isActive`, `superuser` |
+| Первая попытка без owner | UI/backend error: `ownerId must be a UUID` |
+| Выбор owner | dropdown options: `ArtX`, `ВНИИМТ`, `СВК`; выбран `ArtX` |
+| Create | создан disabled disposable user, redirect на `/control/users/47ac9730-2fa6-4cd2-8078-780f66bd009b?...`, title `Codex UI Disposable` |
+| Список | строка содержит email `codex-ui-user-1783683550097@example.invalid`, status `Заблокирован`, owner `ArtX` |
+| Row menu | actions: `edit / Редактировать`, `Удалить` |
+| Delete confirm | dialog: `Вы действительно хотите удалить «Codex UI Disposable»?`, buttons `Отмена`, `Принять` |
+| Delete result | toast: `«Codex UI Disposable» удален`, строка исчезла из UI |
+| API cleanup readback | `GET /api/users/listandcount`, `remaining_matches=0` по email и id |
 
-Interpretation: the typed tool route is correct, but user creation requires an
-additional backend/UI contract not visible from the current static bundle
-snippet. Until a real UI/HAR create-user capture is available, user create/delete
-must stay guarded and treated as not live-verified. User delete itself cannot be
-live-verified without a successfully created disposable user.
+Вывод: UI-контракт для user create/delete снят. Для корректного create обязателен
+`ownerId`; password/repassword сами по себе недостаточны. Delete выполняется из
+row menu списка, а не с edit page.
 
-## Safety fixes from this run
+## Safety fixes из этого этапа
 
-Two safety issues were corrected after live practice:
-
-- `repassword`, `passwordRecoverCode`, `clientSecret`, and similar key names are
-  now redacted by the common MCP redactor.
-- security upsert audit now strips readback metadata before calculating
-  `target_ids`, so `authorId`, `updatedBy`, `version`, and similar fields do not
-  pollute dangerous-write review.
+- `repassword`, `passwordRecoverCode`, `clientSecret` и похожие key names
+  скрываются common MCP redactor.
+- security upsert audit удаляет readback metadata перед расчетом `target_ids`,
+  поэтому `authorId`, `updatedBy`, `version` и похожие fields не попадают в
+  dangerous-write review.
 
 Targeted tests:
 
-- `tests/test_write_control.py::test_dry_run_audit_redacts_sensitive_request_values`
-- `tests/test_write_control.py::test_security_upsert_audit_strips_readback_metadata_target_ids_without_real_network`
+- `tests/test_write_control.py::test_dry_run_audit_redacts_sensitive_request_values`;
+- `tests/test_write_control.py::test_security_upsert_audit_strips_readback_metadata_target_ids_without_real_network`.
 
-Full verification after documentation/code updates:
+Full verification после documentation/code updates:
 
 - `pytest`: 122 passed;
 - `git diff --check`: OK;
-- `py_compile` for `src/alterios_mcp/client.py` and
+- `py_compile` для `src/alterios_mcp/client.py` и
   `src/alterios_mcp/server.py`: OK;
 - changed-file secret scan: no matches for real token/password patterns;
-- final live readback: sandbox type name and publish flags are correct,
-  remaining Codex test roles/user groups/users are all `0`.
+- final live readback: sandbox type name и publish flags корректны,
+  remaining Codex test roles/user groups/users равны `0`.

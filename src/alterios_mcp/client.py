@@ -274,6 +274,9 @@ class AlteriosClient:
     def list_content_types(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
         return self.request("GET", "/api/content-types/listandcount", params={"limit": limit, "offset": offset})
 
+    def list_shared_content_types(self) -> AlteriosResponse:
+        return self.request("GET", "/api/content-types", params={"share": "true"})
+
     def list_users(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
         return self.request("GET", "/api/users/listandcount", params={"limit": limit, "offset": offset})
 
@@ -357,6 +360,11 @@ class AlteriosClient:
     def save_content_type(self, payload: dict[str, Any]) -> AlteriosResponse:
         return self.request("POST", "/api/content-types/save", body=strip_alterios_metadata(payload))
 
+    def clone_content_type(self, content_type_id: str) -> AlteriosResponse:
+        if not content_type_id.strip():
+            raise ValueError("content_type_id must not be empty")
+        return self.request("POST", "/api/content-types/clone", body={"id": content_type_id})
+
     def save_field(self, payload: dict[str, Any]) -> AlteriosResponse:
         return self.request("POST", "/api/fields/save", body=strip_alterios_metadata(payload))
 
@@ -395,7 +403,9 @@ class AlteriosClient:
         return self.save_resource("roles", payload)
 
     def delete_user(self, user_id: str) -> AlteriosResponse:
-        return self.delete_resource("users", user_id)
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        return self.request("DELETE", "/api/users", body={"_id": user_id})
 
     def delete_user_group(self, user_group_id: str) -> AlteriosResponse:
         return self.delete_resource("user-groups", user_group_id)

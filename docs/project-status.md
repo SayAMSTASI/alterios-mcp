@@ -1,104 +1,60 @@
-# Alterios MCP Project Status
+# Статус проекта Alterios MCP
 
-Last updated: 2026-07-10
+Обновлено: 2026-07-10
 
-## Current Summary
+## Текущая сводка
 
-The project has completed the foundation, multi-instance profile inventory,
-read-only inventory expansion, script runtime catalog, controlled write gates,
-and the first browser/UI discovery tooling slice.
-First controlled live write practice has been completed on the `artx` test
-project `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
-The ARTX project entity surface has been cataloged across metadata, UI,
-runtime data, workflow, files, comments, users, and reports.
-The ARTX sandbox metadata chain now exists as a reproducible practice script:
-content type plus representative fields with dry-run, write gate, and readback.
-The same practice script now covers the sandbox UI/data chain: table view,
-view entity, view fields, add/edit/main forms, menu group, and one content row.
-The same practice script now covers comment write/readback and a visible
-`comments_list` UI block for the sandbox content row.
-The same practice script now covers file-field upload, saved manual script
-creation/execution, sandbox BPMN process/task completion, and dashboard report
-create/update/full-readback.
-Method coverage is now tracked explicitly: 66 MCP tools, 14 runtime services,
-15 live read-only route probes, 76 REST route/method patterns, and 13 operation
-classes.
-Reinventory on 2026-07-10 confirmed the main product gap: ART X project base
-has live evidence for views, forms, scripts, BPMN/process/task side effects,
-files, comments, and reports. Typed-write expansion moved the MCP server from
-4 write-like tools out of 23 total tools to 18 write-like tools out of 43 total
-tools, then the metadata/data write expansion moved it to 23 write-like tools
-out of 50 total tools. The dangerous-write safety pass added a read-only
-preflight classifier moved the MCP surface to 51 tools while keeping write-like
-tools at 23. The security/form/bulk expansion moved it to 66 tools and 31
-write-like tools with typed users/user-groups/roles/delete wrappers, a
-form-cell listener patch tool, selected-content bulk update, and a native
-content-type publish planner.
-The 2026-07-10 script/diagram/report research now records all observed script
-types, all BPMN task-like nodes in the ART X project, and a second sandbox
-dashboard report that proves Project Database source binding rules.
-The report-in-tab UI experiment now embeds a data-bound sandbox report in the
-edit form as a named tab with `params.openId=true`; API checks prove that
-current-record view/report context should be verified as `dataId: [openId]`,
-not `contentId` alone. The embedded viewer render itself remains open because
-the in-app browser currently shows an empty `viewer_*` container even for the
-static report.
-The sandbox source view now has a third idempotent practice row so list views
-and current-record scoping can be rechecked with more than the original two
-rows.
-Stimulsoft report work now has a dedicated layout/analytics playbook plus a
-read-only geometry validator for template overlaps, page overflow, and
-dynamic-height risks before saving or rendering reports.
-Deep inventory now has reproducible scanners and live ART X matrices for
-forms, form actions, scripts, BPMN links, process/task readback counts, and
-iconId usage. The first repo-owned skill set now exists in `skills/` and uses
-these matrices, docs, tools, tests, and live sandbox evidence as its source map.
-The multi-agent operating contract now has a detailed task matrix for PM,
-project-base inventory, material/data modeling, view building, form surfaces,
-UI icons/actions, script/BPMN flows, Stimulsoft reports, write tools, safety
-verification, and skill curation.
-Repo-owned skills have now been forward-tested with read-only subagents,
-improved from the findings, and installed into the local Codex skills directory
-with absolute source-map references back to this repository.
-Profile-level live smoke now has a reusable `alterios-profile-smoke` CLI,
-MCP tool `alterios_profile_smoke_matrix`, and sanitized JSON/Markdown evidence
-for configured Alterios instances.
-Write-first metadata/data work now has typed MCP tools for content types,
-fields, content create, menu groups, and helps, with dry-run diffs, explicit
-profile/project targeting, write gate enforcement, managed-update guards, and
-readback where the API returns an id.
-Security/destructive flows now have a separate dangerous gate:
-`alterios_write_safety_preflight`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, and
-`allow_destructive=true` are required before generic REST/service execution can
-reach destructive or permission-changing routes.
-The multi-agent contract now includes Documentation Scribe / Писарь for
-administrator and user instructions aligned with ГОСТ/ЕСПД and ГОСТ 34, using
-the installed `gost-documentation-builder` skill and a local Alterios playbook.
-The root README is now a user-facing entrypoint: it explains functionality by
-work scenario, safe write gates, profile setup, MCP startup, agents/skills, and
-the next roadmap steps without exposing sensitive project details.
-The administrator guide is now published at `docs/administrator-guide.md` and
-closed the previous documentation stage for operational use. The later explicit
-restart added the security/form/bulk typed-tool layer.
-Expanded user/configurator scenarios are now documented in
-`docs/expanded-user-scenarios.md`, including diagrams, views, menu groups,
-users, user groups, roles, inclusions, files, non-basic actions, form listeners,
-multiple selection, reports, scripts, and content type transfer/publishing
-boundaries.
-The requested typed security/form/bulk layer is now implemented in code:
-users/user-groups/roles read/upsert/delete tools are guarded as `security`,
-form listeners can be patched at one cell path, selected content rows can be
-bulk-updated with per-row preflight, and native content-type publish remains a
-planner until UI/HAR route evidence exists.
-Live write practice on 2026-07-10 now verifies native content type publication
-flags on the sandbox type plus full role and user-group create/update/delete
-cycles with cleanup readback. User create remains backend-blocked by an
-unresolved `/api/users` contract and needs UI/HAR evidence before live delete can
-be verified on a disposable user.
+Завершены foundation, multi-instance profile inventory, read-only inventory,
+каталог runtime-сервисов, controlled write gates и первый слой browser/UI
+discovery tooling. Первая controlled live write practice выполнена на тестовом
+проекте `artx` `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
 
-## Completed
+Поверхность проекта ART X каталогизирована по metadata, UI, runtime data,
+workflow, files, comments, users и reports. Sandbox practice script
+воспроизводит цепочку content type -> fields -> view/form/group -> content row,
+а также comments, file-field upload, saved manual script, BPMN process/task и
+dashboard report create/update/full-readback.
 
-| Stage | Result | Commit | Verification |
+Покрытие методов ведется явно: 67 MCP tools, 14 runtime services, 15 live
+read-only route probes, 78 REST route/method patterns и 13 классов операций.
+После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
+текущая write-поверхность составляет 32 write-like tools. Последний UI/HAR
+evidence pass добавил `alterios_clone_shared_content_type`.
+
+По script/diagram/report research зафиксированы все наблюдаемые типы scripts,
+все BPMN task-like nodes проекта ART X и правила Project Database source
+binding для Stimulsoft reports. Report-in-tab эксперимент показал, что
+current-record context нужно проверять через `dataId: [openId]`, а не через
+один `contentId`; визуальный render embedded viewer остается отдельным риском,
+потому что in-app browser показывает пустой `viewer_*` container.
+
+Для форм, form actions, scripts, BPMN links, process/task readback и iconId
+usage есть воспроизводимые deep-inventory scanners и live ART X matrices.
+Первый repo-owned skill set установлен в локальный каталог Codex skills; skills
+ссылаются на матрицы, docs, tools, tests и live sandbox evidence.
+
+Мультиагентный контур включает роли PM, project-base inventory, material/data
+modeling, view building, form surfaces, UI icons/actions, script/BPMN flows,
+Stimulsoft reports, write tools, safety verification, skill curation и
+Documentation Scribe / Писарь для ГОСТ-ориентированных инструкций.
+
+README и administrator guide опубликованы как русские пользовательские точки
+входа. Expanded user/configurator scenarios описывают diagrams, views, menu
+groups, users, user groups, roles, inclusions, files, non-basic actions, form
+listeners, multiple selection, reports, scripts и content type
+transfer/publishing boundaries.
+
+Security/destructive flows имеют отдельный dangerous gate:
+`alterios_write_safety_preflight`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и
+`allow_destructive=true` обязательны перед destructive или permission-changing
+routes. Disposable user create/delete проверен через Alterios UI и независимый
+API cleanup readback. Cross-project content-type transfer имеет route evidence
+для shared-list visibility и clone, но live clone остается gated до появления
+отдельного target sandbox project.
+
+## Завершено
+
+| Этап | Результат | Commit | Проверка |
 |---|---|---|---|
 | 1. Foundation and safety | MCP package scaffold, profile model, project override, secret redaction, guarded writes, static scanner, base docs. | `f4d1b5d` | `pytest`: 18 passed; live project list: 18 projects; live readonly discovery: 11/11 OK; static scan: 143 API paths and 33 services; secret scan clean. |
 | 2. Read-only inventory expansion | Added typed read-only tools for report, view, form, fields, groups, file metadata, comments, and generic view data context. Discovery matrix expanded to 15 routes. | `3821ef7` | `pytest`: 25 passed; live `vniimt` discovery: 15/15 OK; live typed checks OK for view/form/report/fields/groups/comments/file metadata; secret scan clean. |
@@ -137,26 +93,27 @@ be verified on a disposable user.
 | Docs. Expanded user scenarios | Added `docs/expanded-user-scenarios.md` and linked it from README. The document expands scenarios for diagrams, views, groups, users, user groups, roles, inclusions, files, actions, listeners, multiple selection, reports, scripts, and content type transfer/publishing, while marking security/destructive and native publish gaps as evidence-required. | `8edd21a` | `pytest`: 115 passed; README/scenarios link check OK; `git diff --check` OK; README/scenarios secret scan clean; no live write executed. |
 | Build. Typed security/form-listener/bulk tools | Added typed users/user-groups/roles read/upsert/delete tools, `alterios_patch_form_cell_listeners`, `alterios_bulk_update_selected_content_fields`, and `alterios_plan_content_type_publish`. | `805b405` | `pytest`: 121 passed; `py_compile` for client/server OK; no-network tests cover security classification, dangerous gate enforcement, delete path audit, listener patching, bulk selected-row diff, and native publish blocking without UI/HAR evidence. No live security/delete write executed. |
 | Practice. Live security/delete and publish evidence | Verified sandbox content type publication flags, role create/update/delete, user-group create/update/delete, cleanup readback, and documented the remaining user-create backend contract gap. Also fixed redaction for `repassword`-style fields and stripped readback metadata from security audit target IDs. | `63b5d08` | Live `artx` writes: `/api/content-types/save` status `201`, final flags `share=true`, `shareCreating=true`, `shareEditing=true`, `shareDeleting=false`; `/api/roles` create `201`, update `200`, delete `200`, remaining roles `0`; `/api/user-groups` create `201`, update `200`, delete `200`, remaining groups `0`; user create attempts returned backend `HTTP 500` and cleanup scan found `0` sandbox users. Targeted tests for redaction/audit fixes passed. Evidence: `docs/live-write-evidence-2026-07-10.md`. |
+| Practice. UI user/delete and content-type transfer evidence | Captured UI-visible disposable user create/delete flow, API cleanup readback, frontend route evidence for user routes, and native content-type shared-list/clone route evidence. Translated key docs to Russian and documented multi-instance applicability. | pending | UI live: user form required `ownerId`; selecting `ArtX` created disabled user `47ac9730-2fa6-4cd2-8078-780f66bd009b`; row menu delete confirmed and cleanup `GET /api/users/listandcount` returned `remaining_matches=0`. Content-type transfer evidence: `GET /api/content-types?share=true` shows the published sandbox type and frontend service calls `POST /api/content-types/clone`; live clone not executed without a target sandbox project. |
 
-## Active Stage
+## Активный этап
 
-| Stage | Status | Owner | Acceptance Criteria |
+| Этап | Статус | Ответственный | Критерии приемки |
 |---|---|---|---|
-| 13. Security/form/bulk typed-tool expansion | Done | Lead Engineer + Safety Verifier | Typed security admin tools, form listener patch, selected-content bulk update, and content-type publish planner are implemented. Role/user-group security writes and deletes plus sandbox content-type publish flags are live-verified; user create/delete and cross-project native transfer remain evidence-gated. |
+| 14. UI/HAR write evidence and Russian docs | In Progress | Lead Engineer + Safety Verifier | Disposable user create/delete is UI/API verified; content-type cross-project transfer route evidence is documented; docs/Markdown is translated to Russian; tests, secret scan, commit and push remain. |
 
-## Backlog
+## Бэклог
 
-| Priority | Task | Status | Notes |
+| Приоритет | Задача | Статус | Примечания |
 |---:|---|---|---|
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
 | 1 | Add typed metadata/data create tools for content types, fields, content rows, groups, and helps. | Done | Implemented with dry-run diff, explicit `profile/project_id`, write gate, managed-update guard, target mismatch checks, and readback where the API returns an id. Unit-tested without live writes. |
 | 1 | Add separate dangerous write gate for security/destructive flows. | Done | `alterios_write_safety_preflight` classifies generic REST routes; `alterios_rest_write` and destructive services now require both `ALTERIOS_MCP_ALLOW_WRITE=1` and `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` plus `allow_destructive=true` for dangerous execution. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
-| 1 | Add typed users/user-groups/roles/delete tools. | Done | Implemented as dangerous `security` tools with dry-run, expected-name/email checks, dangerous env gate, `allow_destructive`, and readback. Role and user-group create/update/delete are live-verified in the ART X sandbox. User create remains backend-blocked by an unresolved `/api/users` contract, so user delete is not live-verified yet. |
+| 1 | Add typed users/user-groups/roles/delete tools. | Done | Implemented as dangerous `security` tools with dry-run, expected-name/email checks, dangerous env gate, `allow_destructive`, and readback. Role and user-group create/update/delete are live-verified in the ART X sandbox. Disposable user create/delete is UI/API verified; production use still requires sandbox plan and dangerous gates. |
 | 1 | Add separate form-listener tool. | Done | `alterios_patch_form_cell_listeners` patches only `tabs[tab].rows[row].cells[cell].emitting.listeners` with managed-form guard and readback. Unit-tested without live write. |
 | 1 | Add bulk selection tool. | Done | `alterios_bulk_update_selected_content_fields` updates selected content rows with duplicate/count/max guards, per-row preflight, diff, and readback. Unit-tested without live write. |
-| 1 | Add native content-type publish support. | Partial | Sandbox publication flags are live-verified through `/api/content-types/save` (`share`, `shareCreating`, `shareEditing`; `shareDeleting` intentionally left false). Cross-project native publish/transfer is still planner-only until UI/HAR route, method, payload shape, and target readback rules are captured. |
+| 1 | Add native content-type publish support. | Partial | Sandbox publication flags are live-verified through `/api/content-types/save` (`share`, `shareCreating`, `shareEditing`; `shareDeleting` intentionally left false). Cross-project native transfer route evidence is captured: shared list uses `GET /api/content-types?share=true`, clone uses `POST /api/content-types/clone`. Live clone remains gated until a target sandbox project and cleanup/readback plan exist. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | Deferred | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. Deferred because current development is being closed. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
@@ -171,31 +128,30 @@ be verified on a disposable user.
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
 
-## Current Risks
+## Текущие риски
 
-| Risk | Mitigation |
+| Риск | Митигация |
 |---|---|
 | Runtime service endpoint compatibility is blocked in the current `vniimt` config because the endpoint template is `/api/scripts/execute-manual`. | Keep runtime service names cataloged only; do not treat them as executable through manual-script UUID endpoint. |
 | Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; dangerous routes additionally require `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` and `allow_destructive=true`. |
-| Remaining risky surfaces are user create/delete and cross-project native content-type transfer, not absence of typed wrappers. | Keep users/user-groups/roles/destructive deletes behind dry-run, typed target checks, explicit dangerous gate, sandbox-only execution, rollback plan, and UI/readback verification. Role and user-group cycles are live-verified; disposable user creation still needs UI/HAR evidence because `/api/users` currently returns a backend key error. |
+| Remaining risky surface is live cross-project native content-type clone into a target project, not absence of route evidence. | Keep clone behind explicit target sandbox, dry-run review, expected source/target checks, cleanup/readback plan, and no production execution until verified. Users/user-groups/roles/destructive deletes stay behind dangerous gates and expected target checks. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
-| Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
+| Raw HAR artifacts are still not exported from the in-app connector, although UI-visible flow, route snippets, and API readback are captured. | Use sanitized DevTools HAR export only if raw network artifacts become a hard acceptance requirement; keep route/API evidence in docs for normal MCP gating. |
 | Embedded report viewer currently renders an empty `viewer_*` container in the in-app browser, including for the static report that previously rendered. | Treat report template/API readback as verified, but keep data-bound report visual proof open until renderer/network behavior is diagnosed and the static report renders again. |
 | Generic REST write remains a broad escape hatch for route shapes not yet modeled as typed tools. | Prefer typed metadata/data, content/file, view/form, script/BPMN/task, and report tools; keep generic writes for deliberate one-off discovery with explicit gates and readback. |
 
-## Next Concrete Actions
+## Следующие действия
 
 No active feature development remains in the current stage after the typed
 security/form/bulk expansion. Future work requires an explicit restart decision.
 
 Deferred candidates:
 
-1. Capture UI/HAR/API evidence for user creation/deletion in a dedicated
-   sandbox, including rollback and UI-visible readback, before marking
-   `alterios_upsert_user` and `alterios_delete_user` live-verified.
-2. Capture UI/HAR/API evidence for native content type publish/transfer if the
-   Alterios UI exposes such a flow; until then use controlled source-to-target
-   reproduction across explicit projects.
+1. Create or designate a dedicated target sandbox project for live
+   `POST /api/content-types/clone` verification and cleanup/readback.
+2. Export true HAR from DevTools for user create/delete and content-type clone
+   if raw HAR artifacts are required; the current connector provided UI/route/API
+   evidence but not raw network stream.
 3. Expand form-listener coverage only after additional listener event shapes and
    payloads are inventoried from live forms.
 4. Expand Stimulsoft validator with rendered PDF/image comparison once export
@@ -203,7 +159,7 @@ Deferred candidates:
 5. Start release packaging and changelog process if the repository is prepared
    for a tagged release.
 
-## PM Update Checklist
+## Чек-лист обновления PM
 
 - Update this file after every pushed stage.
 - Record commit hashes, not only task names.

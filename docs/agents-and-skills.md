@@ -1,4 +1,4 @@
-# Agents And Skills Plan
+# План агентов и skills
 
 Этот документ задает рабочий контракт для мультиагентного режима в
 `alterios-mcp`. Агенты не заменяют MCP tools: они разделяют исследование,
@@ -16,7 +16,7 @@
 - Live write разрешается только через Lead Engineer gate: явный `profile`,
   явный `project_id`, dry-run, `ALTERIOS_MCP_ALLOW_WRITE=1`, readback.
 
-## Agent Task Matrix
+## Матрица задач агентов
 
 | Agent | Когда подключать | Основные задачи | Входы | Выходы | Пишет код/данные |
 |---|---|---|---|---|---:|
@@ -34,7 +34,7 @@
 | Safety Verifier | Перед признанием результата verified | Проверить profile/project, secret redaction, no leaked tokens, dry-run/write gate, unit tests, diff check, live readback, UI/HAR evidence где нужно | Патчи, команды, live target, expected result | Verification report, residual risks, fail/pass | Нет |
 | Skill Curator | После того как workflow доказан кодом или live sandbox | Создать/обновить repo-owned skill: triggers, workflow, safety rules, references, examples; убрать дублирование с другими skills | Проверенные docs/tools/matrices | `skills/<name>/SKILL.md`, refs, agent config | Да, scoped |
 
-## Agent Details
+## Детализация агентов
 
 ### PM Control Loop
 
@@ -144,7 +144,7 @@ Done:
 - нет текстовых кнопок там, где ожидается компактная иконка;
 - delete не спутан с archive/close, view не спутан с edit.
 
-### Script/BPMN Flow Integrator
+### Интегратор Script/BPMN Flow
 
 Задачи:
 
@@ -162,7 +162,7 @@ Done:
 - task flow можно повторить в sandbox;
 - опасные side effects явно помечены до write.
 
-### Report/Stimulsoft Specialist
+### Специалист по отчетам и Stimulsoft
 
 Задачи:
 
@@ -313,7 +313,7 @@ Done:
 4. Safety Verifier проверяет dry-run/write-gate/readback/redaction.
 5. Lead Engineer мержит, коммитит, пушит.
 
-## Repo-Owned Skills
+## Skills из репозитория
 
 Skills добавляются только после того, как соответствующий workflow уже проверен
 кодом или live sandbox. Иначе skill начнет закреплять догадки.
@@ -350,7 +350,7 @@ skills/<skill-name>/
   references/
 ```
 
-## Handoff Format
+## Формат передачи результата
 
 Каждый агент должен возвращать результат в одном формате:
 
@@ -360,9 +360,9 @@ Scope:
 Inputs:
 Findings:
 Artifacts:
-Verification:
-Risks:
-Next:
+Проверка:
+Риски:
+Дальше:
 ```
 
 Минимальные требования:

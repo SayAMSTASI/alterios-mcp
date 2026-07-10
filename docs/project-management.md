@@ -1,76 +1,81 @@
-# Multi-Agent Project Management
+# Управление проектом и мультиагентный контур
 
-This project uses a lightweight PM control loop so multi-agent work stays
-visible, reviewable, and tied to verified outcomes.
+Проект использует легкий PM control loop, чтобы работа нескольких агентов была
+видимой, проверяемой и привязанной к подтвержденным результатам.
 
-## Roles
+## Роли
 
-| Role | Responsibility | Writes Code |
+| Роль | Ответственность | Пишет код |
 |---|---|---:|
-| Lead Engineer | Owns final integration, verification, commits, and pushes. | Yes |
-| PM Agent | Maintains task status, stage boundaries, risks, decisions, and next actions. | No |
-| Explorer Agent | Answers bounded codebase/API questions with evidence and file references. | No |
-| Worker Agent | Implements a bounded task with an explicit file ownership scope. | Yes |
-| Verifier Agent | Runs independent checks, reviews risk areas, and reports gaps. | No |
-| Documentation Scribe Agent | Prepares administrator/user instructions and ГОСТ/ЕСПД documentation from verified sources. | No |
+| Lead Engineer | Финальная интеграция, проверки, commit и push. | Да |
+| PM Agent | Статус задач, границы этапов, риски, решения и следующие действия. | Нет |
+| Explorer Agent | Ограниченные вопросы по codebase/API с evidence и ссылками на файлы. | Нет |
+| Worker Agent | Реализация ограниченной задачи в заранее заданной зоне файлов. | Да |
+| Verifier Agent | Независимые проверки, обзор рисков и отчет о gaps. | Нет |
+| Documentation Scribe / Писарь | Инструкции администратора/пользователя и ГОСТ/ЕСПД-документация по проверенным источникам. | Нет |
 
-The Lead Engineer is accountable for the final repository state. Subagents can
-recommend or patch, but their work is integrated only after review and checks.
+Lead Engineer отвечает за итоговое состояние репозитория. Subagents могут
+предлагать правки или патчи, но их работа включается только после review и
+проверок.
 
-## Control Artifacts
+## Контрольные артефакты
 
-- `docs/project-status.md` is the single current status board.
-- `docs/roadmap.md` is the durable delivery roadmap.
-- `docs/discovery-plan.md` is the endpoint and inventory strategy.
-- `docs/gost-documentation-scribe-agent.md` is the local playbook for
-  administrator/user instructions and ГОСТ-oriented documentation.
-- Commit messages mark completed slices.
-- Verification evidence is summarized in status updates and final answers.
+- `docs/project-status.md` - текущая status board.
+- `docs/roadmap.md` - durable delivery roadmap.
+- `docs/discovery-plan.md` - стратегия endpoint discovery и inventory.
+- `docs/gost-documentation-scribe-agent.md` - локальный playbook для
+  инструкций администратора/пользователя и ГОСТ-oriented документации.
+- Commit messages фиксируют завершенные slices.
+- Verification evidence суммируется в status updates и final answers.
 
-## Stage Gate
+## Stage gate
 
-Every stage must have:
+Каждый этап должен иметь:
 
-- scope and intended outcome;
+- scope и ожидаемый outcome;
 - owner role;
 - acceptance criteria;
-- verification commands or live smoke checks;
-- risks or blocked items;
-- a commit hash after completion.
+- verification commands или live smoke checks;
+- risks или blocked items;
+- commit hash после завершения.
 
-A task is not `Done` until its code/docs are committed and the relevant checks
-pass, or the status explicitly says what could not be verified.
+Задача не считается `Done`, пока code/docs не закоммичены и нужные проверки не
+прошли, либо статус явно не говорит, что именно не удалось проверить.
 
-## Status Vocabulary
+## Статусы
 
-| Status | Meaning |
+| Статус | Значение |
 |---|---|
-| Done | Implemented, verified, committed, and pushed. |
-| In Progress | Currently being implemented or verified. |
-| Next | Ready to start after the active task. |
-| Blocked | Cannot move without user input or external state change. |
-| Deferred | Valid work, intentionally postponed. |
-| Risk | Known uncertainty that needs mitigation before release. |
+| Done | Реализовано, проверено, закоммичено и отправлено в remote. |
+| In Progress | Сейчас реализуется или проверяется. |
+| Next | Готово к старту после активной задачи. |
+| Blocked | Нужен пользовательский input или внешнее изменение состояния. |
+| Deferred | Валидная работа, осознанно отложена. |
+| Risk | Известная неопределенность, которую надо закрыть до release. |
 
-## Multi-Agent Operating Rules
+## Правила мультиагентной работы
 
-- Spawn agents only for bounded work that can run in parallel.
-- Give each Worker Agent an explicit file or module ownership scope.
-- Tell every Worker Agent that other changes may exist and must not be
-  reverted.
-- Keep PM Agent read-only unless explicitly asked to edit project documents.
-- Close completed agents so no stale work remains open.
-- Do not use subagent output as proof until the Lead Engineer verifies it.
+- Запускать agents только для bounded work, которую можно выполнять
+  параллельно.
+- Давать каждому Worker Agent явную file/module ownership scope.
+- Предупреждать Worker Agent, что в дереве могут быть чужие изменения и их
+  нельзя откатывать.
+- PM Agent остается read-only, если его явно не попросили менять проектные
+  документы.
+- Завершенных agents закрывать, чтобы не оставались stale work items.
+- Не использовать subagent output как proof, пока Lead Engineer сам его не
+  проверит.
 
-## Reporting Cadence
+## Ритм отчетности
 
-At the end of every implementation stage, update `docs/project-status.md` with:
+В конце каждого implementation stage обновлять `docs/project-status.md`:
 
-- completed work;
+- что сделано;
 - commit hash;
-- checks run and result;
-- live-smoke result when applicable;
-- new risks;
-- next stage and first concrete tasks.
+- какие проверки запущены и с каким результатом;
+- live-smoke result, если применимо;
+- новые risks;
+- следующий этап и первые конкретные задачи.
 
-For long stages, update the status board after each meaningful mergeable slice.
+Для длинных этапов status board обновляется после каждого meaningful
+mergeable slice.

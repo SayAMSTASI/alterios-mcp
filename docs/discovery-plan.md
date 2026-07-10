@@ -1,78 +1,76 @@
-# Alterios MCP Discovery Plan
+# План discovery для Alterios MCP
 
-Discovery must produce a reusable production inventory of an Alterios instance,
-not a one-off MVP probe. Each run separates confirmed runtime behavior from
-assumptions, preserves secret hygiene, and records the exact profile and
-project context used.
+Discovery должен давать переиспользуемую production inventory экземпляра
+Alterios, а не одноразовый MVP-probe. Каждый запуск отделяет подтвержденное
+runtime behavior от предположений, соблюдает secret hygiene и записывает точный
+profile/project context.
 
-## Scope Model
+## Модель scope
 
-- `profile` means one Alterios instance: base URL, auth, script endpoint, body
-  style, and timeout settings.
-- An instance can contain many projects.
-- `project_id` is call context. Project-scoped tools accept explicit
-  `project_id` and use `ALTERIOS_<PROFILE>_PROJECT_ID` only as an optional
-  default.
-- Multiple instances are configured as multiple profiles in one private dotenv
-  file. Use `ALTERIOS_PROFILES` for an explicit registry or rely on
-  `ALTERIOS_<PROFILE>_*` auto-discovery.
-- Profile inventory is read locally with `alterios_list_profiles` or
-  `python -m alterios_mcp.discovery --profiles --json`; it must not make
-  network calls or expose API tokens.
-- `--profiles --profile <name>` and `alterios_list_profiles(profile=...)` only
-  change which profile is marked as selected in the inventory output; they do
-  not rewrite dotenv state.
-- Instance-scoped discovery, especially project listing, must work without a
+- `profile` - один экземпляр Alterios: base URL, auth, script endpoint, body
+  style и timeout settings.
+- Один экземпляр может содержать много проектов.
+- `project_id` - контекст вызова. Project-scoped tools принимают явный
+  `project_id` и используют `ALTERIOS_<PROFILE>_PROJECT_ID` только как
+  optional default.
+- Несколько экземпляров настраиваются как несколько profiles в одном приватном
+  dotenv. Используйте `ALTERIOS_PROFILES` или auto-discovery переменных
+  `ALTERIOS_<PROFILE>_*`.
+- Profile inventory читается локально через `alterios_list_profiles` или
+  `python -m alterios_mcp.discovery --profiles --json`; это не должно делать
+  network calls и не должно показывать API tokens.
+- `--profiles --profile <name>` и `alterios_list_profiles(profile=...)`
+  только помечают выбранный profile в output, но не переписывают dotenv.
+- Instance-scoped discovery, особенно project listing, должно работать без
   project id.
-- Secrets are loaded from environment variables or `ALTERIOS_DOTENV_PATH`; they
-  are not copied into this repository or discovery artifacts.
+- Secrets загружаются из environment variables или `ALTERIOS_DOTENV_PATH`; они
+  не копируются в репозиторий и discovery artifacts.
 
-## Discovery Stages
+## Этапы discovery
 
 1. Foundation and safety:
-   - Confirm selected profile with `alterios_config`.
-   - Confirm available instance profiles with `alterios_list_profiles`.
-   - Verify redaction of auth headers, tokens, passwords, and API keys.
-   - Verify missing-value diagnostics for instance, project, and script calls.
-   - Confirm explicit `project_id` overrides the optional env default.
+   - проверить выбранный profile через `alterios_config`;
+   - проверить доступные instance profiles через `alterios_list_profiles`;
+   - проверить redaction auth headers, tokens, passwords и API keys;
+   - проверить diagnostics для отсутствующих instance/project/script values;
+   - подтвердить, что явный `project_id` перекрывает optional env default.
 2. Complete read-only inventory:
-   - List projects at the instance level.
-   - For each target project, inventory content types, fields, views, forms,
-     scripts, diagrams, contents, tasks, processes, reports, and view data
-     smoke checks.
-   - Capture pagination, filter shape, response shape, status code, and error
-     shape for every route.
-   - Save JSON artifacts without secrets.
+   - сначала получить список projects на уровне instance;
+   - для каждого target project собрать content types, fields, views, forms,
+     scripts, diagrams, contents, tasks, processes, reports и view data smoke;
+   - записать pagination, filter shape, response shape, status code и error
+     shape для каждого route;
+   - сохранить JSON artifacts без secrets.
 3. Static source inventory:
-   - Run `python -m alterios_mcp.static_scan <repo> --json`.
-   - By default, skip generated/bulky directories such as `artifacts`, `data`,
-     `outputs`, `site`, and `work`.
-   - Use `--include-generated` only for an intentional full scan.
+   - запустить `python -m alterios_mcp.static_scan <repo> --json`;
+   - по умолчанию пропускать generated/bulky directories: `artifacts`, `data`,
+     `outputs`, `site`, `work`;
+   - `--include-generated` использовать только для намеренного full scan.
 4. Script runtime catalog:
-   - Catalog script-service functions by category, arguments, permissions, and
-     mutation risk.
-   - Probe read-only services first.
-   - Record required body style, endpoint template behavior, and response
-     shapes per instance.
-   - Keep `/api/scripts/execute-manual` separate from runtime service names:
-     execute-manual requires a saved script UUID.
-   - Keep mutating functions disabled until controlled-write gates exist.
+   - каталогизировать script-service functions по category, arguments,
+     permissions и mutation risk;
+   - сначала probe read-only services;
+   - записать body style, endpoint template behavior и response shapes по
+     instance;
+   - держать `/api/scripts/execute-manual` отдельно от runtime service names:
+     execute-manual требует saved script UUID;
+   - mutating functions держать disabled до controlled-write gates.
 5. Controlled writes:
-   - Require `ALTERIOS_MCP_ALLOW_WRITE=1`.
-   - Require verified profile and explicit `project_id`.
-   - Add narrow, typed write tools before broad generic writes.
-   - Record request/response audit data with secrets redacted.
-   - Prefer idempotent helpers, dry-run validation, and test projects.
+   - требовать `ALTERIOS_MCP_ALLOW_WRITE=1`;
+   - требовать verified profile и явный `project_id`;
+   - добавлять narrow typed write tools до broad generic writes;
+   - писать request/response audit с redaction;
+   - предпочитать idempotent helpers, dry-run validation и test projects.
 6. Browser/UI discovery:
-   - Capture real UI network flows for lists, forms, tasks, reports,
-     dashboards, files, and process actions.
-   - Map UI actions to REST routes or script-service calls.
-   - Compare UI-visible behavior with API readbacks.
+   - снимать реальные UI network flows для lists, forms, tasks, reports,
+     dashboards, files и process actions;
+   - маппить UI actions на REST routes или script-service calls;
+   - сравнивать UI-visible behavior с API readbacks.
 7. Release packaging:
-   - Publish MCP configuration examples, private dotenv guidance, smoke-check
-     commands, compatibility notes, and versioned release artifacts.
+   - публиковать MCP config examples, private dotenv guidance, smoke-check
+     commands, compatibility notes и versioned release artifacts.
 
-## Current Read-Only REST Route Catalog
+## Текущий read-only REST route catalog
 
 | Name | Scope | Method | Path | Tool |
 |---|---|---|---|---|
@@ -93,63 +91,62 @@ project context used.
 | helps | project | GET | `/api/helps` | `alterios_list_objects` |
 | view_data_simplified | project | POST | `/api/views/v2/get-data-simplified` | `alterios_view_data_simplified` |
 
-## Typed Read-Only Inventory Tools
+## Typed read-only inventory tools
 
-These tools use confirmed Alterios REST patterns but require caller-provided
-IDs, so they are not part of the route matrix probe:
+Эти tools используют подтвержденные Alterios REST patterns, но требуют
+caller-provided IDs, поэтому не входят в route matrix probe:
 
-- `alterios_report_full` - `GET /api/reports/full/{encode_filter({"_id": id})}`.
-- `alterios_get_view` - `GET /api/views/{view_id}`.
-- `alterios_get_form` - `GET /api/forms/{form_id}`.
-- `alterios_view_entities` - `GET /api/view-entities/by-view/{view_id}`.
-- `alterios_view_fields_populated` - `GET /api/view-fields/populated/{view_id}`.
-- `alterios_file_metadata` - `GET /api/file/list?id=...`.
-- `alterios_list_comments` - `GET /api/v1/comments` with `entity`,
-  `entityId`, `limit`, `depth`, and `page`.
-- `alterios_view_data` - `POST /api/views/v2/get-data` with optional
-  `contentId`, array `dataId`, and `userFilters`.
+- `alterios_report_full` - `GET /api/reports/full/{encode_filter({"_id": id})}`;
+- `alterios_get_view` - `GET /api/views/{view_id}`;
+- `alterios_get_form` - `GET /api/forms/{form_id}`;
+- `alterios_view_entities` - `GET /api/view-entities/by-view/{view_id}`;
+- `alterios_view_fields_populated` - `GET /api/view-fields/populated/{view_id}`;
+- `alterios_file_metadata` - `GET /api/file/list?id=...`;
+- `alterios_list_comments` - `GET /api/v1/comments` с `entity`,
+  `entityId`, `limit`, `depth` и `page`;
+- `alterios_view_data` - `POST /api/views/v2/get-data` с optional
+  `contentId`, array `dataId` и `userFilters`.
 
-## Current Script-Service Catalog
+## Текущий script-service catalog
 
-The source of truth is `src/alterios_mcp/services.py`; the operator-facing
-catalog is documented in [script-runtime-catalog.md](script-runtime-catalog.md).
+Source of truth - `src/alterios_mcp/services.py`; operator-facing catalog
+описан в [script-runtime-catalog.md](script-runtime-catalog.md).
 
-Read-only and safe-to-probe through a compatible runtime endpoint:
+Read-only и safe-to-probe через compatible runtime endpoint:
 
-- `getContents`
-- `getDependentContents`
-- `getTasks`
-- `getViewData`
+- `getContents`;
+- `getDependentContents`;
+- `getTasks`;
+- `getViewData`.
 
-Mutating and disabled unless `ALTERIOS_MCP_ALLOW_WRITE=1`:
+Mutating и disabled без `ALTERIOS_MCP_ALLOW_WRITE=1`:
 
-- `createContent` - `write`
-- `updateContent` - `write`
-- `deleteManyContents` - `destructive`
-- `createDependentContent` - `write`
-- `startProcess` - `workflow_side_effect`
-- `reassignTask` - `workflow_side_effect`
-- `messageToAnotherProcess` - `workflow_side_effect`
-- `uploadFile` - `write`
-- `notify` - `external_side_effect`
-- `writeLog` - `audit_side_effect`
+- `createContent` - `write`;
+- `updateContent` - `write`;
+- `deleteManyContents` - `destructive`;
+- `createDependentContent` - `write`;
+- `startProcess` - `workflow_side_effect`;
+- `reassignTask` - `workflow_side_effect`;
+- `messageToAnotherProcess` - `workflow_side_effect`;
+- `uploadFile` - `write`;
+- `notify` - `external_side_effect`;
+- `writeLog` - `audit_side_effect`.
 
 Manual script execution:
 
-- `/api/scripts/execute-manual` requires a script UUID and is exposed only as a
+- `/api/scripts/execute-manual` требует script UUID и доступен только как
   write-gated operation.
-- Runtime service names such as `getTasks` are not script UUIDs and are rejected
-  when the endpoint template points at `/api/scripts/execute-manual`.
+- Runtime service names вроде `getTasks` не являются script UUID и
+  отклоняются, если endpoint template указывает на `/api/scripts/execute-manual`.
 
-## Safety Rules
+## Правила безопасности
 
-- Always call `alterios_config` before any write-capable tool.
-- Pass explicit `project_id` for project-scoped operations whenever it is known
-  from the UI, URL, ticket, or operator request.
-- Treat `ALTERIOS_<PROFILE>_PROJECT_ID` as an optional default only.
-- Write mode is process-wide and must be explicitly enabled with
-  `ALTERIOS_MCP_ALLOW_WRITE=1`.
-- Tool responses redact known secret-bearing keys.
-- Hidden or undocumented endpoints are not brute-forced.
-- Discovery artifacts must not include tokens, cookies, passwords, or full auth
-  headers.
+- Перед каждым write-capable tool вызывать `alterios_config`.
+- Передавать явный `project_id` для project-scoped operations, когда он известен
+  из UI, URL, ticket или operator request.
+- Считать `ALTERIOS_<PROFILE>_PROJECT_ID` только optional default.
+- Write mode включается process-wide и требует `ALTERIOS_MCP_ALLOW_WRITE=1`.
+- Tool responses скрывают known secret-bearing keys.
+- Hidden или undocumented endpoints не brute-force.
+- Discovery artifacts не должны содержать tokens, cookies, passwords или full
+  auth headers.

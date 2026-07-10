@@ -8,8 +8,8 @@
 
 Контекст текущего покрытия:
 
-- MCP tools: 66;
-- write-like MCP tools: 31;
+- MCP tools: 67;
+- write-like MCP tools: 32;
 - project-base сценарии уже покрывают content types, fields, content, files,
   views, forms, scripts, BPMN/process/tasks, reports, groups, comments;
 - users, roles, user groups writes и destructive delete имеют typed security
@@ -167,9 +167,9 @@
 
 ## 5. Пользователи
 
-Статус: `Поддержано typed security tools`; user create/delete пока требует
-отдельного UI/HAR evidence, потому что live `POST /api/users` возвращает
-backend key error даже для disposable sandbox payload.
+Статус: `Поддержано typed security tools`; disposable user create/delete
+проверен через UI и API cleanup-readback. Production security writes остаются
+dangerous-gated и требуют отдельного sandbox/rollback-плана.
 
 Известный read route:
 
@@ -690,8 +690,8 @@ dangerous workflow.
 
 Статус: создание/обновление type fields `Поддержано typed tool`;
 native флаги публикации type `Поддержано live через /api/content-types/save`;
-cross-project публикация/transfer `Поддержано planner`, execution
-`Требует UI/HAR evidence`.
+cross-project публикация/transfer `Поддержано route evidence + typed clone tool`,
+execution `Требует отдельный target sandbox`.
 
 Поддержанные инструменты:
 
@@ -701,6 +701,7 @@ cross-project публикация/transfer `Поддержано planner`, exec
 - `alterios_create_content`;
 - `alterios_update_content_fields`;
 - `alterios_plan_content_type_publish`.
+- `alterios_clone_shared_content_type`.
 
 Сценарии:
 
@@ -733,35 +734,40 @@ cross-project публикация/transfer `Поддержано planner`, exec
 
 Флаги публикации типа (`share`, `shareCreating`, `shareEditing`) уже
 live-проверены через `/api/content-types/save`; `shareDeleting` не включается
-без отдельного destructive-сценария. Отдельный native endpoint для
-“опубликовать тип материала в другие проекты” в текущем MCP не подтвержден.
-`alterios_plan_content_type_publish` фиксирует source content type, target
-projects и список evidence, но не выполняет cross-project transfer. Для
-executing transfer tool нужно:
+без отдельного destructive-сценария. Native endpoint для копирования
+опубликованного типа в target project подтвержден как
+`POST /api/content-types/clone`, а список опубликованных типов доступен через
+`GET /api/content-types?share=true`.
 
-- найти UI-сценарий публикации content type;
-- снять sanitized HAR;
-- определить route и payload;
+`alterios_plan_content_type_publish` фиксирует source content type, target
+projects и список evidence. `alterios_clone_shared_content_type` выполняет
+dry-run и, при включенных write gates, может вызвать native clone route из
+контекста явного target `project_id`. Live execution пока не выполнялся,
+потому что нужен отдельный target sandbox project и cleanup/readback-план.
+Для production-ready сценария нужно:
+
 - понять, копируются ли fields/views/forms/scripts/reports или только metadata;
 - проверить конфликт имен и `mname`;
 - определить rollback;
-- добавить typed tool, например `alterios_publish_content_type_to_projects`,
-  только после sandbox-проверки.
+- выполнить live clone только в target sandbox;
+- проверить target readback, поля, представления, формы и меню;
+- снять sanitized HAR, если требуется raw network artifact.
 
-До этого нельзя обещать cross-project native publish/transfer как реализованную
-MCP-возможность.
+До target sandbox проверки нельзя обещать cross-project native clone как
+production-готовую возможность, но route и typed MCP tool уже есть.
 
 ## 16. Что добавить в MCP следующим этапом
 
 Приоритетные сценарии расширения:
 
-1. `docs/live-write-evidence-2026-07-10.md`:
+1. `docs/live-write-evidence-2026-07-10.md` и
+   `docs/ui-har-write-evidence-2026-07-10.md`:
    - content type publish flags;
    - role create/update/delete;
    - user group create/update/delete;
-   - user create backend gap.
-2. Remaining security evidence:
    - disposable user create/delete;
+   - cross-project content type clone route.
+2. Remaining security evidence:
    - permissions;
    - delete/delete_contents;
    - assign/unassign role/group semantics.
@@ -773,7 +779,8 @@ MCP-возможность.
    - selected ids;
    - manual script bulk action;
    - destructive bulk delete only after dangerous evidence.
-5. Native content type publish/transfer execution tool:
+5. Native content type publish/transfer live execution:
+   - designate target sandbox project;
    - source/target project map;
    - conflict detection;
    - dry-run diff;

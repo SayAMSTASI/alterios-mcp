@@ -1327,6 +1327,36 @@ def test_upsert_user_execution_requires_dangerous_gate_without_real_network() ->
         )
 
 
+def test_delete_user_dry_run_uses_ui_observed_body_delete_path_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def user_by_id(self, user_id: str) -> FakeResponse:
+            assert user_id == "user-1"
+            return FakeResponse({"_id": "user-1", "email": "user@example.test", "name": "Test User"})
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_delete_user(
+            "user-1",
+            expected_email="user@example.test",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "user_delete"
+    assert result["audit"]["operation"]["risk_level"] == "security"
+    assert result["audit"]["operation"]["method"] == "DELETE"
+    assert result["audit"]["operation"]["path"] == "/api/users"
+    assert result["audit"]["operation"]["request"]["_id"] == "user-1"
+    assert result["response"]["preflight"]["email"] == "user@example.test"
+
+
 def test_security_upsert_audit_strips_readback_metadata_target_ids_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:
@@ -1499,3 +1529,42 @@ def test_content_type_publish_planner_blocks_native_without_ui_har_evidence() ->
     assert result["native_publish"]["ready"] is False
     assert result["native_publish"]["status"] == "blocked_until_ui_har_evidence"
     assert result["target_project_ids"] == ["project-2"]
+
+
+def test_clone_shared_content_type_dry_run_uses_native_clone_route_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_shared_content_types(self) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {
+                        "_id": "ct-source",
+                        "name": "Shared material",
+                        "projectId": "source-project",
+                        "share": True,
+                    }
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_clone_shared_content_type(
+            "ct-source",
+            expected_source_name="Shared material",
+            profile="vniimt",
+            project_id="target-project",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "content_type_clone"
+    assert result["audit"]["operation"]["method"] == "POST"
+    assert result["audit"]["operation"]["path"] == "/api/content-types/clone"
+    assert result["audit"]["operation"]["request"]["id"] == "ct-source"
+    assert result["response"]["source"]["name"] == "Shared material"
+    assert result["response"]["source_project_id"] == "source-project"
+    assert result["response"]["target_project_id"] == "target-project"

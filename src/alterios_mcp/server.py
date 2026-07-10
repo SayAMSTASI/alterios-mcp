@@ -374,9 +374,10 @@ def _security_resource_operation(
     resource_id: str | None,
     request: dict[str, Any],
     summary: str,
+    path_override: str | None = None,
 ) -> WriteOperation:
     method = "DELETE" if action == "delete" else ("PATCH" if resource_id else "POST")
-    path = f"/api/{collection}/{resource_id}" if resource_id else f"/api/{collection}"
+    path = path_override or (f"/api/{collection}/{resource_id}" if resource_id else f"/api/{collection}")
     sanitized_request = strip_alterios_metadata(request)
     return _resource_operation(
         name=f"{method} {path}",
@@ -450,6 +451,13 @@ def _find_content_type(
         return body
     if name:
         return _find_named_resource(client.list_content_types(limit=5000).body, name)
+    return None
+
+
+def _find_shared_content_type(client: AlteriosClient, content_type_id: str) -> dict[str, Any] | None:
+    for item in client.list_shared_content_types().body:
+        if isinstance(item, dict) and item.get("_id") == content_type_id:
+            return item
     return None
 
 
@@ -1366,6 +1374,7 @@ def alterios_delete_user(
         resource_id=user_id,
         request={"_id": user_id, "expectedEmail": expected_email},
         summary="Delete an Alterios user and verify absence through user readback.",
+        path_override="/api/users",
     )
     audit = build_write_audit(
         profile=profile,
@@ -1647,7 +1656,7 @@ def alterios_plan_content_type_publish(
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Plan native content-type publish/transfer; native write stays blocked until UI/HAR evidence exists."""
+    """Plan native content-type publish/transfer and review route evidence before execution."""
     normalized_targets = [str(target_id).strip() for target_id in target_project_ids if str(target_id).strip()]
     if not content_type_id.strip():
         raise ValueError("content_type_id must not be empty.")
@@ -1689,10 +1698,71 @@ def alterios_plan_content_type_publish(
             "Recreate fields, views, forms, groups, scripts, reports, icons, and dependencies by typed tools.",
             "Run target readback and UI checks per project.",
         ],
-        "next_step": "Run alterios_write_safety_preflight for the confirmed native route before adding/executing a native publish tool."
+        "next_step": "Use alterios_clone_shared_content_type for dry-run-first native clone only in an explicit target sandbox project."
         if native_ready
         else "Capture UI/HAR evidence first; do not execute native publish by inference.",
     }
+
+
+@mcp.tool()
+def alterios_clone_shared_content_type(
+    source_content_type_id: str,
+    expected_source_name: str | None = None,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or clone a shared content type into the explicit target project context."""
+    if not source_content_type_id.strip():
+        raise ValueError("source_content_type_id must not be empty.")
+    if not project_id or not project_id.strip():
+        raise ValueError("project_id must be the explicit target project for content type clone.")
+    client = _client(profile, project_id)
+    shared_source = _find_shared_content_type(client, source_content_type_id)
+    if not shared_source:
+        raise ValueError(
+            f"Shared content type {source_content_type_id!r} is not visible from target project {project_id!r}."
+        )
+    if expected_source_name and shared_source.get("name") != expected_source_name:
+        raise ValueError(
+            f"Shared content type name mismatch: expected {expected_source_name!r}, got {shared_source.get('name')!r}."
+        )
+
+    request = {"id": source_content_type_id, "expectedSourceName": expected_source_name}
+    operation = _resource_operation(
+        name="POST /api/content-types/clone",
+        kind="content_type_clone",
+        method="POST",
+        path="/api/content-types/clone",
+        summary="Clone a shared Alterios content type into the explicit target project.",
+        request=request,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "source": _resource_summary(shared_source),
+        "source_project_id": shared_source.get("projectId"),
+        "target_project_id": project_id,
+        "route_evidence": {
+            "shared_list": "GET /api/content-types?share=true",
+            "clone": "POST /api/content-types/clone",
+            "payload": {"id": source_content_type_id},
+        },
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    cloned = client.clone_content_type(source_content_type_id).as_dict()
+    cloned_id = _extract_response_id(cloned)
+    readback = client.content_type_by_id(cloned_id).as_dict() if cloned_id else None
+    response_payload.update({"cloned": cloned, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
 
 
 @mcp.tool()

@@ -1,96 +1,98 @@
-# Controlled Writes
+# Управляемая запись в Alterios
 
-Stage 4 defines the safety contract for every Alterios operation that can
-change state. It does not add a new production write workflow by itself; it
-adds the policy and audit layer that future typed write tools must use.
+Этап 4 задает safety contract для каждой операции Alterios, которая может
+изменить состояние. Сам по себе он не добавляет новый production workflow
+записи; он добавляет policy и audit layer, который обязаны использовать typed
+write tools.
 
-## Default Behavior
+## Поведение по умолчанию
 
-Write-capable MCP tools are dry-run first.
+Все write-capable MCP tools сначала работают как dry-run.
 
-By default, these tools return a write audit and do not send a request:
+По умолчанию эти инструменты возвращают write audit и не отправляют запрос:
 
-- `alterios_call_write_service`
-- `alterios_execute_manual_script`
-- `alterios_rest_write`
-- typed metadata/data/form/report tools such as `alterios_upsert_form`
-- typed security tools such as `alterios_upsert_user` and `alterios_delete_role`
+- `alterios_call_write_service`;
+- `alterios_execute_manual_script`;
+- `alterios_rest_write`;
+- typed metadata/data/form/report tools, например `alterios_upsert_form`;
+- typed security tools, например `alterios_upsert_user` и
+  `alterios_delete_role`.
 
-To execute a write, a caller must pass `dry_run=false` and the process must have
-`ALTERIOS_MCP_ALLOW_WRITE=1`.
+Чтобы реально выполнить запись, caller должен передать `dry_run=false`, а
+процесс должен быть запущен с `ALTERIOS_MCP_ALLOW_WRITE=1`.
 
-Use `alterios_write_safety_preflight` before broad REST writes when the route is
-not already covered by a typed tool. It classifies the route and returns the
-execution gates without sending a network request.
+Перед broad REST writes используйте `alterios_write_safety_preflight`, если
+route еще не покрыт typed tool. Он классифицирует route и возвращает нужные
+execution gates без сетевого запроса.
 
-## Required Context
+## Обязательный контекст
 
-Controlled writes require explicit target context:
+Controlled writes требуют явный target context:
 
-- `profile` must be passed to the tool call.
-- `project_id` must be passed to the tool call.
-- Do not rely on `ALTERIOS_PROFILE` or `ALTERIOS_<PROFILE>_PROJECT_ID` for
-  write execution.
+- `profile` передается в tool call;
+- `project_id` передается в tool call;
+- write execution не должен полагаться на `ALTERIOS_PROFILE` или
+  `ALTERIOS_<PROFILE>_PROJECT_ID`.
 
-This is stricter than read-only tools. Read-only tools may use the configured
-default project for repetitive inspection, but writes must name the target.
+Это строже, чем read-only tools. Read-only tools могут использовать default
+project для повторной инвентаризации, но writes всегда должны явно называть
+цель.
 
-## Dangerous Writes
+## Dangerous writes
 
-Dangerous operations are destructive or permission-changing writes. The current
-classifier marks these as dangerous:
+Dangerous operations - это destructive или permission-changing writes.
+Текущий классификатор считает dangerous:
 
-- destructive service risk, for example `deleteManyContents`;
+- destructive service risk, например `deleteManyContents`;
 - REST `DELETE`;
-- REST writes under `/api/users`, `/api/user-groups`, `/api/usergroups`,
-  `/api/roles`, `/api/security`, or `/api/permissions`.
+- REST writes под `/api/users`, `/api/user-groups`, `/api/usergroups`,
+  `/api/roles`, `/api/security` или `/api/permissions`.
 
-Dangerous execution requires all normal write gates plus:
+Dangerous execution требует все обычные write gates плюс:
 
-- `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`
-- `allow_destructive=true`
+- `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`;
+- `allow_destructive=true`.
 
-Dry-run and `alterios_write_safety_preflight` output remain available without
-these gates, so target IDs and route classification can be reviewed before
-execution.
+Dry-run и `alterios_write_safety_preflight` доступны без этих gates, поэтому
+target IDs и route classification можно проверить до выполнения.
 
-## Audit Shape
+## Форма audit
 
-Every controlled write returns:
+Каждая controlled write возвращает:
 
-- `dry_run` - whether the request was only planned;
-- `audit.status` - `dry_run` or `ready_to_execute`;
-- `audit.write_enabled` - whether `ALTERIOS_MCP_ALLOW_WRITE=1` is active;
-- `audit.dangerous_write_enabled` - whether
-  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` is active;
+- `dry_run` - была ли операция только запланирована;
+- `audit.status` - `dry_run` или `ready_to_execute`;
+- `audit.write_enabled` - включен ли `ALTERIOS_MCP_ALLOW_WRITE=1`;
+- `audit.dangerous_write_enabled` - включен ли
+  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`;
 - `audit.target.profile`;
 - `audit.target.project_id`;
-- `audit.operation` - name, kind, risk level, method/path, target IDs, redacted
-  request summary, and readback requirement;
-- `audit.required_checks` - checks expected before and after execution;
-- `response` - `null` for dry-run or the redacted Alterios response after real
-  execution.
+- `audit.operation` - name, kind, risk level, method/path, target IDs,
+  redacted request summary и readback requirement;
+- `audit.required_checks` - ожидаемые проверки до и после выполнения;
+- `response` - `null` для dry-run или redacted Alterios response после
+  реального выполнения.
 
-Request fields named like tokens, passwords, repeated passwords, password
-recovery codes, secrets, API keys, or auth headers are redacted from audit
-output.
+Поля запроса с tokens, passwords, repeated passwords, recovery codes,
+secrets, API keys и auth headers скрываются из audit output.
 
-## Future Typed Write Tools
+## Правила добавления typed write tool
 
-Before adding a typed write tool:
+Перед добавлением typed write tool:
 
-1. Define the target object and required IDs.
-2. Define validation rules and dry-run summary.
-3. Define the readback route that proves the write happened.
-4. Keep dangerous operations behind the separate dangerous gate and preflight.
-5. Add unit tests that prove dry-run is default and execution is gated.
+1. Определить target object и обязательные IDs.
+2. Определить validation rules и dry-run summary.
+3. Определить readback route, который доказывает выполнение записи.
+4. Оставить dangerous operations за отдельным dangerous gate и preflight.
+5. Добавить unit tests, которые доказывают dry-run по умолчанию и gated
+   execution.
 
-Typed tools should be low-risk or explicitly classified, with a clear readback
-route and no hidden workflow, notification, permission, or delete side effects.
+Typed tools должны быть narrow, с понятным readback route и без скрытых
+workflow, notification, permission или delete side effects.
 
-## Security/Destructive Typed Tools
+## Security/destructive typed tools
 
-Security/destructive flows now have typed wrappers for the first admin slice:
+Security/destructive flows имеют typed wrappers для первого admin slice:
 
 - `alterios_list_users`, `alterios_get_user`, `alterios_upsert_user`,
   `alterios_delete_user`;
@@ -99,32 +101,33 @@ Security/destructive flows now have typed wrappers for the first admin slice:
 - `alterios_list_roles`, `alterios_get_role`, `alterios_upsert_role`,
   `alterios_delete_role`.
 
-These tools are still dangerous. They are typed so the caller gets target
-checks, a route-specific audit, expected-name/email checks, and readback. They
-do not remove the dangerous gate.
+Эти tools остаются dangerous. Typed wrapper нужен для target checks,
+route-specific audit, expected-name/email checks и readback. Он не отменяет
+dangerous gate.
 
-A dangerous-flow run must start read-only:
+Dangerous-flow run начинается read-only:
 
-- run `alterios_write_safety_preflight` for the exact route;
-- verify the target profile and project with `alterios_config`;
-- collect target IDs through safe reads or UI/HAR capture;
-- execute only in a dedicated sandbox with both write env gates enabled;
-- record API readback and UI-visible evidence when permissions or deletes are
-  user-facing.
+- выполнить `alterios_write_safety_preflight` для точного route;
+- проверить target profile и project через `alterios_config`;
+- получить target IDs через safe reads или UI/HAR capture;
+- выполнять только в dedicated sandbox с обоими write env gates;
+- записать API readback и UI-visible evidence, если permissions/delete видимы
+  пользователю.
 
-Prefer typed security tools over generic REST writes for users, user groups,
-roles, and delete flows. Do not execute them in production until the dry-run
-target and rollback/readback plan are reviewed.
+Для users, user groups, roles и delete flows используйте typed security tools,
+а не generic REST writes. В production их нельзя выполнять без dry-run target,
+rollback/readback plan и отдельной проверки.
 
-2026-07-10 live sandbox evidence:
+## Доказательства от 2026-07-10
 
-- role create/update/delete is verified with dry-run, dangerous gates, live
-  execution, delete readback, and cleanup scan;
-- user-group create/update/delete is verified with dry-run, dangerous gates,
-  live execution, delete readback, and cleanup scan;
-- user create/delete is not live-verified yet because `POST /api/users` returns
-  a backend key error even with a disabled disposable sandbox payload and
-  `password/repassword`; use UI/HAR capture before marking this flow complete;
-- content type publication flags are verified through `/api/content-types/save`;
-  cross-project native publish/transfer remains planner-only until UI/HAR route
-  evidence is available.
+- role create/update/delete live-verified с dry-run, dangerous gates, live
+  execution, delete readback и cleanup scan;
+- user-group create/update/delete live-verified с dry-run, dangerous gates,
+  live execution, delete readback и cleanup scan;
+- disposable user create/delete live-verified через UI: форма требует `ownerId`,
+  после выбора владельца `ArtX` создается disabled user, delete выполняется из
+  row menu, cleanup API readback возвращает `remaining_matches=0`;
+- content type publication flags live-verified через `/api/content-types/save`;
+- cross-project content type transfer имеет route evidence:
+  `GET /api/content-types?share=true` и `POST /api/content-types/clone`, но
+  live clone не выполнялся без отдельного target sandbox project.

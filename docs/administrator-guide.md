@@ -135,6 +135,13 @@ python -m venv .venv
 Внутри одного экземпляра может быть много проектов, поэтому `project_id` для
 project-level операций следует передавать явно.
 
+MCP можно применять к другим экземплярам Alterios/LIMS через отдельные
+профили. Это поддерживаемый сценарий, но не слепая гарантия для любой версии:
+установки могут отличаться REST-маршрутами, auth header, project scoping и
+правами токена. Перед записью в новый экземпляр администратор обязан выполнить
+profile smoke, read-only discovery нужного проекта, dry-run write и sandbox
+readback.
+
 Рекомендуется хранить приватную конфигурацию вне репозитория и подключать ее
 через `ALTERIOS_DOTENV_PATH`.
 
@@ -472,9 +479,15 @@ tools:
 отдельного dangerous workflow.
 
 Для публикации типа материала в другие проекты используйте
-`alterios_plan_content_type_publish`. Это planner, а не запись. Native execution
-разрешается добавлять только после UI/HAR evidence маршрута, payload shape и
-readback правил по каждому target project.
+`alterios_plan_content_type_publish` как план и safety review. Для native
+копирования опубликованного типа в явный target project используйте
+`alterios_clone_shared_content_type`: сначала `dry_run=true`, затем execution
+только в отдельном target sandbox project. Флаги публикации
+(`share`, `shareCreating`, `shareEditing`, `shareDeleting`) уже проверены через
+`/api/content-types/save`. Native transfer/copy выполняется route
+`POST /api/content-types/clone` из контекста target project, но live execution
+разрешается только при наличии отдельного target sandbox project, dry-run review
+и cleanup/readback-плана.
 
 Практическая проверка 2026-07-10:
 
@@ -483,9 +496,9 @@ readback правил по каждому target project.
   `MCP Practice. Песочница`; `shareDeleting` намеренно оставлен `false`;
 - role и user-group create/update/delete live-проверены с dangerous gate,
   dry-run перед записью, delete readback и cleanup scan;
-- user create/delete пока не live-проверен: `POST /api/users` возвращает
-  backend key error даже при отключенном disposable payload с
-  `password/repassword`; перед production-сценарием нужен UI/HAR capture.
+- disposable user create/delete live-проверен через UI: форма требует валидный
+  owner, delete находится в row menu списка, cleanup API readback вернул
+  `remaining_matches=0`.
 
 ### 10.7. Установка skills
 
@@ -712,8 +725,8 @@ git pull --ff-only
 На текущем этапе основной функциональный контур разработки закрывается для
 эксплуатации:
 
-- есть 66 MCP-инструментов;
-- есть 31 write-like инструмент;
+- есть 67 MCP-инструментов;
+- есть 32 write-like инструмента;
 - реализованы профили нескольких экземпляров Alterios;
 - реализованы read-only inventory и deep inventory;
 - реализованы controlled write gates;
@@ -721,11 +734,13 @@ git pull --ff-only
   scripts/BPMN/tasks и reports;
 - реализованы typed security tools для users/user-groups/roles/delete с
   dangerous gate, no-network тестами и live-проверкой role/user-group
-  create/update/delete в sandbox;
+  create/update/delete в sandbox; disposable user create/delete проверен через
+  UI и API cleanup-readback;
 - реализованы typed form listener patch и bulk selected-content update;
 - live-проверены sandbox publication flags типа материала через
-  `/api/content-types/save`; cross-project native publish/transfer остается
-  planner-only до UI/HAR evidence;
+  `/api/content-types/save`; cross-project native transfer route
+  (`/api/content-types/clone`) подтвержден, но live clone остается gated до
+  отдельного target sandbox project;
 - реализованы repo-owned skills и installer;
 - создан Documentation Scribe / Писарь;
 - README переведен в пользовательскую точку входа;
@@ -733,10 +748,10 @@ git pull --ff-only
 
 Оставшиеся работы не должны блокировать эксплуатацию текущего MCP:
 
-- user create/delete разрешать только после UI/HAR/API evidence,
-  rollback-плана и sandbox readback;
-- executing native cross-project content-type publish tool добавлять только
-  после UI/HAR route и payload evidence;
+- user/security/delete в production выполнять только после отдельного
+  sandbox-readback и rollback-плана;
+- executing native cross-project content-type clone tool добавлять только
+  после target sandbox, UI/HAR route evidence и cleanup/readback-плана;
 - Stimulsoft render/PDF/image comparison остается расширением validator-а;
 - release packaging и changelog process остаются отдельным release-этапом.
 
