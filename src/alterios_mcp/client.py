@@ -560,6 +560,45 @@ class AlteriosClient:
         except URLError as exc:
             raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
 
+    def upload_icon(self, data: bytes, *, filename: str) -> AlteriosResponse:
+        if not data:
+            raise ValueError("icon data must not be empty")
+        if not filename.strip():
+            raise ValueError("filename must not be empty")
+
+        boundary = "----CodexAlteriosBoundary" + uuid.uuid4().hex
+        body = build_multipart(boundary, "upload", filename, "image/svg+xml", data)
+        headers = dict(self._headers())
+        headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(body)),
+                "ngsw-bypass": "true",
+            }
+        )
+        request = Request(
+            self.config.base_url.rstrip("/") + "/api/file/upload/icon",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                return AlteriosResponse(
+                    response.status,
+                    response.headers.get("Content-Type", ""),
+                    parse_response_body(response.read(), response.headers.get("Content-Type", "")),
+                )
+        except HTTPError as exc:
+            content_type = exc.headers.get("Content-Type", "") if exc.headers else ""
+            parsed_body = parse_response_body(exc.read(), content_type)
+            raise AlteriosRequestError(f"HTTP {exc.code}: {safe_error(parsed_body)}") from exc
+        except TimeoutError as exc:
+            raise AlteriosRequestError("Network error: timed out") from exc
+        except URLError as exc:
+            raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
+
     def list_comments(
         self,
         entity_id: str,

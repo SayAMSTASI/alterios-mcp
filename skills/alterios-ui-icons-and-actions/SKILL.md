@@ -15,6 +15,8 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Prefer compact icon buttons for common actions instead of text-only buttons.
 - Use a three-dot menu for secondary row actions.
 - Keep the standard row action order: edit, visibility/view, delete.
+- Before writing forms, groups, or actions, ensure required Google icons are uploaded into the target project through `alterios_ensure_project_icons`.
+- Use the returned project-local UUID values as `iconId`; never leave raw Google icon names such as `save`, `more_vert`, or `visibility` in saved Alterios JSON.
 - Do not replace an existing icon if it already matches the action meaning and local style.
 - Treat a UUID-like `iconId` as a stored reference, not proof that the icon matches the action standard.
 
@@ -24,8 +26,9 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 2. Check action semantics before checking appearance.
 3. Confirm destructive actions are visually and behaviorally distinct from view/edit.
 4. Check that labels, icons, and menu placement match the user workflow.
-5. If `iconId` is UUID-like, resolve it through the icon usage matrix or verified registry/readback before claiming it matches the semantic icon; otherwise mark it unresolved.
-6. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
+5. If a needed icon is missing from the project registry, call `alterios_ensure_project_icons` in dry-run first; apply only with the saved `plan_id` and write gate.
+6. If `iconId` is UUID-like, resolve it through the icon usage matrix or verified registry/readback before claiming it matches the semantic icon; otherwise mark it unresolved.
+7. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
 
 ## References
 

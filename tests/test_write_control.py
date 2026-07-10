@@ -2531,3 +2531,101 @@ def test_create_process_flow_execution_creates_form_diagram_and_starts_process_w
     assert result["response"]["process_smoke"]["validation"]["task_count_matches"] is True
     assert result["response"]["process_smoke"]["validation"]["task_form_matches"] is True
     assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_ensure_project_icons_dry_run_saves_plan(tmp_path) -> None:
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        result = server.alterios_ensure_project_icons(
+            icon_specs=[{"semantic": "save", "google_name": "save"}],
+            include_defaults=False,
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["response"]["principle"]["source"] == "Google Fonts Icons"
+    assert result["response"]["principle"]["upload_first"] is True
+    assert result["response"]["icons"] == [
+        {
+            "semantic": "save",
+            "google_name": "save",
+            "filename": "codex_icon_save_save_16dp_4B77D1.svg",
+            "planned_action": "upload_google_icon",
+            "file_id": None,
+        }
+    ]
+    assert result["plan"]["plan_id"].startswith("wp_")
+
+
+def test_ensure_project_icons_execution_requires_plan_id(tmp_path) -> None:
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        pytest.raises(ValueError, match="plan_id is required"),
+    ):
+        server.alterios_ensure_project_icons(
+            icon_specs=[{"semantic": "save", "google_name": "save"}],
+            include_defaults=False,
+            dry_run=False,
+            profile="artx",
+            project_id="project-1",
+        )
+
+
+def test_ensure_project_icons_execution_uploads_and_writes_registry(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeIconClient:
+        def __init__(self) -> None:
+            self.uploads: list[dict[str, object]] = []
+
+        def upload_icon(self, data: bytes, *, filename: str) -> FakeResponse:
+            self.uploads.append({"data": data, "filename": filename})
+            return FakeResponse({"_id": "11111111-1111-4111-8111-111111111111", "filename": filename})
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            return FakeResponse([{"_id": file_ids[0], "filename": "icon.svg"}])
+
+    fake_client = FakeIconClient()
+    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+        dry_run = server.alterios_ensure_project_icons(
+            icon_specs=[{"semantic": "save", "google_name": "save"}],
+            include_defaults=False,
+            profile="artx",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict(
+            "os.environ",
+            {"ALTERIOS_MCP_ALLOW_WRITE": "1", "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)},
+            clear=True,
+        ),
+        patch.object(server, "_client", return_value=fake_client),
+        patch.object(server, "_download_google_icon_svg", return_value=b"<svg></svg>"),
+    ):
+        result = server.alterios_ensure_project_icons(
+            icon_specs=[{"semantic": "save", "google_name": "save"}],
+            include_defaults=False,
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["icon_ids"]["save"] == "11111111-1111-4111-8111-111111111111"
+    assert fake_client.uploads == [
+        {"data": b"<svg></svg>", "filename": "codex_icon_save_save_16dp_4B77D1.svg"}
+    ]
+    registry_path = tmp_path / result["response"]["registry"]["path"]
+    assert registry_path.exists()
+    assert "11111111-1111-4111-8111-111111111111" in registry_path.read_text(encoding="utf-8")

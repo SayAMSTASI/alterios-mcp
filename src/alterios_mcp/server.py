@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 from xml.sax.saxutils import escape as _xml_escape
 
 from mcp.server.fastmcp import FastMCP
@@ -39,7 +43,7 @@ from .write_control import (
     controlled_write_result,
     is_dangerous_write_risk,
 )
-from .write_plan import assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
+from .write_plan import artifact_root, assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
 
 mcp = FastMCP("alterios")
 
@@ -276,6 +280,224 @@ def _file_values(value: Any) -> list[Any]:
 
 
 MANAGED_MARKER = "Codex-managed"
+
+PROJECT_ICON_SCHEMA_VERSION = 1
+PROJECT_ICON_DEFAULTS = {
+    "save": "save",
+    "back": "arrow_back",
+    "close": "close",
+    "edit": "edit",
+    "view": "visibility",
+    "delete": "delete",
+    "menu": "more_vert",
+    "info": "info",
+    "add": "add",
+    "sync": "sync",
+    "files": "attach_file",
+    "bulk": "checklist",
+    "report": "analytics",
+    "process": "account_tree",
+    "task": "task_alt",
+    "group": "folder",
+    "search": "search",
+    "filter": "filter_alt",
+}
+ICON_SEMANTIC_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+GOOGLE_ICON_NAME_RE = re.compile(r"^[a-z0-9_]{1,80}$")
+ICON_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _project_icon_operation(
+    *,
+    icon_specs: list[dict[str, str]],
+    size: int,
+    color: str,
+    style: str,
+    force_upload: bool,
+) -> WriteOperation:
+    request = {
+        "icons": icon_specs,
+        "size": size,
+        "color": color,
+        "style": style,
+        "force_upload": force_upload,
+    }
+    return _resource_operation(
+        name="POST /api/file/upload/icon",
+        kind="project_icons",
+        method="POST",
+        path="/api/file/upload/icon",
+        summary="Ensure Google Fonts Icons are uploaded into the target Alterios project file manager and return project-local UUID iconId values.",
+        request=request,
+    )
+
+
+def _normalize_project_icon_specs(
+    icon_specs: list[dict[str, str]] | None,
+    *,
+    include_defaults: bool,
+) -> list[dict[str, str]]:
+    by_semantic: dict[str, dict[str, str]] = {}
+    if include_defaults:
+        for semantic, google_name in PROJECT_ICON_DEFAULTS.items():
+            by_semantic[semantic] = {"semantic": semantic, "google_name": google_name}
+    for raw in icon_specs or []:
+        if not isinstance(raw, dict):
+            raise ValueError("Each icon spec must be an object.")
+        semantic = str(raw.get("semantic") or "").strip().lower()
+        google_name = str(raw.get("google_name") or raw.get("name") or "").strip().lower()
+        if not semantic:
+            raise ValueError("Icon spec semantic must not be empty.")
+        if not google_name:
+            google_name = PROJECT_ICON_DEFAULTS.get(semantic, semantic)
+        if not ICON_SEMANTIC_RE.fullmatch(semantic):
+            raise ValueError(f"Invalid icon semantic {semantic!r}. Use lower-case ascii letters, digits, and underscores.")
+        if not GOOGLE_ICON_NAME_RE.fullmatch(google_name):
+            raise ValueError(f"Invalid Google icon name {google_name!r}.")
+        by_semantic[semantic] = {"semantic": semantic, "google_name": google_name}
+    if not by_semantic:
+        raise ValueError("Pass at least one icon spec or keep include_defaults=True.")
+    return [by_semantic[key] for key in sorted(by_semantic)]
+
+
+def _project_icon_registry_path(*, profile: str, project_id: str) -> Path:
+    return (
+        artifact_root()
+        / "project-icons"
+        / _safe_artifact_component(profile)
+        / _safe_artifact_component(project_id)
+        / "registry.json"
+    )
+
+
+def _safe_artifact_component(value: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip()).strip("._")
+    return normalized or "default"
+
+
+def _relative_artifact_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(artifact_root()))
+    except ValueError:
+        return str(path)
+
+
+def _read_project_icon_registry(*, profile: str, project_id: str) -> dict[str, Any]:
+    path = _project_icon_registry_path(profile=profile, project_id=project_id)
+    if not path.exists():
+        return {
+            "schema_version": PROJECT_ICON_SCHEMA_VERSION,
+            "profile": profile,
+            "project_id": project_id,
+            "icons": {},
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    icons = payload.get("icons")
+    if not isinstance(icons, dict):
+        icons = {}
+    return {
+        "schema_version": payload.get("schema_version") or PROJECT_ICON_SCHEMA_VERSION,
+        "profile": payload.get("profile") or profile,
+        "project_id": payload.get("project_id") or project_id,
+        "icons": icons,
+    }
+
+
+def _write_project_icon_registry(*, profile: str, project_id: str, registry: dict[str, Any]) -> str:
+    path = _project_icon_registry_path(profile=profile, project_id=project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": PROJECT_ICON_SCHEMA_VERSION,
+        "profile": profile,
+        "project_id": project_id,
+        "icons": registry.get("icons") or {},
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return _relative_artifact_path(path)
+
+
+def _registry_icon_current(entry: Any, *, google_name: str, size: int, color: str, style: str) -> bool:
+    return (
+        isinstance(entry, dict)
+        and looks_like_uuid(str(entry.get("file_id") or ""))
+        and entry.get("google_name") == google_name
+        and entry.get("size") == size
+        and str(entry.get("color") or "").lower() == color.lower()
+        and entry.get("style") == style
+    )
+
+
+def _file_metadata_contains_id(body: Any, file_id: str) -> bool:
+    if isinstance(body, dict):
+        if _extract_response_id(body) == file_id:
+            return True
+        for key in ("items", "rows", "data", "results", "values"):
+            value = body.get(key)
+            if isinstance(value, list) and _file_metadata_contains_id(value, file_id):
+                return True
+    if isinstance(body, list):
+        if body and isinstance(body[0], list):
+            return any(_file_metadata_contains_id(item, file_id) for item in body[0])
+        return any(_file_metadata_contains_id(item, file_id) for item in body)
+    return False
+
+
+def _project_icon_file_exists(client: AlteriosClient, file_id: str) -> bool:
+    try:
+        return _file_metadata_contains_id(client.file_metadata([file_id]).body, file_id)
+    except (AlteriosRequestError, ValueError):
+        return False
+
+
+def _google_icon_url(*, google_name: str, style: str) -> str:
+    return f"https://fonts.gstatic.com/s/i/short-term/release/{style}/{google_name}/default/24px.svg"
+
+
+def _download_google_icon_svg(*, google_name: str, style: str, size: int, color: str) -> bytes:
+    url = _google_icon_url(google_name=google_name, style=style)
+    try:
+        with urlopen(url, timeout=20) as response:
+            text = response.read().decode("utf-8")
+    except HTTPError as exc:
+        raise ValueError(f"Google icon {google_name!r} was not found: HTTP {exc.code}.") from exc
+    except URLError as exc:
+        raise ValueError(f"Google icon {google_name!r} download failed: {exc.reason}.") from exc
+    return _normalize_google_icon_svg(text, size=size, color=color)
+
+
+def _normalize_google_icon_svg(text: str, *, size: int, color: str) -> bytes:
+    if "<svg" not in text or "</svg>" not in text:
+        raise ValueError("Google icon response is not an SVG.")
+    match = re.search(r"<svg\b([^>]*)>", text, flags=re.IGNORECASE)
+    if not match:
+        raise ValueError("SVG root element was not found.")
+    attrs = match.group(1)
+    attrs = re.sub(r'\s(?:width|height|fill)="[^"]*"', "", attrs, flags=re.IGNORECASE)
+    if "viewBox=" not in attrs:
+        attrs += ' viewBox="0 -960 960 960"'
+    if "xmlns=" not in attrs:
+        attrs += ' xmlns="http://www.w3.org/2000/svg"'
+    replacement = f'<svg{attrs} width="{size}" height="{size}" fill="{color}">'
+    normalized = text[: match.start()] + replacement + text[match.end() :]
+    return normalized.encode("utf-8")
+
+
+def _project_icon_filename(*, semantic: str, google_name: str, size: int, color: str) -> str:
+    color_slug = color.lstrip("#").upper()
+    return f"codex_icon_{semantic}_{google_name}_{size}dp_{color_slug}.svg"
+
+
+def _icon_registry_summary(registry: dict[str, Any]) -> dict[str, Any]:
+    icons = registry.get("icons") or {}
+    return {
+        "icon_count": len(icons),
+        "semantics": sorted(str(key) for key in icons.keys()),
+    }
 
 
 def _resource_operation(
@@ -2235,6 +2457,160 @@ def alterios_file_metadata(
 ) -> dict[str, Any]:
     """Read Alterios file metadata for one or more file IDs."""
     return _client(profile, project_id).file_metadata(file_ids).as_dict()
+
+
+@mcp.tool()
+def alterios_ensure_project_icons(
+    icon_specs: list[dict[str, str]] | None = None,
+    include_defaults: bool = True,
+    force_upload: bool = False,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or upload Google Fonts Icons into one Alterios project and return UUID iconId values."""
+    size = 16
+    color = "#4B77D1"
+    style = "materialsymbolsoutlined"
+    if not ICON_COLOR_RE.fullmatch(color):
+        raise ValueError("Icon color must be a #RRGGBB value.")
+
+    normalized_specs = _normalize_project_icon_specs(icon_specs, include_defaults=include_defaults)
+    operation = _project_icon_operation(
+        icon_specs=normalized_specs,
+        size=size,
+        color=color,
+        style=style,
+        force_upload=force_upload,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    target = audit.as_dict()["target"]
+    target_profile = str(target["profile"])
+    target_project_id = str(target["project_id"])
+    registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+    registry_path = _project_icon_registry_path(profile=target_profile, project_id=target_project_id)
+
+    planned_icons = []
+    for spec in normalized_specs:
+        semantic = spec["semantic"]
+        google_name = spec["google_name"]
+        entry = (registry.get("icons") or {}).get(semantic)
+        reusable = (not force_upload) and _registry_icon_current(
+            entry,
+            google_name=google_name,
+            size=size,
+            color=color,
+            style=style,
+        )
+        filename = _project_icon_filename(semantic=semantic, google_name=google_name, size=size, color=color)
+        planned_icons.append(
+            {
+                "semantic": semantic,
+                "google_name": google_name,
+                "filename": filename,
+                "planned_action": "reuse_registry" if reusable else "upload_google_icon",
+                "file_id": entry.get("file_id") if reusable and isinstance(entry, dict) else None,
+            }
+        )
+
+    response_payload: dict[str, Any] = {
+        "principle": {
+            "source": "Google Fonts Icons",
+            "upload_first": True,
+            "icon_id_rule": "Use only UUID values returned by /api/file/upload/icon in forms, groups, and actions.",
+            "size": size,
+            "color": color,
+            "style": style,
+        },
+        "registry": {
+            "path": _relative_artifact_path(registry_path),
+            **_icon_registry_summary(registry),
+        },
+        "icons": planned_icons,
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_ensure_project_icons.")
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+
+    client = _client(profile, project_id)
+    registry_icons = registry.setdefault("icons", {})
+    ensured_icons = []
+    for spec in normalized_specs:
+        semantic = spec["semantic"]
+        google_name = spec["google_name"]
+        entry = registry_icons.get(semantic)
+        file_id = str((entry or {}).get("file_id") or "") if isinstance(entry, dict) else ""
+        if (
+            not force_upload
+            and _registry_icon_current(entry, google_name=google_name, size=size, color=color, style=style)
+            and _project_icon_file_exists(client, file_id)
+        ):
+            ensured_icons.append(
+                {
+                    "semantic": semantic,
+                    "google_name": google_name,
+                    "file_id": file_id,
+                    "action": "reused_registry",
+                }
+            )
+            continue
+
+        svg = _download_google_icon_svg(google_name=google_name, style=style, size=size, color=color)
+        filename = _project_icon_filename(semantic=semantic, google_name=google_name, size=size, color=color)
+        uploaded = client.upload_icon(svg, filename=filename).as_dict()
+        uploaded_id = _extract_response_id(uploaded)
+        if not uploaded_id:
+            raise ValueError(f"Icon upload for {semantic!r} returned no file id.")
+        metadata = client.file_metadata([uploaded_id]).as_dict()
+        registry_icons[semantic] = {
+            "semantic": semantic,
+            "google_name": google_name,
+            "file_id": uploaded_id,
+            "filename": filename,
+            "size": size,
+            "color": color,
+            "style": style,
+            "source": _google_icon_url(google_name=google_name, style=style),
+            "sha256": hashlib.sha256(svg).hexdigest(),
+        }
+        ensured_icons.append(
+            {
+                "semantic": semantic,
+                "google_name": google_name,
+                "file_id": uploaded_id,
+                "filename": filename,
+                "action": "uploaded",
+                "metadata": metadata,
+            }
+        )
+
+    registry_path_result = _write_project_icon_registry(
+        profile=target_profile,
+        project_id=target_project_id,
+        registry=registry,
+    )
+    response_payload.update(
+        {
+            "registry": {
+                "path": registry_path_result,
+                **_icon_registry_summary(registry),
+            },
+            "icons": ensured_icons,
+            "icon_ids": {item["semantic"]: item["file_id"] for item in ensured_icons},
+        }
+    )
+    return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
 
 @mcp.tool()

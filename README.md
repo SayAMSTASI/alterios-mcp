@@ -372,6 +372,28 @@ MCP анализирует расположение элементов, пуст
 стили, условия, действия и иконки. После анализа можно точечно заменить tabs или
 action containers без полной ручной пересборки формы.
 
+### Подготовить иконки проекта
+
+Перед записью форм, групп или действий с иконками сначала загрузите Google Fonts
+Icons в файловый менеджер нужного проекта:
+
+```powershell
+# 1. Dry-run: получить plan_id и проверить, какие иконки будут загружены.
+alterios_ensure_project_icons(
+  profile="artx",
+  project_id="<project-id>",
+  icon_specs=[{"semantic": "save", "google_name": "save"}],
+  include_defaults=false
+)
+
+# 2. Apply: выполнить тот же вызов с dry_run=false и plan_id при ALTERIOS_MCP_ALLOW_WRITE=1.
+```
+
+Правило: в JSON форм/групп/действий использовать только UUID из результата
+`alterios_ensure_project_icons`, а не строковые `save`, `more_vert`,
+`visibility` и другие Google icon names. Registry хранится отдельно для каждого
+`profile + project_id` в `artifacts/project-icons/...`.
+
 ### Связать форму, скрипт и BPMN
 
 MCP может показать, какие действия формы запускают скрипты, какие userTask
