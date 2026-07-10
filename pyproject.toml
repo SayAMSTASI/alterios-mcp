@@ -27,6 +27,7 @@ alterios-form-surface-check = "alterios_mcp.form_surface:main"
 alterios-deep-inventory = "alterios_mcp.deep_inventory:main"
 alterios-ui-flow = "alterios_mcp.ui_flow:main"
 alterios-profile-smoke = "alterios_mcp.profile_smoke:main"
+alterios-replay-smoke = "alterios_mcp.replay_smoke:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

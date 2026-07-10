@@ -105,6 +105,10 @@
 
 ## Этап 17. UI/report validation
 
+Статус: начат. Replay/smoke foundation реализован: `alterios-replay-smoke`
+и MCP tool `alterios_replay_smoke` проверяют локальные контракты MCP без записи
+и могут дополнительно запускать read-only live discovery.
+
 Что закрыть:
 
 1. Диагностика пустого Stimulsoft viewer.
@@ -118,6 +122,7 @@
    - selected manual script action;
    - selected process action;
    - destructive bulk delete только после отдельного dangerous workflow.
+6. Replay/smoke command для проверки MCP после обновления. Готово.
 
 ## Этап 18. Inventory optimization
 
@@ -139,5 +144,5 @@
 2. Сделать `alterios_create_material_module`. Готово.
 3. Сделать `alterios_create_report_tab`. Готово.
 4. Сделать `alterios_create_process_flow`. Готово.
-5. После сценарных tools перейти к render validation. Следующий шаг.
+5. После сценарных tools перейти к render validation. Replay/smoke готов; следующий шаг - viewer/render diagnostics.
 6. После render validation перейти к inventory cache/diff health.

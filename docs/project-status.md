@@ -15,12 +15,12 @@ workflow, files, comments, users и reports. Sandbox practice script
 а также comments, file-field upload, saved manual script, BPMN process/task и
 dashboard report create/update/full-readback.
 
-Покрытие методов ведется явно: 73 MCP tools, 14 runtime services, 15 live
+Покрытие методов ведется явно: 74 MCP tools, 14 runtime services, 15 live
 read-only route probes, 78 REST route/method patterns и 13 классов операций.
 После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
 текущая write-поверхность составляет 35 write-like tools. Последний
-scenario-tool pass добавил `alterios_create_process_flow`. Этап оптимизации
-добавил read-only tools для write plans и write journal, а сценарные
+stage-17 pass добавил `alterios_replay_smoke`. Этап оптимизации
+добавил read-only tools для write plans, write journal и replay smoke, а сценарные
 material-module/report-tab/process-flow apply теперь требуют проверенный `plan_id`.
 
 По script/diagram/report research зафиксированы все наблюдаемые типы scripts,
@@ -98,13 +98,14 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | Practice. UI user/delete and content-type transfer evidence | Captured UI-visible disposable user create/delete flow, API cleanup readback, frontend route evidence for user routes, and native content-type shared-list/clone route evidence. Translated key docs to Russian and documented multi-instance applicability. | `f2a762a` | UI live: user form required `ownerId`; selecting `ArtX` created disabled user `47ac9730-2fa6-4cd2-8078-780f66bd009b`; row menu delete confirmed and cleanup `GET /api/users/listandcount` returned `remaining_matches=0`. Content-type transfer evidence: `GET /api/content-types?share=true` shows the published sandbox type and frontend service calls `POST /api/content-types/clone`; live clone not executed without a target sandbox project. Tests: targeted 83 passed, full 126 passed, py_compile OK, diff/secret checks clean. |
 | Build. Write workflow plan/journal foundation | Added automatic `plan_id` storage for dry-run write results, write plan/journal artifacts, read-only MCP tools for plan/journal inspection, and `plan_id` enforcement for generic `alterios_rest_write` execution. Added `docs/optimization-plan.md`. | `e558e1d` | Targeted `tests/test_write_control.py`: 50 passed; full `pytest`: 128 passed; `py_compile` OK; `git diff --check` OK; secret scan clean. |
 | Build. Process-flow scenario tool | Added `alterios_create_process_flow` for task-form/BPMN/script-ref/process smoke composition with saved `plan_id` apply enforcement, generated BPMN formKey support, task form surface validation, diagram readback, and optional task completion. | current | Targeted `tests/test_write_control.py -k "create_process_flow or create_report_tab or create_material_module"`: 10 passed; full `pytest`: 138 passed; `py_compile` and `git diff --check` OK; no live write executed. |
+| Build. Replay smoke command | Added `alterios-replay-smoke` CLI and read-only MCP tool `alterios_replay_smoke` for post-update checks: MCP tool count, write-gate blocking, dry-run `plan_id` creation/match/mismatch, redaction, form-surface validation, Stimulsoft layout validation, risk classification, and optional read-only live discovery. | current | Local CLI smoke returned 6 checks, 0 failed; `tests/test_replay_smoke.py`: 3 passed; no live write executed. |
 
 ## Активный этап
 
 | Этап | Статус | Ответственный | Критерии приемки |
 |---|---|---|---|
 | 16. Scenario tools | Done | Lead Engineer + Write Tools + Form/View + Script/BPMN + Report | `alterios_create_material_module`, `alterios_create_report_tab`, and `alterios_create_process_flow` implemented with saved `plan_id` workflow and no-network unit coverage. |
-| 17. UI/report validation and replay smoke | Next | Lead Engineer + Report + Safety Verifier | Close empty Stimulsoft viewer/render validation, extend form listener/bulk coverage, and add replay/smoke command for MCP updates. |
+| 17. UI/report validation and replay smoke | In progress | Lead Engineer + Report + Safety Verifier | Replay/smoke command is implemented. Remaining acceptance: close empty Stimulsoft viewer/render validation and extend form listener/bulk coverage. |
 
 ## Бэклог
 
@@ -132,7 +133,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
-| 1 | Add write `plan_id`, write journal, and replay/smoke foundation. | Partial | Foundation is done: dry-run plans, plan/journal readers, and `plan_id` enforcement for generic REST write. Replay/smoke command remains next. |
+| 1 | Add write `plan_id`, write journal, and replay/smoke foundation. | Done | Foundation is done: dry-run plans, plan/journal readers, `plan_id` enforcement for generic REST write, and `alterios-replay-smoke`/`alterios_replay_smoke` post-update checks. |
 | 1 | Add scenario tool `alterios_create_material_module`. | Done | Composes content type, fields, view, view entity, view fields, add/edit/list forms, group, metadata/form/group readback, and view-data smoke using saved `plan_id`. |
 | 1 | Add scenario tool `alterios_create_report_tab`. | Done | Composes source view, Project Database report template, form tab, `openId`, `dataId` check, static layout validation, readback, and saved `plan_id`; browser render evidence remains stage 17. |
 | 1 | Add scenario tool `alterios_create_process_flow`. | Done | Composes task form, script refs, BPMN XML, `camunda:formKey`, diagram readback, optional process start/task smoke, optional task completion, and saved `plan_id`. |
@@ -151,9 +152,9 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 
 ## Следующие действия
 
-В текущем closeout-этапе активная разработка закрыта после UI/HAR evidence,
-перевода Markdown-документации на русский и добавления native clone tool.
-Следующая разработка требует отдельного решения о рестарте работ.
+Текущий stage 17 начат с replay/smoke foundation. Следующая практическая часть -
+render/UI evidence для embedded Stimulsoft viewer и расширение runtime проверок
+там, где есть надежный renderer/export или browser evidence.
 
 Отложенные кандидаты:
 

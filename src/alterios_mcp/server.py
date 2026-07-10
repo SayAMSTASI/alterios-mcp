@@ -25,6 +25,7 @@ from .client import (
 from .discovery import discover_readonly, list_objects, list_projects
 from .form_surface import analyze_form_surface
 from .profile_smoke import run_profile_smoke
+from .replay_smoke import run_replay_smoke
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
@@ -5316,6 +5317,24 @@ def alterios_profile_smoke_matrix(
         include_project_discovery=include_project_discovery,
         include_project_ids=include_project_ids,
         include_project_names=include_project_names,
+    )
+
+
+@mcp.tool()
+def alterios_replay_smoke(
+    profile: str | None = None,
+    project_id: str | None = None,
+    include_live: bool = False,
+    expected_tool_count_min: int = 74,
+) -> dict[str, Any]:
+    """Run local/read-only MCP replay smoke checks after an update."""
+    if expected_tool_count_min < 1:
+        raise ValueError("expected_tool_count_min must be positive.")
+    return run_replay_smoke(
+        profile=profile,
+        project_id=project_id,
+        include_live=include_live,
+        expected_tool_count_min=expected_tool_count_min,
     )
 
 
