@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Form Surfaces"
+  short_description: "Design Alterios forms and views"
+  default_prompt: "Use $alterios-form-view-surface to analyze or build Alterios forms and views."

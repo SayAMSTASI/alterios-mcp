@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Project Inventory"
+  short_description: "Inventory Alterios project base"
+  default_prompt: "Use $alterios-project-base-inventory to inventory an Alterios project base safely."

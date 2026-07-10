@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios PM Control"
+  short_description: "Track Alterios MCP delivery stages"
+  default_prompt: "Use $alterios-pm-control-loop to manage Alterios MCP stages, risks, and next actions."

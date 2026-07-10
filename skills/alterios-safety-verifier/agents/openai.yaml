@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Safety Verifier"
+  short_description: "Verify Alterios MCP safety gates"
+  default_prompt: "Use $alterios-safety-verifier to verify Alterios MCP writes, scans, tests, and readback."

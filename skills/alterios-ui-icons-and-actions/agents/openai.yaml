@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios UI Icons"
+  short_description: "Review Alterios icons and actions"
+  default_prompt: "Use $alterios-ui-icons-and-actions to validate Alterios form icons and action order."

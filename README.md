@@ -349,6 +349,24 @@ write-capable tool-а нужно одновременно:
 Текущая реинвентаризация write-surface и project base:
 [docs/reinventory-2026-07-10.md](docs/reinventory-2026-07-10.md).
 
+## Repo-Owned Skills
+
+Первый набор Codex skills хранится в `skills/`. Это не замена MCP tools, а
+тонкие рабочие инструкции для повторяемых задач Alterios:
+
+- `alterios-project-base-inventory` - инвентаризация project base и route evidence;
+- `alterios-form-view-surface` - формы, представления, layout и `openId`;
+- `alterios-ui-icons-and-actions` - Google Fonts Icons, `iconId` и порядок действий;
+- `alterios-script-bpmn-flow` - scripts, BPMN, task forms и side effects;
+- `alterios-write-tools` - guarded typed write tools, dry-run и readback;
+- `alterios-stimulsoft-project-db` - Stimulsoft отчеты от Project Database;
+- `alterios-safety-verifier` - проверки, секреты, write-gate и UI/readback;
+- `alterios-pm-control-loop` - этапы, риски, acceptance criteria и handoff.
+
+Каждый skill содержит `SKILL.md`, `agents/openai.yaml` и
+`references/source-map.md`, который указывает на проверенные документы и
+матрицы в `docs/`.
+
 ## Practice-Сценарии
 
 Для тестового проекта можно держать отдельный воспроизводимый practice chain:

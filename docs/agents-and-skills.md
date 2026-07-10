@@ -272,6 +272,11 @@ Done:
 Skills добавляются только после того, как соответствующий workflow уже проверен
 кодом или live sandbox. Иначе skill начнет закреплять догадки.
 
+Первый набор из 8 repo-owned skills создан в `skills/`. Эти skills являются
+тонкими диспетчерами: `SKILL.md` содержит триггеры, workflow, safety rules и
+границы ответственности, а `references/source-map.md` указывает на проверенные
+docs, JSON-матрицы, тесты и кодовые области.
+
 | Skill | Когда создавать | Основной владелец | Что должен знать |
 |---|---|---|---|
 | `alterios-project-base-inventory` | После deep inventory project-base matrix | Project Base Explorer | Профиль, project_id, listandcount, object totals, route/readback evidence |
