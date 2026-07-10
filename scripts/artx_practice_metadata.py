@@ -45,6 +45,7 @@ EDIT_FORM_NAME = "MCP Practice. Карточка записи"
 MAIN_FORM_NAME = "MCP Practice"
 GROUP_NAME = "MCP Practice"
 CONTENT_ROW_TITLE = "MCP Practice. Тестовая запись"
+OPENID_CONTROL_ROW_TITLE = "MCP Practice. OpenId control row"
 
 SAVE_ICON_ID = "95ec6613-fdcc-4ad5-b93f-16e871b8cbbc"
 ADD_ICON_ID = "de3b1bed-27d2-4963-8024-64e7d71d9fb2"
@@ -60,6 +61,8 @@ BPMN_DIAGRAM_NAME = "MCP Practice. BPMN Sandbox"
 BPMN_DIAGRAM_MARKER = "Codex-managed: alterios-mcp BPMN/process/task sandbox."
 REPORT_NAME = "MCP Practice. Report Sandbox"
 REPORT_MARKER = "Codex-managed: alterios-mcp report sandbox."
+OPENID_REPORT_TAB_NAME = "\u041e\u0442\u0447\u0435\u0442 openId"
+OPENID_REPORT_CELL_NAME = "\u041e\u0442\u0447\u0435\u0442 openId"
 
 BPMN_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL"
 BPMNDI_NS = "http://www.omg.org/spec/BPMN/20100524/DI"
@@ -265,7 +268,7 @@ def setup_metadata(
         client,
         results,
         EDIT_FORM_NAME,
-        build_edit_form(view["_id"], view_fields),
+        build_edit_form(view["_id"], view_fields, report_id=report.get("_id") if report else None),
         profile=profile,
         project_id=project_id,
         execute=execute,
@@ -296,6 +299,7 @@ def setup_metadata(
 
     ensure_group(client, results, main_form["_id"], profile=profile, project_id=project_id, execute=execute)
     content = ensure_practice_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
+    ensure_openid_control_content(client, results, content_type["_id"], fields, profile=profile, project_id=project_id, execute=execute)
     if content and content.get("_id"):
         ensure_practice_comment(client, results, content["_id"], profile=profile, project_id=project_id, execute=execute)
         ensure_file_upload(client, results, content_type["_id"], fields, content, profile=profile, project_id=project_id, execute=execute)
@@ -796,6 +800,55 @@ def ensure_practice_content(
     return created
 
 
+def ensure_openid_control_content(
+    client: AlteriosClient,
+    results: list[Result],
+    content_type_id: str,
+    fields: list[dict[str, Any]],
+    *,
+    profile: str,
+    project_id: str,
+    execute: bool,
+) -> dict[str, Any] | None:
+    field_mnames = field_mnames_by_suffix(fields)
+    rows = list_content_rows(client, content_type_id, limit=500)
+    existing = next((row for row in rows if first((row.get("fields") or {}).get(field_mnames["title"])) == OPENID_CONTROL_ROW_TITLE), None)
+    payload_fields = {
+        field_mnames["title"]: [OPENID_CONTROL_ROW_TITLE],
+        field_mnames["status"]: ["draft"],
+        field_mnames["score"]: [13],
+        field_mnames["checked_at"]: ["2026-07-10"],
+        field_mnames["verified"]: [False],
+        field_mnames["comment"]: ["OpenId context control row for embedded report and view-data checks."],
+    }
+    if existing:
+        updated = dict(existing)
+        updated["fields"] = dict(existing.get("fields") or {})
+        if all(updated["fields"].get(key) == value for key, value in payload_fields.items()):
+            results.append(Result("exists", "content", OPENID_CONTROL_ROW_TITLE, existing["_id"]))
+            return existing
+        updated["fields"].update(payload_fields)
+        payload = content_save_payload(updated)
+        saved = write_rest(client, "PATCH", "/api/contents/save", payload, profile=profile, project_id=project_id, execute=execute)
+        if not execute:
+            results.append(Result("planned", "content", OPENID_CONTROL_ROW_TITLE, existing["_id"]))
+            return existing
+        results.append(Result("updated", "content", OPENID_CONTROL_ROW_TITLE, existing["_id"]))
+        return saved if isinstance(saved, dict) else updated
+
+    payload = {"contentTypeId": content_type_id, "fields": payload_fields}
+    write_rest(client, "POST", "/api/contents/save", payload, profile=profile, project_id=project_id, execute=execute)
+    if not execute:
+        results.append(Result("planned", "content", OPENID_CONTROL_ROW_TITLE))
+        return None
+    refreshed_rows = list_content_rows(client, content_type_id, limit=500)
+    created = next((row for row in refreshed_rows if first((row.get("fields") or {}).get(field_mnames["title"])) == OPENID_CONTROL_ROW_TITLE), None)
+    if not created or not created.get("_id"):
+        raise RuntimeError(f"Create content {OPENID_CONTROL_ROW_TITLE!r} was not visible on readback.")
+    results.append(Result("created", "content", OPENID_CONTROL_ROW_TITLE, created["_id"]))
+    return created
+
+
 def ensure_practice_comment(
     client: AlteriosClient,
     results: list[Result],
@@ -1168,11 +1221,14 @@ def build_add_form(content_type_id: str, fields: list[dict[str, Any]]) -> dict[s
     }
 
 
-def build_edit_form(view_id: str, view_fields: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def build_edit_form(view_id: str, view_fields: dict[str, dict[str, Any]], *, report_id: str | None = None) -> dict[str, Any]:
+    tabs = [{"name": None, "rows": [view_data_row(view_id, view_fields, editable=True), comments_row()]}]
+    if report_id:
+        tabs.append({"name": OPENID_REPORT_TAB_NAME, "rows": [report_row(report_id, name=OPENID_REPORT_CELL_NAME, open_id=True)]})
     return {
         "name": EDIT_FORM_NAME,
         "pageTitle": EDIT_FORM_NAME,
-        "tabs": [{"name": None, "rows": [view_data_row(view_id, view_fields, editable=True), comments_row()]}],
+        "tabs": tabs,
         "formActionContainers": [save_action_container()],
     }
 
@@ -1217,14 +1273,17 @@ def build_main_form(
     }
 
 
-def report_row(report_id: str) -> dict[str, Any]:
+def report_row(report_id: str, *, name: str = REPORT_NAME, open_id: bool = False) -> dict[str, Any]:
+    params = {"reportId": report_id, "fullscreenMode": False}
+    if open_id:
+        params["openId"] = True
     return {
         "cells": [
             {
-                "name": REPORT_NAME,
+                "name": name,
                 "type": "report",
                 "adding": {},
-                "params": {"reportId": report_id, "fullscreenMode": False},
+                "params": params,
                 "styles": flex_styles(),
                 "editing": {},
                 "emitting": {},
@@ -1884,12 +1943,21 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
     group = next((item for item in list_groups(client) if item.get("name") == GROUP_NAME and not item.get("root")), None)
     rows = list_content_rows(client, content_type_id, limit=500) if content_type_id else []
     content = None
+    openid_control_content = None
     if field_mnames:
         content = next(
             (
                 row
                 for row in rows
                 if first((row.get("fields") or {}).get(field_mnames["title"])) == CONTENT_ROW_TITLE
+            ),
+            None,
+        )
+        openid_control_content = next(
+            (
+                row
+                for row in rows
+                if first((row.get("fields") or {}).get(field_mnames["title"])) == OPENID_CONTROL_ROW_TITLE
             ),
             None,
         )
@@ -1915,10 +1983,18 @@ def verify_metadata(client: AlteriosClient, content_type_id: str | None) -> dict
         "view_id": view.get("_id") if view else None,
         "view_field_count": len(list_view_fields(client, view["_id"])) if view else 0,
         "forms": {name: form.get("_id") if form else None for name, form in forms.items()},
+        "edit_form_openid_report_tab": form_has_openid_report_tab(forms.get(EDIT_FORM_NAME), report.get("_id") if report else None),
         "group_id": group.get("_id") if group else None,
         "group_form_id": group.get("formId") if group else None,
         "content_id": content.get("_id") if content else None,
         "content_title": first((content.get("fields") or {}).get(field_mnames["title"])) if content and field_mnames else None,
+        "content_count": len(rows),
+        "openid_control_content_id": openid_control_content.get("_id") if openid_control_content else None,
+        "openid_control_content_title": (
+            first((openid_control_content.get("fields") or {}).get(field_mnames["title"]))
+            if openid_control_content and field_mnames
+            else None
+        ),
         "comment_found": bool(practice_comment),
         "comment_id": practice_comment.get("_id") if practice_comment else None,
         "comment_count": len(flatten_comments(comments)),
@@ -2137,6 +2213,20 @@ def report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
     if report_template_has_marker(full):
         return True
     return existing.get("name") == REPORT_NAME and report_has_dashboard_page(full)
+
+
+def form_has_openid_report_tab(form: dict[str, Any] | None, report_id: str | None) -> bool:
+    if not form or not report_id:
+        return False
+    for tab in form.get("tabs") or []:
+        if tab.get("name") != OPENID_REPORT_TAB_NAME:
+            continue
+        for row in tab.get("rows") or []:
+            for cell in row.get("cells") or []:
+                params = cell.get("params") or {}
+                if cell.get("type") == "report" and params.get("reportId") == report_id and params.get("openId") is True:
+                    return True
+    return False
 
 
 def report_template_payload(report: Any) -> dict[str, Any] | None:
