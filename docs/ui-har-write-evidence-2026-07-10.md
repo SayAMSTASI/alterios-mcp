@@ -15,7 +15,7 @@ network capture и прогнать через `alterios-ui-flow`.
 
 Scope:
 
-- Base URL: `https://lims.artx.ru`;
+- Base URL: `<alterios-base-url>`;
 - UI route: `/control/users`;
 - Created disposable user id: `47ac9730-2fa6-4cd2-8078-780f66bd009b`;
 - Created disposable email: `codex-ui-user-1783683550097@example.invalid`;
@@ -60,7 +60,7 @@ UI flow:
 
 Scope:
 
-- Source project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`;
+- Source project: `<sandbox-project-id>`;
 - Source content type: `572aedf5-500f-4538-82be-ae2170ff174a`;
 - Name: `MCP Practice. Песочница`.
 

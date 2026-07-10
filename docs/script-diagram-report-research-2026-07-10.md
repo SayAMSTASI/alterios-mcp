@@ -2,8 +2,8 @@
 
 Дата: 2026-07-10
 Profile: `artx`
-Project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`
-Base URL: `https://lims.artx.ru`
+Project: `<sandbox-project-id>`
+Base URL: `<alterios-base-url>`
 
 Это live research note по ART X sandbox project. Secrets не печатались и не
 сохранялись. Созданный report - Codex-managed sandbox object.

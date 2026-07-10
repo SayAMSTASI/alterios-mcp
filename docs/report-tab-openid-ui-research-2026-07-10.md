@@ -2,7 +2,7 @@
 
 Дата: 2026-07-10
 Profile: `artx`
-Project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`
+Project: `<sandbox-project-id>`
 
 Документ фиксирует live experiments по встраиванию Alterios report во вкладку
 формы с контекстом текущей записи.

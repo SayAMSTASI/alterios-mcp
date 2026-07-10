@@ -9,7 +9,7 @@
 | Параметр | Значение |
 |---|---|
 | Профиль | `artx` |
-| Project base / workspace | `4e247a6b-55ef-4665-b88c-3c156fee19ba` |
+| Project base / workspace | `<sandbox-project-id>` |
 | Приватный конфиг | Через `ALTERIOS_DOTENV_PATH`, секреты не выводились |
 | Smoke запуска | `alterios-discover.exe --profiles --profile artx --json` |
 | Read-only discovery | 15/15 маршрутов OK |

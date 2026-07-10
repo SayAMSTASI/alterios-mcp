@@ -7,7 +7,7 @@ ART X.
 ## Цель проверки
 
 - Profile: `artx`.
-- Project: `4e247a6b-55ef-4665-b88c-3c156fee19ba`.
+- Project: `<sandbox-project-id>`.
 - Sandbox content type: `572aedf5-500f-4538-82be-ae2170ff174a`,
   `MCP Practice. Песочница`.
 - Write gate для обычных writes: `ALTERIOS_MCP_ALLOW_WRITE=1`.

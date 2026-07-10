@@ -3,9 +3,9 @@
 Контекст анализа:
 
 - профиль MCP: `artx`;
-- экземпляр: `https://lims.artx.ru`;
-- проект: `4e247a6b-55ef-4665-b88c-3c156fee19ba`;
-- workspace: `https://lims.artx.ru/workspace/4e247a6b-55ef-4665-b88c-3c156fee19ba`;
+- экземпляр: `<alterios-base-url>`;
+- проект: `<sandbox-project-id>`;
+- workspace: `<alterios-base-url>/workspace/<sandbox-project-id>`;
 - режим анализа: live read-only API + безопасная write-практика на `/api/helps`
   и sandbox practice chain.
 
@@ -17,7 +17,7 @@
 
 | Сущность | Количество | Что означает |
 |---|---:|---|
-| Проекты экземпляра | 35 | Доступные workspace внутри `lims.artx.ru`. |
+| Проекты экземпляра | 35 | Доступные workspace внутри `<alterios-host>`. |
 | Типы материалов / content types | 14 | Модель данных: какие записи существуют. |
 | Поля | 2528 | Метаданные полей всех типов материалов. |
 | Представления | 22 | Таблицы/списки/справочные выборки поверх данных. |
@@ -139,7 +139,7 @@ Write:
 - endpoint: `POST /api/content-types/save`;
 - `fieldNamePrefix=mcp_practice`;
 - `contentNameTemplate={{field_test__mcp_practice_mcp_practice_title}}`;
-- воспроизводимая команда: `python scripts\artx_practice_metadata.py --profile artx --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba --execute`.
+- воспроизводимая команда: `python scripts\artx_practice_metadata.py --profile artx --project-id <sandbox-project-id> --execute`.
 
 ## Поля
 
@@ -439,7 +439,7 @@ Write:
 - group id: `aa997c9a-d81e-4042-91c5-bafa90b32819`;
 - `formId=3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`;
 - browser URL:
-  `https://lims.artx.ru/workspace/4e247a6b-55ef-4665-b88c-3c156fee19ba/group-viewer/aa997c9a-d81e-4042-91c5-bafa90b32819/form-viewer/3cfc70ab-3fb0-4567-8e25-7c863f0e87d0?menuAnchor=aa997c9a-d81e-4042-91c5-bafa90b32819`.
+  `<alterios-base-url>/workspace/<sandbox-project-id>/group-viewer/aa997c9a-d81e-4042-91c5-bafa90b32819/form-viewer/3cfc70ab-3fb0-4567-8e25-7c863f0e87d0?menuAnchor=aa997c9a-d81e-4042-91c5-bafa90b32819`.
 
 ## Скрипты / Scripts
 

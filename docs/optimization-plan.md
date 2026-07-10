@@ -105,11 +105,12 @@
 
 ## Этап 17. UI/report validation
 
-Статус: начат. Replay/smoke foundation реализован: `alterios-replay-smoke`
-и MCP tool `alterios_replay_smoke` проверяют локальные контракты MCP без записи
-и могут дополнительно запускать read-only live discovery.
+Статус: пропущен / отложен по решению пользователя от 2026-07-10. Replay/smoke
+foundation реализован: `alterios-replay-smoke` и MCP tool `alterios_replay_smoke`
+проверяют локальные контракты MCP без записи и могут дополнительно запускать
+read-only live discovery.
 
-Что закрыть:
+Что остается в отложенной зоне:
 
 1. Диагностика пустого Stimulsoft viewer.
 2. Render/PDF/image validation для отчетов.
@@ -144,5 +145,5 @@
 2. Сделать `alterios_create_material_module`. Готово.
 3. Сделать `alterios_create_report_tab`. Готово.
 4. Сделать `alterios_create_process_flow`. Готово.
-5. После сценарных tools перейти к render validation. Replay/smoke готов; следующий шаг - viewer/render diagnostics.
-6. После render validation перейти к inventory cache/diff health.
+5. Stage 17 пропущен по решению пользователя; viewer/render diagnostics остается deferred.
+6. Следующий активный шаг - stage 18: inventory cache/diff health.

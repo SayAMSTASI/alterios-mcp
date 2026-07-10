@@ -35,7 +35,6 @@ from alterios_mcp.write_control import (
 
 
 DEFAULT_PROFILE = "artx"
-PROJECT_ID = "4e247a6b-55ef-4665-b88c-3c156fee19ba"
 CONTENT_TYPE_NAME = "MCP Practice. Песочница"
 CONTENT_TYPE_MARKER = "Codex-managed: alterios-mcp metadata write practice. Safe to modify."
 FIELD_PREFIX = "mcp_practice"
@@ -198,7 +197,11 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Create or update the ARTX MCP practice chain.")
     parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Alterios profile to use.")
-    parser.add_argument("--project-id", default=PROJECT_ID, help="Target Alterios workspace id.")
+    parser.add_argument(
+        "--project-id",
+        default="",
+        help="Target Alterios workspace id. Defaults to ALTERIOS_<PROFILE>_PROJECT_ID from the private environment.",
+    )
     parser.add_argument("--execute", action="store_true", help="Run writes. Without this flag only a dry-run plan is returned.")
     parser.add_argument("--json", action="store_true", help="Print JSON output.")
     args = parser.parse_args(argv)

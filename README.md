@@ -263,7 +263,7 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 Проверка MCP после обновления без записи:
 
 ```powershell
-.\.venv\Scripts\python.exe -m alterios_mcp.replay_smoke --json --profile artx --project-id 4e247a6b-55ef-4665-b88c-3c156fee19ba
+.\.venv\Scripts\python.exe -m alterios_mcp.replay_smoke --json --profile artx --project-id <sandbox-project-id>
 ```
 
 Минимальная локальная проверка конфигурации без записи:
