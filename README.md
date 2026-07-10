@@ -82,8 +82,10 @@ MCP умеет собирать состав проекта:
 - patch Stimulsoft template;
 - создание комментариев;
 - security-операции users/user-groups/roles и delete через отдельные typed tools
-  с dangerous-gate, expected-проверками и readback;
-- планирование native content-type publish/transfer без записи до UI/HAR evidence.
+  с dangerous-gate, expected-проверками и readback; role/user-group
+  create/update/delete live-проверены в sandbox;
+- native content-type publish flags через `/api/content-types/save`; cross-project
+  publish/transfer остается planner-only до UI/HAR evidence.
 
 Есть generic-инструменты `alterios_rest_write` и `alterios_call_write_service`,
 но для штатной работы предпочтительны типизированные инструменты: они знают контекст,
@@ -284,8 +286,8 @@ ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 Для destructive/security операций нужен отдельный read-only анализ target,
 dry-run typed tool или `alterios_write_safety_preflight`, затем явные gates:
 `ALTERIOS_MCP_ALLOW_WRITE=1`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`,
-`allow_destructive=true`. Native content-type publish не выполняется без
-UI/HAR/API evidence маршрута, payload shape и readback-правил.
+`allow_destructive=true`. Cross-project native content-type publish/transfer не
+выполняется без UI/HAR/API evidence маршрута, payload shape и readback-правил.
 
 ## Основные пользовательские сценарии
 
@@ -357,6 +359,9 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   публикация типов материалов.
 - [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md) - матрица
   инструментов, route patterns и operation classes.
+- [docs/live-write-evidence-2026-07-10.md](docs/live-write-evidence-2026-07-10.md) -
+  live evidence по publish flags, role/user-group security delete и user-create
+  gap.
 - [docs/form-surface-inventory.md](docs/form-surface-inventory.md) - инвентаризация
   форм.
 - [docs/script-bpmn-linkage.md](docs/script-bpmn-linkage.md) - связи scripts,
@@ -372,10 +377,10 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
 Активная разработка текущего этапа закрыта. Новые работы стоит запускать
 отдельным решением и фиксировать в `docs/project-status.md`.
 
-1. Собрать read-only UI/HAR/API evidence для users, roles, delete и других
-   destructive/security маршрутов.
-2. После evidence добавить типизированные tools для безопасных permission-changing
-   и destructive операций, если они действительно нужны.
+1. Собрать UI/HAR/API evidence для disposable user create/delete и закрыть
+   backend-контракт `/api/users`.
+2. Собрать UI/HAR/API evidence для cross-project native content-type
+   publish/transfer, если такой UI-сценарий реально используется.
 3. Расширить Stimulsoft-проверку до render/PDF/image comparison, когда будет
    доступен надежный экспорт или renderer.
 4. Довести release packaging и changelog process, если репозиторий готовится к

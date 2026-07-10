@@ -90,6 +90,11 @@ users/user-groups/roles read/upsert/delete tools are guarded as `security`,
 form listeners can be patched at one cell path, selected content rows can be
 bulk-updated with per-row preflight, and native content-type publish remains a
 planner until UI/HAR route evidence exists.
+Live write practice on 2026-07-10 now verifies native content type publication
+flags on the sandbox type plus full role and user-group create/update/delete
+cycles with cleanup readback. User create remains backend-blocked by an
+unresolved `/api/users` contract and needs UI/HAR evidence before live delete can
+be verified on a disposable user.
 
 ## Completed
 
@@ -131,12 +136,13 @@ planner until UI/HAR route evidence exists.
 | Docs. Administrator guide and closeout | Added `docs/administrator-guide.md` as the administrator instruction for installation, profile configuration, MCP startup, safe writes, operating workflows, checks, diagnostics, update procedure, backup expectations, and current development closeout. | `b0cb63d` | `pytest`: 115 passed; README/admin-guide link check OK; `git diff --check` OK; README/admin-guide/status secret scan clean; no live write executed. |
 | Docs. Expanded user scenarios | Added `docs/expanded-user-scenarios.md` and linked it from README. The document expands scenarios for diagrams, views, groups, users, user groups, roles, inclusions, files, actions, listeners, multiple selection, reports, scripts, and content type transfer/publishing, while marking security/destructive and native publish gaps as evidence-required. | `8edd21a` | `pytest`: 115 passed; README/scenarios link check OK; `git diff --check` OK; README/scenarios secret scan clean; no live write executed. |
 | Build. Typed security/form-listener/bulk tools | Added typed users/user-groups/roles read/upsert/delete tools, `alterios_patch_form_cell_listeners`, `alterios_bulk_update_selected_content_fields`, and `alterios_plan_content_type_publish`. | `805b405` | `pytest`: 121 passed; `py_compile` for client/server OK; no-network tests cover security classification, dangerous gate enforcement, delete path audit, listener patching, bulk selected-row diff, and native publish blocking without UI/HAR evidence. No live security/delete write executed. |
+| Practice. Live security/delete and publish evidence | Verified sandbox content type publication flags, role create/update/delete, user-group create/update/delete, cleanup readback, and documented the remaining user-create backend contract gap. Also fixed redaction for `repassword`-style fields and stripped readback metadata from security audit target IDs. | `579bdf3` | Live `artx` writes: `/api/content-types/save` status `201`, final flags `share/shareCreating/shareEditing=true`, `shareDeleting=false`; `/api/roles` create `201`, update `200`, delete `200`, remaining roles `0`; `/api/user-groups` create `201`, update `200`, delete `200`, remaining groups `0`; user create attempts returned backend `HTTP 500` and cleanup scan found `0` sandbox users. Targeted tests for redaction/audit fixes passed. Evidence: `docs/live-write-evidence-2026-07-10.md`. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 13. Security/form/bulk typed-tool expansion | Done | Lead Engineer + Safety Verifier | Typed security admin tools, form listener patch, selected-content bulk update, and content-type publish planner are implemented and tested without live destructive/security execution. |
+| 13. Security/form/bulk typed-tool expansion | Done | Lead Engineer + Safety Verifier | Typed security admin tools, form listener patch, selected-content bulk update, and content-type publish planner are implemented. Role/user-group security writes and deletes plus sandbox content-type publish flags are live-verified; user create/delete and cross-project native transfer remain evidence-gated. |
 
 ## Backlog
 
@@ -147,10 +153,10 @@ planner until UI/HAR route evidence exists.
 | 1 | Add separate dangerous write gate for security/destructive flows. | Done | `alterios_write_safety_preflight` classifies generic REST routes; `alterios_rest_write` and destructive services now require both `ALTERIOS_MCP_ALLOW_WRITE=1` and `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` plus `allow_destructive=true` for dangerous execution. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
 | 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
-| 1 | Add typed users/user-groups/roles/delete tools. | Done | Implemented as dangerous `security` tools with dry-run, expected-name/email checks, dangerous env gate, `allow_destructive`, and readback. Unit-tested without live security/delete writes. |
+| 1 | Add typed users/user-groups/roles/delete tools. | Done | Implemented as dangerous `security` tools with dry-run, expected-name/email checks, dangerous env gate, `allow_destructive`, and readback. Role and user-group create/update/delete are live-verified in the ART X sandbox. User create remains backend-blocked by an unresolved `/api/users` contract, so user delete is not live-verified yet. |
 | 1 | Add separate form-listener tool. | Done | `alterios_patch_form_cell_listeners` patches only `tabs[tab].rows[row].cells[cell].emitting.listeners` with managed-form guard and readback. Unit-tested without live write. |
 | 1 | Add bulk selection tool. | Done | `alterios_bulk_update_selected_content_fields` updates selected content rows with duplicate/count/max guards, per-row preflight, diff, and readback. Unit-tested without live write. |
-| 1 | Add native content-type publish support. | Deferred | `alterios_plan_content_type_publish` validates source/targets and blocks native execution until UI/HAR route, method, payload shape, and target readback rules are captured. |
+| 1 | Add native content-type publish support. | Partial | Sandbox publication flags are live-verified through `/api/content-types/save` (`share`, `shareCreating`, `shareEditing`; `shareDeleting` intentionally left false). Cross-project native publish/transfer is still planner-only until UI/HAR route, method, payload shape, and target readback rules are captured. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | Deferred | File/script/BPMN/report paths now have API sandbox coverage; report-in-tab form wiring is browser-visible; remaining capture priority is destructive/security flows and renderer diagnostics for the empty embedded report viewer. Deferred because current development is being closed. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
@@ -171,7 +177,7 @@ planner until UI/HAR route evidence exists.
 |---|---|
 | Runtime service endpoint compatibility is blocked in the current `vniimt` config because the endpoint template is `/api/scripts/execute-manual`. | Keep runtime service names cataloged only; do not treat them as executable through manual-script UUID endpoint. |
 | Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; dangerous routes additionally require `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` and `allow_destructive=true`. |
-| Remaining risky surfaces are live execution of security/destructive flows, not absence of typed wrappers. | Keep users/user-groups/roles/destructive deletes behind dry-run, typed target checks, explicit dangerous gate, sandbox-only execution, rollback plan, and UI/readback verification. |
+| Remaining risky surfaces are user create/delete and cross-project native content-type transfer, not absence of typed wrappers. | Keep users/user-groups/roles/destructive deletes behind dry-run, typed target checks, explicit dangerous gate, sandbox-only execution, rollback plan, and UI/readback verification. Role and user-group cycles are live-verified; disposable user creation still needs UI/HAR evidence because `/api/users` currently returns a backend key error. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
 | Embedded report viewer currently renders an empty `viewer_*` container in the in-app browser, including for the static report that previously rendered. | Treat report template/API readback as verified, but keep data-bound report visual proof open until renderer/network behavior is diagnosed and the static report renders again. |
@@ -184,9 +190,9 @@ security/form/bulk expansion. Future work requires an explicit restart decision.
 
 Deferred candidates:
 
-1. Capture UI/HAR/API evidence for users/user-groups/roles/delete execution in
-   a dedicated sandbox, including rollback and UI-visible readback, before
-   marking these tools live-verified.
+1. Capture UI/HAR/API evidence for user creation/deletion in a dedicated
+   sandbox, including rollback and UI-visible readback, before marking
+   `alterios_upsert_user` and `alterios_delete_user` live-verified.
 2. Capture UI/HAR/API evidence for native content type publish/transfer if the
    Alterios UI exposes such a flow; until then use controlled source-to-target
    reproduction across explicit projects.

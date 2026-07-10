@@ -44,7 +44,7 @@ browser/HAR capture и sandbox write-практику.
 | Workflow/process/task | Да | `POST /api/diagrams`, `POST /api/processes`, `GET /api/tasks/`, `DELETE /api/tasks/complete` | Dedicated sandbox BPMN created; process started; user task completed; process readback completed. |
 | Files | Да | `POST /api/file/upload/field`, `GET /api/file/list` | File-field created; multipart upload executed; content value patched; file metadata readback verified. |
 | Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
-| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; users/user-groups/roles have typed security wrappers and no-network tests; live dangerous execution remains sandbox/UI evidence only. |
+| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; role and user-group create/update/delete live-verified in ART X sandbox; user create/delete remains blocked until `/api/users` UI/HAR contract is captured. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
 ## MCP Tools: 66
@@ -83,7 +83,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_list_comments` | Comment read |
 | `alterios_add_comment` | Controlled comment write |
 | `alterios_upsert_content_type` | Controlled typed content type create/update |
-| `alterios_plan_content_type_publish` | Content type publish/transfer planner; native write blocked until UI/HAR evidence |
+| `alterios_plan_content_type_publish` | Content type publish/transfer planner; native cross-project transfer blocked until UI/HAR evidence |
 | `alterios_upsert_field` | Controlled typed field create/update |
 | `alterios_create_content` | Controlled typed content create |
 | `alterios_upsert_group` | Controlled typed menu group create/update |
@@ -153,7 +153,9 @@ write-like, and 2 of them are still broad generic escape hatches:
 - `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`,
   `alterios_delete_user`, `alterios_delete_user_group`, and
   `alterios_delete_role` cover the first typed security/destructive admin
-  slice with dangerous gates and no-network tests;
+  slice with dangerous gates. Role and user-group create/update/delete now have
+  live sandbox evidence; user create/delete still needs UI/HAR evidence because
+  live `POST /api/users` returns a backend key error;
 - `alterios_upsert_script` and `alterios_execute_manual_script` now cover saved
   script upsert plus manual UUID execution;
 - `alterios_upsert_bpmn_diagram`, `alterios_start_process`,
@@ -167,10 +169,10 @@ write-like, and 2 of them are still broad generic escape hatches:
 
 Next coverage work must therefore focus on the remaining non-normal surfaces:
 
-1. live sandbox/UI evidence for security/destructive execution, including
-   rollback and user-visible readback;
-2. native content-type publish route evidence from UI/HAR before adding an
-   executing native publish tool;
+1. UI/HAR evidence for user creation/deletion, including rollback and
+   user-visible readback;
+2. native cross-project content-type publish/transfer route evidence from UI/HAR
+   before adding an executing native transfer tool;
 3. rendered Stimulsoft proof for report layouts where visual acceptance matters.
 
 ## Runtime Services: 14
@@ -263,24 +265,24 @@ Statuses:
 | 56 | GET | `/api/tasks/` | Active task read | `live_read` |
 | 57 | DELETE | `/api/tasks/complete` | Task transition/complete | `live_write` |
 | 58 | GET | `/api/roles/listandcount` | Role read | `live_read` |
-| 59 | POST | `/api/users` | User create | `typed_guarded`, `needs_sandbox_execution` |
-| 60 | PATCH | `/api/users/{userId}` | User update variant | `typed_guarded`, `needs_sandbox_execution` |
-| 61 | PUT | `/api/users/{userId}` | User update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 62 | PUT | `/api/users` | User update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 63 | DELETE | `/api/users/{userId}` | User delete | `typed_guarded`, `needs_sandbox_execution` |
-| 64 | DELETE | `/api/users` | User delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 65 | POST | `/api/user-groups` | User group create | `typed_guarded`, `needs_sandbox_execution` |
-| 66 | PATCH | `/api/user-groups/{userGroupId}` | User group update variant | `typed_guarded`, `needs_sandbox_execution` |
-| 67 | PUT | `/api/user-groups/{userGroupId}` | User group update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 68 | PUT | `/api/user-groups` | User group update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 69 | DELETE | `/api/user-groups/{userGroupId}` | User group delete | `typed_guarded`, `needs_sandbox_execution` |
-| 70 | DELETE | `/api/user-groups` | User group delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 71 | POST | `/api/roles` | Role create | `typed_guarded`, `needs_sandbox_execution` |
-| 72 | PATCH | `/api/roles/{roleId}` | Role update variant | `typed_guarded`, `needs_sandbox_execution` |
-| 73 | PUT | `/api/roles/{roleId}` | Role update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 74 | PUT | `/api/roles` | Role update fallback variant | `typed_guarded`, `needs_sandbox_execution` |
-| 75 | DELETE | `/api/roles/{roleId}` | Role delete | `typed_guarded`, `needs_sandbox_execution` |
-| 76 | DELETE | `/api/roles` | Role delete fallback variant | `typed_guarded`, `needs_sandbox_execution` |
+| 59 | POST | `/api/users` | User create | `typed_guarded`, `blocked_backend_key_error`, `needs_ui_har` |
+| 60 | PATCH | `/api/users/{userId}` | User update variant | `typed_guarded`, `needs_disposable_user` |
+| 61 | PUT | `/api/users/{userId}` | User update fallback variant | `typed_guarded`, `needs_disposable_user` |
+| 62 | PUT | `/api/users` | User update fallback variant | `typed_guarded`, `needs_disposable_user` |
+| 63 | DELETE | `/api/users/{userId}` | User delete | `typed_guarded`, `needs_disposable_user` |
+| 64 | DELETE | `/api/users` | User delete fallback variant | `typed_guarded`, `needs_disposable_user` |
+| 65 | POST | `/api/user-groups` | User group create | `typed_guarded`, `live_write` |
+| 66 | PATCH | `/api/user-groups/{userGroupId}` | User group update variant | `typed_guarded`, `live_write` |
+| 67 | PUT | `/api/user-groups/{userGroupId}` | User group update fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 68 | PUT | `/api/user-groups` | User group update fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 69 | DELETE | `/api/user-groups/{userGroupId}` | User group delete | `typed_guarded`, `live_write` |
+| 70 | DELETE | `/api/user-groups` | User group delete fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 71 | POST | `/api/roles` | Role create | `typed_guarded`, `live_write` |
+| 72 | PATCH | `/api/roles/{roleId}` | Role update variant | `typed_guarded`, `live_write` |
+| 73 | PUT | `/api/roles/{roleId}` | Role update fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 74 | PUT | `/api/roles` | Role update fallback variant | `typed_guarded`, `fallback_not_executed` |
+| 75 | DELETE | `/api/roles/{roleId}` | Role delete | `typed_guarded`, `live_write` |
+| 76 | DELETE | `/api/roles` | Role delete fallback variant | `typed_guarded`, `fallback_not_executed` |
 
 ## What Counts As "All Types"
 
@@ -297,9 +299,9 @@ every internal route in advance. A class is considered covered only when it has:
 By that definition, all main operation classes are represented. The not-yet
 closed areas are:
 
-- live execution evidence for users/user-groups/roles security writes;
-- live execution evidence for destructive delete flows;
-- native content-type publish route and payload evidence.
+- UI/HAR evidence for disposable user creation/deletion;
+- native cross-project content-type publish/transfer route and payload evidence;
+- rendered Stimulsoft proof for report layouts where visual acceptance matters.
 
 These are deliberately not marked complete until each has a sandbox scenario,
 HAR/API evidence, execution gate, and readback/UI verification.

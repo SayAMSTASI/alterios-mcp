@@ -377,13 +377,14 @@ def _security_resource_operation(
 ) -> WriteOperation:
     method = "DELETE" if action == "delete" else ("PATCH" if resource_id else "POST")
     path = f"/api/{collection}/{resource_id}" if resource_id else f"/api/{collection}"
+    sanitized_request = strip_alterios_metadata(request)
     return _resource_operation(
         name=f"{method} {path}",
         kind=kind,
         method=method,
         path=path,
         summary=summary,
-        request=request,
+        request=sanitized_request,
         risk_level="security",
     )
 

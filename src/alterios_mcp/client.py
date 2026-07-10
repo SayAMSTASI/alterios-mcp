@@ -983,7 +983,7 @@ def _redact_sensitive_query_text(value: str) -> str:
 
 def _is_sensitive_config_key(key: str) -> bool:
     normalized = key.lower().replace("-", "_")
-    return normalized in {"api_key", "apikey", "authorization", "password", "secret", "token"} or normalized.endswith("_token")
+    return _is_sensitive_key_name(normalized)
 
 
 def _same_profile(left: str, right: str) -> bool:
@@ -994,11 +994,22 @@ def _same_profile(left: str, right: str) -> bool:
     return normalize_profile_key(left) == normalize_profile_key(right)
 
 
+def _is_sensitive_key_name(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    compact = normalized.replace("_", "")
+    return (
+        normalized in {"api_key", "apikey", "authorization", "secret", "token"}
+        or "password" in normalized
+        or "secret" in normalized
+        or compact.endswith("apikey")
+        or normalized.endswith("_token")
+    )
+
+
 def redact_sensitive(value: Any) -> Any:
-    sensitive_keys = {"apikey", "api_key", "authorization", "password", "token"}
     if isinstance(value, dict):
         return {
-            key: "<redacted>" if key.lower() in sensitive_keys else redact_sensitive(item)
+            key: "<redacted>" if _is_sensitive_key_name(str(key)) else redact_sensitive(item)
             for key, item in value.items()
         }
     if isinstance(value, list):

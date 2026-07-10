@@ -71,8 +71,9 @@ Every controlled write returns:
 - `response` - `null` for dry-run or the redacted Alterios response after real
   execution.
 
-Request fields named like tokens, passwords, API keys, or auth headers are
-redacted from audit output.
+Request fields named like tokens, passwords, repeated passwords, password
+recovery codes, secrets, API keys, or auth headers are redacted from audit
+output.
 
 ## Future Typed Write Tools
 
@@ -114,3 +115,16 @@ A dangerous-flow run must start read-only:
 Prefer typed security tools over generic REST writes for users, user groups,
 roles, and delete flows. Do not execute them in production until the dry-run
 target and rollback/readback plan are reviewed.
+
+2026-07-10 live sandbox evidence:
+
+- role create/update/delete is verified with dry-run, dangerous gates, live
+  execution, delete readback, and cleanup scan;
+- user-group create/update/delete is verified with dry-run, dangerous gates,
+  live execution, delete readback, and cleanup scan;
+- user create/delete is not live-verified yet because `POST /api/users` returns
+  a backend key error even with a disabled disposable sandbox payload and
+  `password/repassword`; use UI/HAR capture before marking this flow complete;
+- content type publication flags are verified through `/api/content-types/save`;
+  cross-project native publish/transfer remains planner-only until UI/HAR route
+  evidence is available.

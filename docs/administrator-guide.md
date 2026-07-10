@@ -476,6 +476,17 @@ tools:
 разрешается добавлять только после UI/HAR evidence маршрута, payload shape и
 readback правил по каждому target project.
 
+Практическая проверка 2026-07-10:
+
+- флаги публикации типа материала (`share`, `shareCreating`, `shareEditing`)
+  live-проверены через `/api/content-types/save` на sandbox type
+  `MCP Practice. Песочница`; `shareDeleting` намеренно оставлен `false`;
+- role и user-group create/update/delete live-проверены с dangerous gate,
+  dry-run перед записью, delete readback и cleanup scan;
+- user create/delete пока не live-проверен: `POST /api/users` возвращает
+  backend key error даже при отключенном disposable payload с
+  `password/repassword`; перед production-сценарием нужен UI/HAR capture.
+
 ### 10.7. Установка skills
 
 Dry-run установки:
@@ -709,9 +720,12 @@ git pull --ff-only
 - реализованы typed write tools для metadata/data, files, forms/views,
   scripts/BPMN/tasks и reports;
 - реализованы typed security tools для users/user-groups/roles/delete с
-  dangerous gate и no-network тестами;
+  dangerous gate, no-network тестами и live-проверкой role/user-group
+  create/update/delete в sandbox;
 - реализованы typed form listener patch и bulk selected-content update;
-- реализован planner для native content-type publish/transfer без live записи;
+- live-проверены sandbox publication flags типа материала через
+  `/api/content-types/save`; cross-project native publish/transfer остается
+  planner-only до UI/HAR evidence;
 - реализованы repo-owned skills и installer;
 - создан Documentation Scribe / Писарь;
 - README переведен в пользовательскую точку входа;
@@ -719,10 +733,10 @@ git pull --ff-only
 
 Оставшиеся работы не должны блокировать эксплуатацию текущего MCP:
 
-- live execution destructive/security tools разрешать только после UI/HAR/API
-  evidence, rollback-плана и sandbox readback;
-- executing native content-type publish tool добавлять только после UI/HAR
-  route и payload evidence;
+- user create/delete разрешать только после UI/HAR/API evidence,
+  rollback-плана и sandbox readback;
+- executing native cross-project content-type publish tool добавлять только
+  после UI/HAR route и payload evidence;
 - Stimulsoft render/PDF/image comparison остается расширением validator-а;
 - release packaging и changelog process остаются отдельным release-этапом.
 

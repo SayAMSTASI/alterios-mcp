@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from alterios_mcp import server
+from alterios_mcp.client import redact_sensitive
 from alterios_mcp.write_control import (
     ControlledWriteError,
     WriteOperation,
@@ -51,7 +52,16 @@ def test_dry_run_audit_redacts_sensitive_request_values() -> None:
         method="POST",
         path="/api/example",
         target_ids=("record-1",),
-        request={"body": {"token": "secret-token", "password": "secret-password", "name": "demo"}},
+        request={
+            "body": {
+                "token": "secret-token",
+                "password": "secret-password",
+                "repassword": "secret-password",
+                "passwordRecoverCode": "recover-code",
+                "clientSecret": "client-secret",
+                "name": "demo",
+            }
+        },
     )
 
     audit = build_write_audit(
@@ -65,7 +75,13 @@ def test_dry_run_audit_redacts_sensitive_request_values() -> None:
     assert audit["status"] == "dry_run"
     assert audit["operation"]["request"]["body"]["token"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["password"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["repassword"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["passwordRecoverCode"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["clientSecret"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["name"] == "demo"
+    assert redact_sensitive({"planned_payload": {"repassword": "secret-password"}}) == {
+        "planned_payload": {"repassword": "<redacted>"}
+    }
 
 
 def test_write_execution_requires_env_gate() -> None:
@@ -1309,6 +1325,42 @@ def test_upsert_user_execution_requires_dangerous_gate_without_real_network() ->
             profile="vniimt",
             project_id="project-1",
         )
+
+
+def test_security_upsert_audit_strips_readback_metadata_target_ids_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def user_group_by_id(self, user_group_id: str) -> FakeResponse:
+            assert user_group_id == "group-1"
+            return FakeResponse(
+                {
+                    "_id": "group-1",
+                    "name": "Sandbox group",
+                    "projectId": "project-1",
+                    "authorId": "author-1",
+                    "updatedBy": {"_id": "updated-by-1"},
+                    "users": [],
+                }
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_user_group(
+            {"description": "changed"},
+            user_group_id="group-1",
+            expected_name="Sandbox group",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["audit"]["operation"]["target_ids"] == ["group-1", "project-1"]
+    assert "author-1" not in str(result["audit"])
+    assert "updated-by-1" not in str(result["audit"])
 
 
 def test_delete_role_dry_run_uses_security_delete_path_without_real_network() -> None:
