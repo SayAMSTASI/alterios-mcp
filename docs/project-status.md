@@ -55,6 +55,9 @@ verification, and skill curation.
 Repo-owned skills have now been forward-tested with read-only subagents,
 improved from the findings, and installed into the local Codex skills directory
 with absolute source-map references back to this repository.
+Profile-level live smoke now has a reusable `alterios-profile-smoke` CLI,
+MCP tool `alterios_profile_smoke_matrix`, and sanitized JSON/Markdown evidence
+for configured Alterios instances.
 
 ## Completed
 
@@ -88,12 +91,13 @@ with absolute source-map references back to this repository.
 | Design. Agent task matrix | Expanded `docs/agents-and-skills.md` into a concrete multi-agent task contract and synced `docs/roadmap.md` with the expanded role set. | `703e593` | `pytest`: 95 passed; `git diff --check` OK; docs secret scan found only public write-gate variable names. |
 | Build. Repo-owned skill set | Added the first 8 repo-owned Alterios skills under `skills/`, each with `SKILL.md`, `agents/openai.yaml`, and `references/source-map.md`; added structure tests and documented the set in README/agents docs. | `d664588` | Skill Creator `quick_validate`: 8/8 valid; `pytest`: 97 passed; `git diff --check` OK; skills/docs secret scan clean; two read-only subagents reviewed references, required rules, duplication risks, and acceptance checks. |
 | Build. Skill forward-test and installer | Added `scripts/install_repo_skills.py`, installer tests, install documentation, forward-test report, PM inventory template, and skill improvements from three read-only subagent scenarios; installed the 8 skills into `C:\Users\admin\.codex\skills`. | `85acdc7` | Skill Creator `quick_validate`: repo 8/8 valid and installed 8/8 valid; `pytest`: 100 passed; installer dry-run reports 8 `skip` after install; installed source maps have no `../../../` paths. |
+| Build. Profile-level smoke matrix | Added `alterios-profile-smoke`, MCP tool `alterios_profile_smoke_matrix`, unit tests, README guidance, and sanitized live evidence in `docs/profile-smoke-matrix-2026-07-10.*`. | `c90963f` | Live read-only smoke: 2 profiles, project lists OK for both, 53 projects total, default-project route discovery 15/15 OK for both, write gate false; `pytest`: 103 passed; `git diff --check` OK; artifact secret/URL/UUID scan clean. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 9. Profile-level smoke matrix | In Progress | Lead Engineer + Project Base Explorer + Safety Verifier | Run profile-level read-only smoke across configured Alterios instances, record profile/project coverage, and keep writes disabled. |
+| 10. Security/destructive sandbox gate | Planned | Lead Engineer + Safety Verifier + Write Tools Agent | Define and implement separate read-only-first evidence and extra gates for roles/security/delete flows before any destructive or permission-changing practice. |
 
 ## Backlog
 
@@ -108,7 +112,7 @@ with absolute source-map references back to this repository.
 | 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Done | First pass created 8 skills with source maps, OpenAI metadata, structure tests, and Skill Creator validation. |
 | 2 | Forward-test and install repo-owned skills. | Done | Three read-only subagent scenarios covered inventory/PM, form/icons/BPMN, and write/report/safety; installer copies skills to the local Codex skills dir and rewrites installed source maps to absolute repo paths. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
-| 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Next | Run `alterios_list_profiles`, then read-only project list per profile with explicit `project_id` only where needed. |
+| 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Done | `alterios-profile-smoke` and `alterios_profile_smoke_matrix` record sanitized profile/project coverage; live 2026-07-10 run covered `artx` and `vniimt` with 15/15 default-project route smoke each. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |
@@ -127,9 +131,10 @@ with absolute source-map references back to this repository.
 
 ## Next Concrete Actions
 
-1. Add profile-level smoke matrix across configured Alterios instances.
-2. Keep destructive/security flows out of normal write tools until a separate
+1. Keep destructive/security flows out of normal write tools until a separate
    sandbox scenario and destructive gate are implemented.
+2. Expand Stimulsoft validator with rendered PDF/image comparison once export
+   or render tooling is available.
 
 ## PM Update Checklist
 
