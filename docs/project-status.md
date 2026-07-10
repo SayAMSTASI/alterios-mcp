@@ -71,6 +71,9 @@ reach destructive or permission-changing routes.
 The multi-agent contract now includes Documentation Scribe / Писарь for
 administrator and user instructions aligned with ГОСТ/ЕСПД and ГОСТ 34, using
 the installed `gost-documentation-builder` skill and a local Alterios playbook.
+The root README is now a user-facing entrypoint: it explains functionality by
+work scenario, safe write gates, profile setup, MCP startup, agents/skills, and
+the next roadmap steps without exposing sensitive project details.
 
 ## Completed
 
@@ -108,6 +111,7 @@ the installed `gost-documentation-builder` skill and a local Alterios playbook.
 | Build. Typed metadata/data write tools | Added `alterios_list_content_types`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, and `alterios_upsert_help`. | `512cd55` | `pytest`: 111 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 | Build. Dangerous write safety gate | Added `alterios_write_safety_preflight`, security-route classification, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, dangerous gate audit visibility, PATCH support for generic REST writes, and profile-smoke gate reporting. | `70bc301` | `pytest`: 115 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 | Design. Documentation Scribe agent | Added Documentation Scribe / Писарь to the multi-agent matrix and created `docs/gost-documentation-scribe-agent.md` for ГОСТ-oriented administrator/user instructions. | `6b19685` | `pytest`: 115 passed; `git diff --check` OK; changed-file secret scan clean; no live write executed. |
+| Docs. User-facing README | Reworked the root README into a clear Russian user guide covering functionality, write safety, profile setup, MCP startup, common scenarios, agents/skills, verification, and next roadmap steps. | `5dea221` | `pytest`: 115 passed; README link check OK; `git diff --check` OK; README/docs secret scan clean; no live write executed. |
 
 ## Active Stage
 
@@ -153,9 +157,9 @@ the installed `gost-documentation-builder` skill and a local Alterios playbook.
 1. Capture read-only UI/HAR/API evidence for users/roles/delete routes and run
    `alterios_write_safety_preflight` for each candidate before any typed tool is
    added.
-2. Prepare source maps for administrator and user instructions: verified setup
-   commands, MCP startup, profile configuration, write gates, common workflows,
-   screenshots needed, and unresolved facts.
+2. Prepare separate administrator and user instructions from the README source
+   map: verified setup commands, MCP startup, profile configuration, write
+   gates, common workflows, screenshots needed, and unresolved facts.
 3. Expand Stimulsoft validator with rendered PDF/image comparison once export
    or render tooling is available.
 
