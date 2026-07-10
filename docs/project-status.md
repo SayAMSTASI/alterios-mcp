@@ -68,6 +68,9 @@ Security/destructive flows now have a separate dangerous gate:
 `alterios_write_safety_preflight`, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, and
 `allow_destructive=true` are required before generic REST/service execution can
 reach destructive or permission-changing routes.
+The multi-agent contract now includes Documentation Scribe / Писарь for
+administrator and user instructions aligned with ГОСТ/ЕСПД and ГОСТ 34, using
+the installed `gost-documentation-builder` skill and a local Alterios playbook.
 
 ## Completed
 
@@ -104,6 +107,7 @@ reach destructive or permission-changing routes.
 | Build. Profile-level smoke matrix | Added `alterios-profile-smoke`, MCP tool `alterios_profile_smoke_matrix`, unit tests, README guidance, and sanitized live evidence in `docs/profile-smoke-matrix-2026-07-10.*`. | `c90963f` | Live read-only smoke: 2 profiles, project lists OK for both, 53 projects total, default-project route discovery 15/15 OK for both, write gate false; `pytest`: 103 passed; `git diff --check` OK; artifact secret/URL/UUID scan clean. |
 | Build. Typed metadata/data write tools | Added `alterios_list_content_types`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, and `alterios_upsert_help`. | `512cd55` | `pytest`: 111 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
 | Build. Dangerous write safety gate | Added `alterios_write_safety_preflight`, security-route classification, `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, dangerous gate audit visibility, PATCH support for generic REST writes, and profile-smoke gate reporting. | `70bc301` | `pytest`: 115 passed; `git diff --check` OK; `py_compile` OK; changed-file secret scan clean; no live write executed. |
+| Design. Documentation Scribe agent | Added Documentation Scribe / Писарь to the multi-agent matrix and created `docs/gost-documentation-scribe-agent.md` for ГОСТ-oriented administrator/user instructions. | `6b19685` | `pytest`: 115 passed; `git diff --check` OK; changed-file secret scan clean; no live write executed. |
 
 ## Active Stage
 
@@ -125,6 +129,7 @@ reach destructive or permission-changing routes.
 | 2 | Build deep form/script/BPMN/icon inventory before skills. | Done | Added `alterios-deep-inventory` plus `docs/form-surface-inventory.*`, `docs/script-bpmn-linkage.*`, `docs/icon-usage-matrix.json`, and `docs/alterios-icon-standards.md`. |
 | 2 | Add repo-owned agents and skills scaffolding after deep inventory. | Done | First pass created 8 skills with source maps, OpenAI metadata, structure tests, and Skill Creator validation. |
 | 2 | Forward-test and install repo-owned skills. | Done | Three read-only subagent scenarios covered inventory/PM, form/icons/BPMN, and write/report/safety; installer copies skills to the local Codex skills dir and rewrites installed source maps to absolute repo paths. |
+| 2 | Add Documentation Scribe / Писарь agent for ГОСТ-oriented instructions. | Done | Added docs-only agent, local playbook, handoff format, and documentation pipeline. It reuses installed `gost-documentation-builder` instead of creating a duplicate repo-owned skill. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Next | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Done | `alterios-profile-smoke` and `alterios_profile_smoke_matrix` record sanitized profile/project coverage; live 2026-07-10 run covered `artx` and `vniimt` with 15/15 default-project route smoke each. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
@@ -148,7 +153,10 @@ reach destructive or permission-changing routes.
 1. Capture read-only UI/HAR/API evidence for users/roles/delete routes and run
    `alterios_write_safety_preflight` for each candidate before any typed tool is
    added.
-2. Expand Stimulsoft validator with rendered PDF/image comparison once export
+2. Prepare source maps for administrator and user instructions: verified setup
+   commands, MCP startup, profile configuration, write gates, common workflows,
+   screenshots needed, and unresolved facts.
+3. Expand Stimulsoft validator with rendered PDF/image comparison once export
    or render tooling is available.
 
 ## PM Update Checklist
