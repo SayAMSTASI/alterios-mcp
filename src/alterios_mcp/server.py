@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import os
+import time
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -15,6 +17,7 @@ from .client import (
     normalize_content_field_value,
     looks_like_uuid,
     listandcount_items,
+    report_full_item,
     strip_alterios_metadata,
 )
 from .discovery import discover_readonly, list_objects, list_projects
@@ -268,11 +271,12 @@ def _resource_operation(
     path: str,
     summary: str,
     request: dict[str, Any],
+    risk_level: str = "write",
 ) -> WriteOperation:
     return WriteOperation(
         name=name,
         kind=kind,
-        risk_level="write",
+        risk_level=risk_level,
         summary=summary,
         method=method,
         path=path,
@@ -404,6 +408,225 @@ def _view_field_save_payload(field: dict[str, Any]) -> dict[str, Any]:
     for key in ("contentType", "contentTypeField", "relatedViewField", "diagramsNames"):
         payload.pop(key, None)
     return payload
+
+
+def _find_script(
+    client: AlteriosClient,
+    *,
+    script_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if script_id:
+        body = client.script_by_id(script_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Script readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_scripts(limit=5000).body, name)
+    return None
+
+
+def _find_diagram(
+    client: AlteriosClient,
+    *,
+    diagram_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if diagram_id:
+        body = client.diagram_by_id(diagram_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Diagram readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_diagrams(limit=5000).body, name)
+    return None
+
+
+def _find_report(
+    client: AlteriosClient,
+    *,
+    report_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any] | None:
+    if report_id:
+        body = client.report_by_id(report_id).body
+        if not isinstance(body, dict):
+            raise ValueError("Report readback returned unexpected payload.")
+        return body
+    if name:
+        return _find_named_resource(client.list_reports(limit=5000).body, name)
+    return None
+
+
+def _response_items(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        for key in ("items", "comments", "rows", "data", "results", "values"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return listandcount_items(payload)
+
+
+def _processes_body(
+    client: AlteriosClient,
+    *,
+    diagram_id: str | None = None,
+    content_id: str | None = None,
+    process_id: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    return listandcount_items(
+        client.list_processes(
+            diagram_id=diagram_id,
+            content_id=content_id,
+            process_id=process_id,
+            limit=limit,
+            offset=0,
+        ).body
+    )
+
+
+def _tasks_body(
+    client: AlteriosClient,
+    *,
+    diagram_id: str | None = None,
+    content_id: str | None = None,
+    process_id: str | None = None,
+    task_id: str | None = None,
+) -> list[dict[str, Any]]:
+    return _response_items(
+        client.list_tasks(
+            diagram_id=diagram_id,
+            content_id=content_id,
+            process_id=process_id,
+            task_id=task_id,
+        ).body
+    )
+
+
+def _find_task(
+    client: AlteriosClient,
+    *,
+    task_id: str,
+    process_id: str | None = None,
+    diagram_id: str | None = None,
+    content_id: str | None = None,
+) -> dict[str, Any] | None:
+    queries = [
+        {"task_id": task_id, "process_id": process_id, "diagram_id": diagram_id, "content_id": content_id},
+        {"task_id": None, "process_id": process_id, "diagram_id": diagram_id, "content_id": content_id},
+        {"task_id": task_id, "process_id": None, "diagram_id": None, "content_id": None},
+    ]
+    for query in queries:
+        for task in _tasks_body(client, **query):
+            if task.get("_id") == task_id:
+                return task
+    return None
+
+
+def _assert_expected_task(
+    task: dict[str, Any],
+    *,
+    expected_process_id: str | None = None,
+    expected_content_id: str | None = None,
+    expected_diagram_id: str | None = None,
+) -> None:
+    expected = {
+        "processId": expected_process_id,
+        "contentId": expected_content_id,
+        "diagramId": expected_diagram_id,
+    }
+    for key, value in expected.items():
+        if value and task.get(key) != value:
+            raise ValueError(f"Task {task.get('_id')!r} {key} mismatch: expected {value!r}, got {task.get(key)!r}.")
+
+
+def _report_template_payload(report: Any) -> dict[str, Any] | None:
+    if not isinstance(report, dict):
+        return None
+    template = report.get("template")
+    if isinstance(template, str):
+        try:
+            template = json.loads(template)
+        except json.JSONDecodeError:
+            return None
+    return template if isinstance(template, dict) else None
+
+
+def _report_has_dashboard_page(report: Any) -> bool:
+    template = _report_template_payload(report)
+    if not isinstance(template, dict):
+        return False
+    page = (template.get("Pages") or {}).get("0")
+    return isinstance(page, dict) and page.get("Ident") == "StiDashboard"
+
+
+def _report_template_has_marker(report: Any, marker: str | None = None) -> bool:
+    template = _report_template_payload(report)
+    return isinstance(template, dict) and template.get("CodexMarker") == (marker or None)
+
+
+def _walk_values(value: Any) -> list[Any]:
+    values = [value]
+    if isinstance(value, dict):
+        for child in value.values():
+            values.extend(_walk_values(child))
+    elif isinstance(value, list):
+        for child in value:
+            values.extend(_walk_values(child))
+    return values
+
+
+def _contains_text(value: Any, expected: str) -> bool:
+    return any(expected in item for item in _walk_values(value) if isinstance(item, str))
+
+
+def _has_project_database(template: dict[str, Any] | None) -> bool:
+    if not isinstance(template, dict):
+        return False
+    for value in _walk_values(template):
+        if isinstance(value, dict) and value.get("ServiceName") == "Project Database":
+            return True
+        if isinstance(value, str) and value == "Project Database":
+            return True
+    return False
+
+
+def _report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
+    if MANAGED_MARKER in str(existing.get("description") or ""):
+        return True
+    if isinstance(full, dict) and MANAGED_MARKER in str(full.get("description") or ""):
+        return True
+    template = _report_template_payload(full)
+    return isinstance(template, dict) and MANAGED_MARKER in str(template.get("CodexMarker") or "")
+
+
+def _report_project_base_validation(
+    report: dict[str, Any],
+    *,
+    expected_view_name: str | None = None,
+    expected_marker: str | None = None,
+) -> dict[str, Any]:
+    template = _report_template_payload(report)
+    marker = template.get("CodexMarker") if isinstance(template, dict) else None
+    return {
+        "has_template": isinstance(template, dict),
+        "has_dashboard_page": _report_has_dashboard_page(report),
+        "has_project_database": _has_project_database(template),
+        "marker": marker,
+        "marker_matches": expected_marker is None or marker == expected_marker,
+        "view_name_matches": expected_view_name is None or _contains_text(template, expected_view_name),
+    }
+
+
+def _operation_result_shape(value: Any) -> str:
+    if isinstance(value, dict):
+        return "dict:" + ",".join(sorted(str(key) for key in value.keys())[:8])
+    if isinstance(value, list):
+        return f"list:{len(value)}"
+    return type(value).__name__
 
 
 @mcp.tool()
@@ -1182,6 +1405,469 @@ def alterios_view_data(
 
 
 @mcp.tool()
+def alterios_upsert_script(
+    name: str,
+    script_id: str | None = None,
+    script_type: str | None = None,
+    body: str | None = None,
+    active: bool | None = None,
+    share: bool | None = None,
+    config: dict[str, Any] | None = None,
+    libraries_ids: list[str] | None = None,
+    description: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios manual/event/diagram script."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_script(client, script_id=script_id, name=name)
+    if existing:
+        _assert_managed_or_allowed(existing, kind="Script", allow_unmanaged_update=allow_unmanaged_update)
+    elif body is None:
+        raise ValueError("body is required when creating a new script.")
+
+    effective_type = script_type or (existing or {}).get("type") or "manual"
+    if effective_type not in {"manual", "event", "diagram"}:
+        raise ValueError("script_type must be one of: manual, event, diagram.")
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp script.",
+        "type": effective_type,
+        "active": active if active is not None else (existing or {}).get("active", True),
+        "body": body if body is not None else (existing or {}).get("body") or "",
+        "share": share if share is not None else (existing or {}).get("share", False),
+        "config": config if config is not None else (existing or {}).get("config") or {},
+        "librariesIds": libraries_ids if libraries_ids is not None else (existing or {}).get("librariesIds") or [],
+    }
+    operation = _resource_operation(
+        name=("PUT /api/scripts" if existing else "POST /api/scripts"),
+        kind="script",
+        method="PUT" if existing else "POST",
+        path="/api/scripts",
+        summary="Create or update an Alterios script with managed-object guard and readback.",
+        request={"_id": payload.get("_id"), "name": name, "type": effective_type},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(existing, payload, ("name", "description", "type", "active", "body", "share", "config", "librariesIds")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_script(payload).as_dict()
+    saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
+    readback = client.script_by_id(saved_id).as_dict() if saved_id else {"body": _find_script(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_validate_script(
+    script_id: str | None = None,
+    name: str | None = None,
+    expected_type: str | None = None,
+    expected_active: bool | None = None,
+    expected_managed: bool = False,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read and validate an Alterios script by ID or name."""
+    if not script_id and not name:
+        raise ValueError("Pass script_id or name.")
+    script = _find_script(_client(profile, project_id), script_id=script_id, name=name)
+    if not script:
+        raise ValueError("Script was not found.")
+    validation = {
+        "type_matches": expected_type is None or script.get("type") == expected_type,
+        "active_matches": expected_active is None or script.get("active") is expected_active,
+        "managed": MANAGED_MARKER in str(script.get("description") or ""),
+        "managed_matches": not expected_managed or MANAGED_MARKER in str(script.get("description") or ""),
+        "has_body": bool(script.get("body")),
+        "has_config": isinstance(script.get("config"), dict),
+        "librariesIds_is_list": isinstance(script.get("librariesIds"), list),
+    }
+    return {"script": _resource_summary(script), "validation": validation, "script_type": script.get("type"), "active": script.get("active")}
+
+
+@mcp.tool()
+def alterios_upsert_bpmn_diagram(
+    name: str,
+    diagram_id: str | None = None,
+    value: str | None = None,
+    content_type_id: str | None = None,
+    create_on_start: bool | None = None,
+    delayed_start: bool | None = None,
+    description: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update a BPMN diagram."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_diagram(client, diagram_id=diagram_id, name=name)
+    if existing:
+        _assert_managed_or_allowed(existing, kind="Diagram", allow_unmanaged_update=allow_unmanaged_update)
+    elif value is None or content_type_id is None:
+        raise ValueError("value and content_type_id are required when creating a new BPMN diagram.")
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp BPMN diagram.",
+        "value": value if value is not None else (existing or {}).get("value") or "",
+        "contentTypeId": content_type_id if content_type_id is not None else (existing or {}).get("contentTypeId"),
+        "createOnStart": create_on_start if create_on_start is not None else (existing or {}).get("createOnStart", False),
+        "delayedStart": delayed_start if delayed_start is not None else (existing or {}).get("delayedStart", False),
+    }
+    operation = _resource_operation(
+        name=("PATCH /api/diagrams/{id}" if existing else "POST /api/diagrams"),
+        kind="bpmn_diagram",
+        method="PATCH" if existing else "POST",
+        path=f"/api/diagrams/{existing.get('_id')}" if existing else "/api/diagrams",
+        summary="Create or update a BPMN diagram with managed-object guard and readback.",
+        request={"_id": payload.get("_id"), "name": name, "contentTypeId": payload.get("contentTypeId")},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(existing, payload, ("name", "description", "value", "contentTypeId", "createOnStart", "delayedStart")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_diagram(payload).as_dict()
+    saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
+    readback = client.diagram_by_id(saved_id).as_dict() if saved_id else {"body": _find_diagram(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_list_process_tasks(
+    process_id: str | None = None,
+    diagram_id: str | None = None,
+    content_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read process instances and active tasks by process, diagram, or content context."""
+    if not process_id and not diagram_id and not content_id:
+        raise ValueError("Pass process_id, diagram_id, or content_id.")
+    client = _client(profile, project_id)
+    processes = _processes_body(client, process_id=process_id, diagram_id=diagram_id, content_id=content_id)
+    tasks = _tasks_body(client, process_id=process_id, diagram_id=diagram_id, content_id=content_id)
+    return {"processes": processes, "tasks": tasks, "process_count": len(processes), "task_count": len(tasks)}
+
+
+@mcp.tool()
+def alterios_start_process(
+    diagram_id: str,
+    content_id: str | None = None,
+    params: dict[str, Any] | None = None,
+    name: str | None = None,
+    start_message_id: str | None = None,
+    response_message_id: str | None = None,
+    contents: list[dict[str, Any]] | None = None,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or start a BPMN process. Execution creates workflow side effects."""
+    if not diagram_id.strip():
+        raise ValueError("diagram_id must not be empty.")
+    client = _client(profile, project_id)
+    diagram = _find_diagram(client, diagram_id=diagram_id)
+    if not diagram:
+        raise ValueError(f"Diagram {diagram_id!r} was not found.")
+    content = client.content_by_id(content_id).body if content_id else None
+    operation = _resource_operation(
+        name="POST /api/processes",
+        kind="process_start",
+        method="POST",
+        path="/api/processes",
+        summary="Start an Alterios BPMN process and read back process/tasks.",
+        request={
+            "diagramId": diagram_id,
+            "contentId": content_id,
+            "name": name,
+            "params": params,
+            "startMessageId": start_message_id,
+            "responseMessageId": response_message_id,
+        },
+        risk_level="workflow_side_effect",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    before = _processes_body(client, diagram_id=diagram_id, content_id=content_id) if content_id else []
+    response_payload: dict[str, Any] = {
+        "diagram": _resource_summary(diagram),
+        "content": _content_summary(content) if isinstance(content, dict) else None,
+        "preflight_process_count": len(before),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    started = client.start_process(
+        diagram_id,
+        content_id=content_id,
+        params=params,
+        name=name,
+        start_message_id=start_message_id,
+        response_message_id=response_message_id,
+        contents=contents,
+    ).as_dict()
+    body = started.get("body") if isinstance(started, dict) else None
+    process_id = body.get("processId") or body.get("_id") or body.get("id") if isinstance(body, dict) else None
+    readback_processes = _processes_body(client, process_id=str(process_id) if process_id else None, diagram_id=diagram_id, content_id=content_id)
+    if not process_id and readback_processes:
+        process = next((item for item in readback_processes if not item.get("completed") and not item.get("error")), None)
+        process = process or readback_processes[0]
+        process_id = process.get("_id")
+    readback_tasks = _tasks_body(client, process_id=str(process_id)) if process_id else []
+    if not readback_tasks:
+        readback_tasks = _tasks_body(client, diagram_id=diagram_id, content_id=content_id)
+    response_payload.update({"started": started, "process_id": process_id, "readback_processes": readback_processes, "readback_tasks": readback_tasks})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_complete_task(
+    task_id: str,
+    next_flow_id: str | None = None,
+    process_content: dict[str, Any] | None = None,
+    contents: list[dict[str, Any]] | None = None,
+    expected_process_id: str | None = None,
+    expected_content_id: str | None = None,
+    expected_diagram_id: str | None = None,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or complete a BPMN task. Execution advances workflow state."""
+    if not task_id.strip():
+        raise ValueError("task_id must not be empty.")
+    client = _client(profile, project_id)
+    task = _find_task(
+        client,
+        task_id=task_id,
+        process_id=expected_process_id,
+        diagram_id=expected_diagram_id,
+        content_id=expected_content_id,
+    )
+    if not task:
+        raise ValueError(f"Task {task_id!r} was not found.")
+    _assert_expected_task(
+        task,
+        expected_process_id=expected_process_id,
+        expected_content_id=expected_content_id,
+        expected_diagram_id=expected_diagram_id,
+    )
+    operation = _resource_operation(
+        name="DELETE /api/tasks/complete",
+        kind="task_complete",
+        method="DELETE",
+        path="/api/tasks/complete",
+        summary="Complete an Alterios task and read back related process/task state.",
+        request={"_id": task_id, "nextFlowId": next_flow_id, "processId": expected_process_id, "contentId": expected_content_id, "diagramId": expected_diagram_id},
+        risk_level="workflow_side_effect",
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {"preflight_task": task}
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    completed = client.complete_task(task_id, next_flow_id=next_flow_id, process_content=process_content, contents=contents or []).as_dict()
+    readback_tasks = _tasks_body(client, process_id=expected_process_id, diagram_id=expected_diagram_id, content_id=expected_content_id)
+    readback_processes = _processes_body(client, process_id=expected_process_id, diagram_id=expected_diagram_id, content_id=expected_content_id) if (expected_process_id or expected_diagram_id or expected_content_id) else []
+    response_payload.update({"completed": completed, "readback_tasks": readback_tasks, "readback_processes": readback_processes})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_validate_process_result(
+    process_id: str | None = None,
+    diagram_id: str | None = None,
+    content_id: str | None = None,
+    expected_completed: bool | None = None,
+    expected_error_absent: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Read and validate process completion/error state."""
+    if not process_id and not diagram_id and not content_id:
+        raise ValueError("Pass process_id, diagram_id, or content_id.")
+    processes = _processes_body(_client(profile, project_id), process_id=process_id, diagram_id=diagram_id, content_id=content_id)
+    selected = processes[0] if processes else None
+    validation = {
+        "found": selected is not None,
+        "completed_matches": selected is not None and (expected_completed is None or selected.get("completed") is expected_completed),
+        "error_absent_matches": selected is not None and (not expected_error_absent or not selected.get("error")),
+        "status": selected.get("status") if selected else None,
+        "stages": selected.get("stages") if selected else None,
+    }
+    return {"process": selected, "process_count": len(processes), "validation": validation}
+
+
+@mcp.tool()
+def alterios_upsert_report(
+    name: str,
+    report_id: str | None = None,
+    report_type: str | None = None,
+    template: str | dict[str, Any] | None = None,
+    description: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create/update an Alterios report and read it back through report full."""
+    if not name.strip():
+        raise ValueError("name must not be empty.")
+    client = _client(profile, project_id)
+    existing = _find_report(client, report_id=report_id, name=name)
+    full = client.report_by_id(existing["_id"]).body if existing and existing.get("_id") else None
+    if existing and not allow_unmanaged_update and not _report_is_manageable(existing, full):
+        raise ValueError(f"Report {existing.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
+    elif not existing and template is None:
+        raise ValueError("template is required when creating a new report.")
+    existing_type = (existing or {}).get("type")
+    full_type = full.get("type") if isinstance(full, dict) else None
+    existing_template = full.get("template") if isinstance(full, dict) else None
+    payload = {
+        **(existing or {}),
+        "name": name,
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp report.",
+        "type": report_type if report_type is not None else existing_type or full_type or "dashboard",
+        "template": template if template is not None else existing_template,
+    }
+    operation = _resource_operation(
+        name=("PUT /api/reports" if existing else "POST /api/reports"),
+        kind="report",
+        method="PUT" if existing else "POST",
+        path="/api/reports",
+        summary="Create or update an Alterios report and read it back through /api/reports/full.",
+        request={"_id": payload.get("_id"), "name": name, "type": payload.get("type")},
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(existing),
+        "diff": _resource_diff(full if isinstance(full, dict) else existing, payload, ("name", "description", "type", "template")),
+        "planned_payload": strip_alterios_metadata(payload),
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    saved = client.save_report(payload).as_dict()
+    saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
+    readback = client.report_by_id(saved_id).as_dict() if saved_id else {"body": _find_report(client, name=name)}
+    response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_patch_report_template(
+    report_id: str,
+    template: str | dict[str, Any],
+    expected_name: str | None = None,
+    expected_marker: str | None = None,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or replace only a report template while preserving report metadata."""
+    client = _client(profile, project_id)
+    existing = _find_report(client, report_id=report_id)
+    if not existing:
+        raise ValueError(f"Report {report_id!r} was not found.")
+    if expected_name and existing.get("name") != expected_name:
+        raise ValueError(f"Report name mismatch: expected {expected_name!r}, got {existing.get('name')!r}.")
+    if not allow_unmanaged_update and not _report_is_manageable(existing, existing):
+        raise ValueError(f"Report {report_id!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
+    validation = _report_project_base_validation(existing, expected_marker=expected_marker)
+    return alterios_upsert_report(
+        str(existing.get("name") or ""),
+        report_id=report_id,
+        report_type=str(existing.get("type") or "dashboard"),
+        template=template,
+        description=existing.get("description"),
+        allow_unmanaged_update=True,
+        dry_run=dry_run,
+        profile=profile,
+        project_id=project_id,
+    ) | {"template_preflight_validation": validation}
+
+
+@mcp.tool()
+def alterios_validate_report_project_base(
+    report_id: str,
+    expected_view_id: str | None = None,
+    expected_view_name: str | None = None,
+    expected_marker: str | None = None,
+    view_limit: int = 5,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate a report template and optionally read the source view through get-data-simplified."""
+    client = _client(profile, project_id)
+    report = client.report_by_id(report_id).body
+    if not isinstance(report, dict):
+        raise ValueError("Report readback returned unexpected payload.")
+    validation = _report_project_base_validation(report, expected_view_name=expected_view_name, expected_marker=expected_marker)
+    view_readback = None
+    if expected_view_id:
+        view_readback = client.view_data_simplified(expected_view_id, limit=view_limit, offset=0).as_dict()
+        body = view_readback.get("body") if isinstance(view_readback, dict) else None
+        rows = None
+        if isinstance(body, list):
+            rows = body
+        elif isinstance(body, dict):
+            rows = next((body.get(key) for key in ("items", "rows", "data", "results") if isinstance(body.get(key), list)), None)
+        validation["view_readback_ok"] = view_readback.get("status_code") in {200, 201}
+        validation["view_row_count"] = len(rows) if isinstance(rows, list) else None
+    return {"report": _resource_summary(report), "validation": validation, "view_readback": view_readback}
+
+
+@mcp.tool()
 def alterios_discover_readonly(
     profile: str | None = None,
     project_id: str | None = None,
@@ -1227,12 +1913,14 @@ def alterios_call_write_service(
 def alterios_execute_manual_script(
     script_id: str,
     args: dict[str, Any],
+    expected_name: str | None = None,
+    expected_active: bool | None = True,
     dry_run: bool = True,
     allow_destructive: bool = False,
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Plan or execute a manual Alterios script by UUID. Execution requires explicit write gates."""
+    """Plan or execute a manual Alterios script by UUID with preflight and readback."""
     operation = _manual_script_operation(script_id, args)
     audit = build_write_audit(
         profile=profile,
@@ -1242,8 +1930,23 @@ def alterios_execute_manual_script(
         write_enabled=_write_enabled(),
         allow_destructive=allow_destructive,
     )
+    client = _client(profile, project_id)
+    script = _find_script(client, script_id=script_id)
+    if not script:
+        raise ValueError(f"Script {script_id!r} was not found.")
+    if script.get("type") != "manual":
+        raise ValueError(f"Script {script_id!r} has type {script.get('type')!r}; expected 'manual'.")
+    if expected_name and script.get("name") != expected_name:
+        raise ValueError(f"Script name mismatch: expected {expected_name!r}, got {script.get('name')!r}.")
+    if expected_active is not None and script.get("active") is not expected_active:
+        raise ValueError(f"Script active mismatch: expected {expected_active!r}, got {script.get('active')!r}.")
+    response_payload: dict[str, Any] = {
+        "preflight": _resource_summary(script),
+        "script_type": script.get("type"),
+        "active": script.get("active"),
+    }
     if dry_run:
-        return controlled_write_result(audit=audit)
+        return controlled_write_result(audit=audit, response=response_payload)
 
     assert_write_allowed(
         profile=profile,
@@ -1252,13 +1955,13 @@ def alterios_execute_manual_script(
         write_enabled=_write_enabled(),
         allow_destructive=allow_destructive,
     )
-    response = _client(profile, project_id).call_script_service(
-        script_id,
-        args,
-        body_style="manual_script",
-        allow_write=True,
-    ).as_dict()
-    return controlled_write_result(audit=audit, response=response)
+    response = client.execute_manual_script(script_id, args).as_dict()
+    response_payload["executed"] = response
+    response_payload["script_readback"] = client.script_by_id(script_id).as_dict()
+    content_id = args.get("contentId") if isinstance(args, dict) else None
+    if isinstance(content_id, str) and content_id.strip():
+        response_payload["content_readback"] = client.content_by_id(content_id).as_dict()
+    return controlled_write_result(audit=audit, response=response_payload)
 
 
 @mcp.tool()

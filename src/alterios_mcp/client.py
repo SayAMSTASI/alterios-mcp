@@ -213,6 +213,20 @@ class AlteriosClient:
         )
         return self._send(prepared)
 
+    def execute_manual_script(self, script_id: str, args: Any = None) -> AlteriosResponse:
+        if not looks_like_uuid(script_id):
+            raise AlteriosConfigError("manual script execution requires a script UUID")
+        missing = self.config.missing_for_script_call()
+        if missing:
+            raise AlteriosConfigError(f"Missing required configuration: {', '.join(missing)}")
+        prepared = PreparedAlteriosRequest(
+            method="POST",
+            url=self.build_script_url(script_id),
+            headers=self._headers(),
+            body=build_script_body(script_id, args, "manual_script"),
+        )
+        return self._send(prepared)
+
     def request(
         self,
         method: str,
@@ -248,11 +262,33 @@ class AlteriosClient:
     def list_forms(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
         return self.request("GET", "/api/forms/listandcount", params={"limit": limit, "offset": offset})
 
+    def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/scripts/listandcount", params={"limit": limit, "offset": offset})
+
+    def list_diagrams(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", "/api/diagrams/listandcount", params={"limit": limit, "offset": offset})
+
+    def list_reports(self, *, limit: int = 1000, offset: int = 0) -> AlteriosResponse:
+        return self.request("GET", f"/api/reports/listandcount/{encode_filter({})}", params={"limit": limit, "offset": offset})
+
     def view_by_id(self, view_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/views/listandcount", view_id, "View")
 
     def form_by_id(self, form_id: str) -> AlteriosResponse:
         return self._listandcount_item_by_id("/api/forms/listandcount", form_id, "Form")
+
+    def script_by_id(self, script_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/scripts/listandcount", script_id, "Script")
+
+    def diagram_by_id(self, diagram_id: str) -> AlteriosResponse:
+        return self._listandcount_item_by_id("/api/diagrams/listandcount", diagram_id, "Diagram")
+
+    def report_by_id(self, report_id: str) -> AlteriosResponse:
+        response = self.report_full(report_id)
+        item = report_full_item(response.body)
+        if not isinstance(item, dict) or not item.get("_id"):
+            raise AlteriosRequestError(f"Report {report_id!r} was not found.")
+        return AlteriosResponse(response.status_code, response.content_type, item)
 
     def view_entities(self, view_id: str) -> AlteriosResponse:
         return self.request("GET", f"/api/view-entities/by-view/{path_segment(view_id)}")
@@ -268,6 +304,23 @@ class AlteriosClient:
 
     def save_view_entity(self, payload: dict[str, Any]) -> AlteriosResponse:
         return self.save_resource("view-entities", payload)
+
+    def save_script(self, payload: dict[str, Any]) -> AlteriosResponse:
+        body = strip_alterios_metadata(payload)
+        if self.config.api_token:
+            body["apiKey"] = self.config.api_token
+        if body.get("_id"):
+            return self.request("PUT", "/api/scripts", body=body)
+        return self.request("POST", "/api/scripts", body=body)
+
+    def save_diagram(self, payload: dict[str, Any]) -> AlteriosResponse:
+        return self.save_resource("diagrams", payload)
+
+    def save_report(self, payload: dict[str, Any]) -> AlteriosResponse:
+        body = strip_alterios_metadata(payload)
+        if body.get("_id"):
+            return self.request("PUT", "/api/reports", body=body)
+        return self.request("POST", "/api/reports", body=body)
 
     def add_view_entity_field(
         self,
@@ -452,6 +505,91 @@ class AlteriosClient:
         if user_filters is not None:
             body["userFilters"] = user_filters
         return self.request("POST", "/api/views/v2/get-data", body=body)
+
+    def view_data_simplified(self, view_id: str, *, limit: int = 20, offset: int = 0) -> AlteriosResponse:
+        return self.request("POST", "/api/views/v2/get-data-simplified", body={"viewId": view_id, "limit": limit, "offset": offset})
+
+    def list_processes(
+        self,
+        *,
+        diagram_id: str | None = None,
+        content_id: str | None = None,
+        process_id: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> AlteriosResponse:
+        return self.request(
+            "GET",
+            "/api/processes/listandcount",
+            params={
+                "_id": process_id,
+                "diagramId": diagram_id,
+                "contentId": content_id,
+                "limit": limit,
+                "offset": offset,
+            },
+        )
+
+    def list_tasks(
+        self,
+        *,
+        diagram_id: str | None = None,
+        content_id: str | None = None,
+        process_id: str | None = None,
+        task_id: str | None = None,
+    ) -> AlteriosResponse:
+        return self.request(
+            "GET",
+            "/api/tasks/",
+            params={"_id": task_id, "diagramId": diagram_id, "contentId": content_id, "processId": process_id},
+        )
+
+    def start_process(
+        self,
+        diagram_id: str,
+        *,
+        content_id: str | None = None,
+        params: dict[str, Any] | None = None,
+        name: str | None = None,
+        start_message_id: str | None = None,
+        response_message_id: str | None = None,
+        contents: list[dict[str, Any]] | None = None,
+    ) -> AlteriosResponse:
+        if not diagram_id.strip():
+            raise ValueError("diagram_id must not be empty")
+        body: dict[str, Any] = {"diagramId": diagram_id}
+        if content_id is not None:
+            body["contentId"] = content_id
+        if params is not None:
+            body["params"] = params
+        if name is not None:
+            body["name"] = name
+        if start_message_id is not None:
+            body["startMessageId"] = start_message_id
+        if response_message_id is not None:
+            body["responseMessageId"] = response_message_id
+        if contents is not None:
+            body["contents"] = contents
+        return self.request("POST", "/api/processes", body=body)
+
+    def complete_task(
+        self,
+        task_id: str,
+        *,
+        next_flow_id: str | None = None,
+        process_content: dict[str, Any] | None = None,
+        contents: list[dict[str, Any]] | None = None,
+    ) -> AlteriosResponse:
+        if not task_id.strip():
+            raise ValueError("task_id must not be empty")
+        body: dict[str, Any] = {"_id": task_id}
+        if next_flow_id is not None:
+            body["nextFlowId"] = next_flow_id
+        if process_content is not None:
+            body["processContent"] = process_content
+        if contents is not None:
+            body["contents"] = contents
+        return self.request("DELETE", "/api/tasks/complete", body=body)
 
     def build_script_url(self, function: str) -> str:
         template = self.config.endpoint_template.strip()
@@ -782,6 +920,18 @@ def listandcount_items(payload: Any) -> list[dict[str, Any]]:
             if isinstance(value, list):
                 return [item for item in value if isinstance(item, dict)]
     raise AlteriosRequestError("listandcount returned unexpected payload.")
+
+
+def report_full_item(payload: Any) -> dict[str, Any] | None:
+    if isinstance(payload, list):
+        return payload[0] if payload and isinstance(payload[0], dict) else None
+    if isinstance(payload, dict):
+        for key in ("items", "rows", "data", "results", "values"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value[0] if value and isinstance(value[0], dict) else None
+        return payload
+    return None
 
 
 def content_update_payload(

@@ -66,6 +66,22 @@
   action containers, managed-marker guard и readback.
 - `alterios_patch_form_actions` - узкая замена `formActionContainers` формы.
 - `alterios_patch_form_tabs` - узкая замена `tabs` формы.
+- `alterios_upsert_script` - typed create/update manual/event/diagram script
+  через `/api/scripts` с preflight, managed-marker guard, dry-run diff,
+  write-gate и readback.
+- `alterios_validate_script` - read-only проверка script type, active,
+  librariesIds/config и managed marker.
+- `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
+  UUID скрипта с preflight, active/name checks и readback.
+- `alterios_upsert_bpmn_diagram` - typed create/update BPMN diagram через
+  `/api/diagrams` с managed-marker guard и readback.
+- `alterios_start_process`, `alterios_list_process_tasks`,
+  `alterios_complete_task`, `alterios_validate_process_result` - typed
+  workflow/process/task surface для start/read/complete/validate side effects.
+- `alterios_upsert_report`, `alterios_patch_report_template`,
+  `alterios_validate_report_project_base` - typed report/dashboard surface с
+  `/api/reports`, `/api/reports/full/{filter}`, Project Database validation и
+  контрольным `get-data-simplified` по source view.
 - `alterios_view_data` - чтение `/api/views/v2/get-data` с опциональным
   контекстом `content_id`, массивом `data_id` и `user_filters`.
 - `alterios_discover_readonly` - живая матрица маршрутов только для чтения.
@@ -73,13 +89,13 @@
   `alterios_file_upload_to_field`, `alterios_upsert_view`,
   `alterios_upsert_view_entity`, `alterios_upsert_view_field`,
   `alterios_upsert_form`, `alterios_patch_form_actions`,
-  `alterios_patch_form_tabs`, `alterios_call_write_service`,
-  `alterios_execute_manual_script` и `alterios_rest_write` - отключены, пока
+  `alterios_patch_form_tabs`, `alterios_upsert_script`,
+  `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`,
+  `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`,
+  `alterios_patch_report_template`, `alterios_call_write_service` и
+  `alterios_rest_write` - отключены, пока
   явно не выставлен `ALTERIOS_MCP_ALLOW_WRITE=1`; по умолчанию возвращают
   dry-run audit и не выполняют запись.
-- `alterios_execute_manual_script` - запуск `/api/scripts/execute-manual` по
-  UUID скрипта; также по умолчанию работает как dry-run и требует
-  `ALTERIOS_MCP_ALLOW_WRITE=1` для выполнения.
 
 Инструменты уровня проекта следует вызывать с `project_id`, когда целевой проект
 известен из URL, UI-сессии или контекста задачи. Настроенный

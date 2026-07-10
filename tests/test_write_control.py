@@ -540,6 +540,224 @@ def test_upsert_view_field_execution_adds_then_saves_without_real_network() -> N
     assert result["response"]["readback"]["_id"] == "vf-1"
 
 
+def test_upsert_script_dry_run_uses_put_route_and_redacts_secret_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse(
+                [
+                    [
+                        {
+                            "_id": "script-1",
+                            "name": "Script",
+                            "description": "Codex-managed: existing",
+                            "type": "manual",
+                            "active": True,
+                            "body": "old",
+                            "apiKey": "secret-token",
+                        }
+                    ],
+                    1,
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_script(
+            "Script",
+            body="new",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "script"
+    assert result["audit"]["operation"]["name"] == "PUT /api/scripts"
+    assert result["audit"]["operation"]["target_ids"] == ["script-1"]
+    assert {"field": "body", "before": "old", "after": "new", "changed": True} in result["response"]["diff"]
+    assert "secret-token" not in str(result)
+
+
+def test_execute_manual_script_dry_run_prefights_script_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def script_by_id(self, script_id: str) -> FakeResponse:
+            return FakeResponse({"_id": script_id, "name": "Script", "description": "manual", "type": "manual", "active": True})
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_execute_manual_script(
+            "11111111-1111-4111-8111-111111111111",
+            {"contentId": "content-1"},
+            expected_name="Script",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "manual_script"
+    assert result["response"]["preflight"]["_id"] == "11111111-1111-4111-8111-111111111111"
+    assert result["response"]["script_type"] == "manual"
+
+
+def test_start_process_execution_returns_process_and_task_readback_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def diagram_by_id(self, diagram_id: str) -> FakeResponse:
+            return FakeResponse({"_id": diagram_id, "name": "Diagram", "description": "Codex-managed: diagram"})
+
+        def content_by_id(self, content_id: str) -> FakeResponse:
+            return FakeResponse({"_id": content_id, "name": "Content", "contentTypeId": "ct-1", "fields": {}})
+
+        def list_processes(
+            self,
+            *,
+            diagram_id: str | None = None,
+            content_id: str | None = None,
+            process_id: str | None = None,
+            limit: int = 20,
+            offset: int = 0,
+        ) -> FakeResponse:
+            if process_id:
+                return FakeResponse([[{"_id": process_id, "diagramId": diagram_id, "contentId": content_id}], 1])
+            return FakeResponse([[], 0])
+
+        def list_tasks(
+            self,
+            *,
+            diagram_id: str | None = None,
+            content_id: str | None = None,
+            process_id: str | None = None,
+            task_id: str | None = None,
+        ) -> FakeResponse:
+            return FakeResponse([{"_id": "task-1", "processId": process_id, "diagramId": diagram_id, "contentId": content_id}])
+
+        def start_process(
+            self,
+            diagram_id: str,
+            **kwargs: object,
+        ) -> FakeResponse:
+            assert diagram_id == "diagram-1"
+            assert kwargs["content_id"] == "content-1"
+            return FakeResponse({"processId": "process-1"})
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_start_process(
+            "diagram-1",
+            content_id="content-1",
+            params={"source": "test"},
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["risk_level"] == "workflow_side_effect"
+    assert result["response"]["process_id"] == "process-1"
+    assert result["response"]["readback_tasks"][0]["_id"] == "task-1"
+
+
+def test_complete_task_dry_run_checks_expected_context_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_tasks(
+            self,
+            *,
+            diagram_id: str | None = None,
+            content_id: str | None = None,
+            process_id: str | None = None,
+            task_id: str | None = None,
+        ) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {
+                        "_id": task_id,
+                        "processId": process_id,
+                        "diagramId": diagram_id,
+                        "contentId": content_id,
+                    }
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_complete_task(
+            "task-1",
+            next_flow_id="Flow_to_end",
+            expected_process_id="process-1",
+            expected_content_id="content-1",
+            expected_diagram_id="diagram-1",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["kind"] == "task_complete"
+    assert result["audit"]["operation"]["risk_level"] == "workflow_side_effect"
+    assert result["response"]["preflight_task"]["_id"] == "task-1"
+
+
+def test_report_project_base_validation_checks_template_and_view_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 201, "content_type": "application/json", "body": self.body}
+
+    template = {
+        "CodexMarker": "Codex-managed: alterios-mcp report sandbox.",
+        "Pages": {"0": {"Ident": "StiDashboard"}},
+        "Dictionary": {"Databases": {"0": {"ServiceName": "Project Database"}}, "DataSources": {"0": {"Name": "MCP Practice. Список"}}},
+    }
+
+    class FakeClient:
+        def report_by_id(self, report_id: str) -> FakeResponse:
+            return FakeResponse({"_id": report_id, "name": "Report", "description": "Codex-managed: report", "template": template})
+
+        def view_data_simplified(self, view_id: str, *, limit: int = 20, offset: int = 0) -> FakeResponse:
+            return FakeResponse({"rows": [{"_id": "row-1"}], "viewId": view_id})
+
+    with patch.object(server, "_client", return_value=FakeClient()):
+        result = server.alterios_validate_report_project_base(
+            "report-1",
+            expected_view_id="view-1",
+            expected_view_name="MCP Practice. Список",
+            expected_marker="Codex-managed: alterios-mcp report sandbox.",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["validation"]["has_dashboard_page"] is True
+    assert result["validation"]["has_project_database"] is True
+    assert result["validation"]["view_name_matches"] is True
+    assert result["validation"]["view_row_count"] == 1
+
+
 def test_server_lists_configured_profiles_without_secrets() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",

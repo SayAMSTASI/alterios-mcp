@@ -27,9 +27,9 @@ classes.
 Reinventory on 2026-07-10 confirmed the main product gap: ART X project base
 has live evidence for views, forms, scripts, BPMN/process/task side effects,
 files, comments, and reports. Typed-write expansion moved the MCP server from
-4 write-like tools out of 23 total tools to 12 write-like tools out of 31 total
-tools. The current build stage remains typed write expansion rather than more
-generic REST access.
+4 write-like tools out of 23 total tools to 18 write-like tools out of 41 total
+tools. The current build stage is shifting from typed write expansion to
+repo-owned agents/skills and remaining high-risk security/destructive flows.
 
 ## Completed
 
@@ -52,12 +52,13 @@ generic REST access.
 | Analysis. ARTX reinventory and MCP startup correction | Rechecked project base totals, MCP tool surface, startup shape, typed-write gaps, and agents/skills plan. Added `docs/reinventory-2026-07-10.md` and `docs/agents-and-skills.md`; updated README startup guidance to prefer `alterios-mcp.exe`. | `b1141bc` | Live profile smoke OK for `artx` and `vniimt`; live read-only discovery 15/15 OK for ART X project; project totals: 14 content types, 2529 fields, 22 views, 40 forms, 12 scripts, 4 diagrams, 145 contents, 17 processes, 1 report; MCP surface: 23 tools, 4 write-like tools. |
 | Build. Typed content/file tools | Added `alterios_update_content_fields` and `alterios_file_upload_to_field` with preflight, dry-run diff, expected target checks, write gate, execution, file metadata readback, and content readback. | `aa06edb` | Unit tests for client/server write paths passed; ART X dry-run resolved sandbox content and file field; live `PATCH /api/contents/save` returned 200 and readback `field_test__mcp_practice_mcp_practice_verified=[true]`; live `/api/file/upload/field` returned 201 with file `5d3697d2-3bbb-48c4-960e-e1b312651978`; `/api/file/list` and practice dry-run confirmed `mcp-practice-upload.txt`. |
 | Build. Typed view/form tools | Added `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, and `alterios_patch_form_tabs` with managed-marker guard, dry-run diff, write gate, execution, and readback. | `2c7fdae` | Unit tests for client/server write paths passed; `artx` profile check OK; live `dry_run=false` verified sandbox view `cfd46277-d8da-4b7d-ba0e-7c96ea85046e`, entity `f3e71cac-475a-479b-9242-d129b04e9746`, view field `b1a18bb6-12d9-4657-92d2-e4b0668cc065`, and form `3cfc70ab-3fb0-4567-8e25-7c863f0e87d0`; `get-data-simplified` returned `rows_len=1`; practice dry-run remained idempotent with view field count 8 and report/process/file checks still OK. |
+| Build. Typed script/BPMN/report tools | Added `alterios_upsert_script`, `alterios_validate_script`, stronger `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_list_process_tasks`, `alterios_complete_task`, `alterios_validate_process_result`, `alterios_upsert_report`, `alterios_patch_report_template`, and `alterios_validate_report_project_base`. | `TBD-TYPED-SCRIPT-BPMN-REPORT-COMMIT` | Unit/full tests passed; `artx` profile check OK; live `dry_run=false` verified script upsert, manual script execution, BPMN diagram upsert, process start, task completion, report upsert/template patch, and Project Database validation. Final live process start returned task and completion status 200; process validation returned `completed_matches=true`; report validation returned dashboard page, Project Database, marker match, view name match, and `view_row_count=1`; practice dry-run remained consistent with `process_count=3`, active `task_count=0`, report full readback, and view data row_count 1. |
 
 ## Active Stage
 
 | Stage | Status | Owner | Acceptance Criteria |
 |---|---|---|---|
-| 6. Typed write expansion | In Progress | Lead Engineer + PM/Explorer/Worker/Verifier agents | Add entity-specific write tools with preflight, dry-run diff, managed-marker guard, write gate, live sandbox execution, and readback. |
+| 7. Repo agents and skills | Next | Lead Engineer + PM/Explorer/Worker/Verifier agents | Add repo-owned agent/skill scaffolding only for workflows backed by verified tools, tests, and live readback evidence. |
 
 ## Backlog
 
@@ -65,7 +66,7 @@ generic REST access.
 |---:|---|---|---|
 | 1 | Add typed content/file tools: `alterios_update_content_fields` and `alterios_file_upload_to_field`. | Done | Implemented and live-verified against existing `MCP Practice` sandbox with preflight read, expected target check, dry-run diff, execution gate, file metadata readback, and content readback. |
 | 1 | Add typed view/form tools. | Done | Implemented and live-verified against `MCP Practice. Список` plus the main MCP Practice form with managed-marker guard, dry-run diff, write gate, execution, and readback. |
-| 1 | Add typed script/BPMN/report tools. | Next | Cover script upsert, manual script execution preflight, BPMN diagram upsert, process start/task complete, report upsert, and Project Database validation. |
+| 1 | Add typed script/BPMN/report tools. | Done | Implemented and live-verified against `MCP Practice` sandbox with script upsert/manual execution, BPMN diagram upsert, process start/task complete, report save/template patch, Project Database validation, and source view readback. |
 | 1 | Capture browser/UI network-flow workflow for uncovered operation classes. | In Progress | File/script/BPMN/report paths now have API sandbox coverage; remaining capture priority is destructive/security flows and UI proof for production-grade typed writes. |
 | 1 | Build sandbox data chain: content type -> fields -> form -> view -> content record. | Done | Completed in ARTX sandbox; comments, files, manual scripts, BPMN/process/task side effects, and reports are now covered. |
 | 2 | Add repo-owned agents and skills scaffolding after typed tools land. | Next | Follow `docs/agents-and-skills.md`; do not create skills that document unverified APIs as facts. |
@@ -80,17 +81,16 @@ generic REST access.
 |---|---|
 | Runtime service endpoint compatibility is blocked in the current `vniimt` config because the endpoint template is `/api/scripts/execute-manual`. | Keep runtime service names cataloged only; do not treat them as executable through manual-script UUID endpoint. |
 | Generic write tools can mutate production Alterios projects if deliberately executed. | Keep dry-run as default, require explicit `profile`, explicit `project_id`, `ALTERIOS_MCP_ALLOW_WRITE=1`, and `dry_run=false`; use typed tools with readback for production workflows. |
-| Current write MCP surface is still too small for full operational use. | Content/files and views/forms now have typed tools; continue typed entity tools for scripts, BPMN/process/tasks, and reports. |
+| Remaining risky surfaces are security/destructive flows, not normal project-base builders. | Keep users/roles/destructive deletes behind separate sandbox scenario, explicit destructive gate, and UI/readback verification. |
 | Many Alterios endpoints are project-scoped even when they look generic. | Continue treating profile as instance and `project_id` as explicit call context. |
 | Browser/UI flow tooling has not yet captured a live Alterios scenario in this session. | Keep Stage 5 open; capture only in scratch/test context and commit sanitized artifacts after redaction checks. |
 | Generic REST write can create live UI objects but does not yet provide typed preflight semantics. | Use the ARTX help sandbox result to design narrow typed write tools with explicit allowed fields, dry-run diffs, and readback checks. |
 
 ## Next Concrete Actions
 
-1. Add script/BPMN/report typed tools and verify against the already-created
-   manual script, BPMN process/task chain, and Project Database dashboard.
-2. Add repo-owned skill folders only after each workflow has verified code and
+1. Add repo-owned skill folders only after each workflow has verified code and
    readback evidence.
+2. Add profile-level smoke matrix across configured Alterios instances.
 3. Keep destructive/security flows out of normal write tools until a separate
    sandbox scenario and destructive gate are implemented.
 

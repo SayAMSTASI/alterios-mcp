@@ -54,8 +54,8 @@
 
 На момент реинвентаризации в `src/alterios_mcp/server.py` было опубликовано
 23 MCP tools, из них write-like tools только 4. Первый кодовый этап после этой
-реинвентаризации добавил typed content/file и views/forms tools; текущий surface:
-31 tools, 12 write-like tools.
+реинвентаризации добавил typed content/file, views/forms, scripts, BPMN/process/task
+и report tools; текущий surface: 41 tools, 18 write-like tools.
 
 | Tool | Что делает | Ограничение |
 |---|---|---|
@@ -68,8 +68,14 @@
 | `alterios_upsert_form` | Typed form write | Добавлено после реинвентаризации; create/update form с tabs/action containers |
 | `alterios_patch_form_actions` | Typed form actions patch | Добавлено после реинвентаризации; узкая замена `formActionContainers` |
 | `alterios_patch_form_tabs` | Typed form tabs patch | Добавлено после реинвентаризации; узкая замена `tabs` |
+| `alterios_upsert_script` | Typed script write | Добавлено после реинвентаризации; create/update manual/event/diagram script |
+| `alterios_execute_manual_script` | Typed manual script execution | Усилено после реинвентаризации; preflight, active/name checks, readback |
+| `alterios_upsert_bpmn_diagram` | Typed BPMN write | Добавлено после реинвентаризации; diagram create/update |
+| `alterios_start_process` | Typed workflow side effect | Добавлено после реинвентаризации; process start + process/task readback |
+| `alterios_complete_task` | Typed task side effect | Добавлено после реинвентаризации; task complete + process/task readback |
+| `alterios_upsert_report` | Typed report write | Добавлено после реинвентаризации; report save/full readback |
+| `alterios_patch_report_template` | Typed report template patch | Добавлено после реинвентаризации; узкая замена Stimulsoft template |
 | `alterios_call_write_service` | Generic runtime service write | Нет typed контракта по сущностям |
-| `alterios_execute_manual_script` | Запуск сохраненного manual script UUID | Не создает и не обновляет скрипты |
 | `alterios_rest_write` | Generic REST write | Слишком широкий интерфейс для стабильной работы |
 
 Вывод: live API-практика уже доказала больше, чем текущий MCP surface удобно
@@ -148,17 +154,19 @@ Live-состояние:
 | `diagram` | 1 |
 
 Уже доказано: `POST /api/scripts`, `POST /api/scripts/execute-manual`.
-В каталоге также есть update-route `PUT /api/scripts`, но typed update еще не
-экспортирован как MCP tool.
+Typed update через `PUT /api/scripts` экспортирован как MCP tool и проверен на
+sandbox manual script.
 
-Нужные typed tools:
+Добавленные typed tools:
 
 | Tool | Назначение |
 |---|---|
 | `alterios_upsert_script` | Создать/обновить manual/event/diagram script |
 | `alterios_validate_script` | Проверить type, active, librariesIds, config, managed marker |
-| `alterios_execute_manual_script` | Оставить, но усилить preflight и readback |
-| `alterios_bind_script_to_form_action` | Связать manual script с кнопкой формы |
+| `alterios_execute_manual_script` | Запустить manual script UUID с preflight, active/name checks и readback |
+
+`alterios_bind_script_to_form_action` отдельно не добавлен: текущий проверенный
+контракт формы уже покрывается `alterios_patch_form_actions`.
 
 Важно: runtime service names (`getTasks`, `createContent`, `startProcess`) и
 manual script UUID - разные уровни. Endpoint `/api/scripts/execute-manual`
@@ -174,13 +182,13 @@ manual script UUID - разные уровни. Endpoint `/api/scripts/execute-m
 - `DELETE /api/tasks/complete`;
 - readback процессов через `/api/processes/listandcount`.
 
-Sandbox BPMN `MCP Practice. BPMN Sandbox` содержит start/user/end events,
-имеет 1 процесс, процесс завершен, активных задач нет.
+Sandbox BPMN `MCP Practice. BPMN Sandbox` содержит start/user/end events.
+После typed live-проверки есть 3 завершенных процесса, активных задач нет.
 
 Дополнительный HR demo BPMN имеет 12 процессов, 11 завершенных, 1 активную
 задачу. Это полезный источник для анализа реальных side effects.
 
-Нужные typed tools:
+Добавленные typed tools:
 
 | Tool | Назначение |
 |---|---|
@@ -206,11 +214,11 @@ Full readback подтвержден. Сохраненный Stimulsoft template
 - alias/name source `MCP Practice. Список`.
 
 Буквальный `view-data-v2` в сохраненном template не найден; текущая проверенная
-связь с project base идет через Stimulsoft `Project Database`. Следующий tool
-должен проверять оба уровня: report template и контрольное чтение исходного view
+связь с project base идет через Stimulsoft `Project Database`. Typed validation
+теперь проверяет оба уровня: report template и контрольное чтение исходного view
 через `/api/views/v2/get-data-simplified`.
 
-Нужные typed tools:
+Добавленные typed tools:
 
 | Tool | Назначение |
 |---|---|
@@ -221,9 +229,8 @@ Full readback подтвержден. Сохраненный Stimulsoft template
 
 ## Главный Gap
 
-Проблема не в том, что нет write API. Проблема в том, что write API пока
-экспортирован в MCP как generic operations. Для полноценного MCP нужны typed
-commands по сущностям:
+Проблема не в том, что нет write API. Основной project-base builder surface уже
+экспортирован в MCP как typed commands по сущностям:
 
 1. content/content fields/file-field;
 2. views/view entities/view fields;
@@ -231,8 +238,11 @@ commands по сущностям:
 4. scripts/manual/event/diagram scripts;
 5. BPMN/process/task side effects;
 6. reports/Stimulsoft Project Database;
-7. groups/help/comments;
-8. security/destructive flows отдельным gated этапом.
+7. groups/help/comments.
+
+Оставшиеся gaps уже не относятся к нормальной сборке project base: repo
+agents/skills, multi-instance smoke matrix и security/destructive flows
+отдельным gated этапом.
 
 ## План Дальше
 
@@ -242,13 +252,13 @@ commands по сущностям:
 | 2 | Вынести общие typed write helpers | Единые preflight, dry-run diff, managed-marker guard, write-gate, readback |
 | 3 | Добавить content/file typed tools | Выполнено: `alterios_update_content_fields`, `alterios_file_upload_to_field`, тесты, live sandbox readback |
 | 4 | Добавить views/forms typed tools | Выполнено: `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, тесты, live sandbox readback |
-| 5 | Добавить scripts typed tools | Upsert manual/event/diagram script, execute preflight, form binding |
-| 6 | Добавить BPMN/process/task tools | Diagram upsert, process start, task list/complete, process result validation |
-| 7 | Добавить report tools | Upsert report, Project Database validation, full readback |
+| 5 | Добавить scripts typed tools | Выполнено: `alterios_upsert_script`, `alterios_validate_script`, усиленный `alterios_execute_manual_script`, тесты, live sandbox readback |
+| 6 | Добавить BPMN/process/task tools | Выполнено: `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_list_process_tasks`, `alterios_complete_task`, `alterios_validate_process_result`, тесты, live process/task side effect |
+| 7 | Добавить report tools | Выполнено: `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, Project Database validation, full readback |
 | 8 | Добавить repo agents/skills | Агентные роли и skill-пакеты привязаны к проверенным tools и docs |
 | 9 | Закрыть security/destructive flows | Только после отдельного sandbox сценария и явного destructive gate |
 
-Первые кодовые шаги после этой реинвентаризации выполнены: typed content/file
-и views/forms tools добавлены и проверены на `MCP Practice` sandbox. Следующий
-шаг - typed scripts/BPMN/report tools, потому что API-практика уже доказана, но
-операторский MCP surface пока остается generic/narrow.
+Ключевые кодовые шаги после этой реинвентаризации выполнены: typed content/file,
+views/forms, scripts, BPMN/process/task и reports tools добавлены и проверены
+на `MCP Practice` sandbox. Следующий шаг - repo agents/skills и отдельный
+security/destructive этап с собственным sandbox-сценарием.

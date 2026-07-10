@@ -318,6 +318,32 @@ def test_view_and_form_listandcount_by_id_use_id_filter_without_network() -> Non
     ]
 
 
+def test_script_diagram_and_report_reads_use_verified_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+    responses = [
+        AlteriosResponse(200, "application/json", [[{"_id": "script-1", "name": "Script"}], 1]),
+        AlteriosResponse(200, "application/json", [[{"_id": "diagram-1", "name": "Diagram"}], 1]),
+        AlteriosResponse(200, "application/json", [{"_id": "report-1", "name": "Report", "template": "{}"}]),
+    ]
+
+    with patch.object(client, "_send", side_effect=responses) as send:
+        assert client.script_by_id("script-1").body == {"_id": "script-1", "name": "Script"}
+        assert client.diagram_by_id("diagram-1").body == {"_id": "diagram-1", "name": "Diagram"}
+        assert client.report_by_id("report-1").body["_id"] == "report-1"
+
+    urls = [call.args[0].url for call in send.call_args_list]
+    assert urls == [
+        "https://alterios.example/api/scripts/listandcount?_id=script-1&limit=1&offset=0",
+        "https://alterios.example/api/diagrams/listandcount?_id=diagram-1&limit=1&offset=0",
+        "https://alterios.example/api/reports/full/%7B%22_id%22%3A%22report-1%22%7D",
+    ]
+
+
 def test_save_resource_create_and_update_routes_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",
@@ -363,6 +389,40 @@ def test_view_entity_and_field_write_routes_without_network() -> None:
     assert requests[2].method == "POST"
     assert requests[2].url == "https://alterios.example/api/view-fields/save"
     assert requests[2].body == {"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}}
+
+
+def test_script_diagram_report_process_and_task_write_routes_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.save_script({"_id": "script-1", "name": "Script", "body": "code", "apiKey": "ignored"})
+        client.save_script({"name": "Script", "body": "code"})
+        client.save_diagram({"_id": "diagram-1", "name": "Diagram"})
+        client.save_report({"_id": "report-1", "name": "Report"})
+        client.start_process("diagram-1", content_id="content-1", params={"source": "test"})
+        client.complete_task("task-1", next_flow_id="Flow_to_end", contents=[])
+
+    requests = [call.args[0] for call in send.call_args_list]
+    assert requests[0].method == "PUT"
+    assert requests[0].url == "https://alterios.example/api/scripts"
+    assert requests[0].body["apiKey"] == "secret-token"
+    assert requests[1].method == "POST"
+    assert requests[1].url == "https://alterios.example/api/scripts"
+    assert requests[2].method == "PATCH"
+    assert requests[2].url == "https://alterios.example/api/diagrams/diagram-1"
+    assert requests[3].method == "PUT"
+    assert requests[3].url == "https://alterios.example/api/reports"
+    assert requests[4].method == "POST"
+    assert requests[4].url == "https://alterios.example/api/processes"
+    assert requests[4].body == {"diagramId": "diagram-1", "contentId": "content-1", "params": {"source": "test"}}
+    assert requests[5].method == "DELETE"
+    assert requests[5].url == "https://alterios.example/api/tasks/complete"
+    assert requests[5].body == {"_id": "task-1", "nextFlowId": "Flow_to_end", "contents": []}
 
 
 def test_list_fields_builds_expected_query_without_network() -> None:
@@ -584,6 +644,26 @@ def test_execute_manual_endpoint_requires_script_uuid() -> None:
 
     with pytest.raises(AlteriosRequestError, match="requires a script UUID"):
         AlteriosClient(config).prepare_script_request("getTasks", {"limit": 1})
+
+
+def test_execute_manual_script_bypasses_runtime_service_catalog_without_network() -> None:
+    script_id = "11111111-1111-4111-8111-111111111111"
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+        endpoint_template="{base_url}/api/scripts/execute-manual",
+        body_style="rpc",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {"ok": True})) as send:
+        client.execute_manual_script(script_id, {"contentId": "content-1"})
+
+    prepared = send.call_args.args[0]
+    assert prepared.method == "POST"
+    assert prepared.url == "https://alterios.example/api/scripts/execute-manual"
+    assert prepared.body == {"_id": script_id, "args": {"contentId": "content-1"}}
 
 
 def test_script_body_styles() -> None:
