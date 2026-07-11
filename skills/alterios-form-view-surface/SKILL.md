@@ -32,7 +32,7 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - For list forms, set `pageTitle` to `{наименование сущности во множественном роде}`.
 - For view/detail and edit forms, set `pageTitle` to `{наименование сущности в единственном роде}`.
 - Check field order, labels, `displaying`, required status, and source field meaning before treating a field cell as finished.
-- Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip/help, placeholder, or separate help block instead of always-visible bottom text.
+- Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip, placeholder, or separate help block instead of always-visible bottom text. Treat analyzer issue `field_footnote_requires_date` as a tester failure before accepting a form.
 - For table display cells, keep the visible cell header centered and bold. For non-table display cells, do not add a visible cell header; use `pageTitle`, tab titles, field labels, or tooltips instead.
 - Use `view_data_list` for related rows and validate the real relation field.
 - Validate view filters explicitly: static filters, user filters, role-dependent filters, and `openId`/`dataId` current-record filters have different acceptance checks.

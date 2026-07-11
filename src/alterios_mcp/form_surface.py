@@ -9,9 +9,39 @@ VIEW_CELL_TYPES = {"view_data", "view_data_list"}
 DATA_CELL_TYPES = VIEW_CELL_TYPES | {"content", "report", "comments_list", "edit_task"}
 EXPECTED_ROW_ACTION_ORDER = {"edit": 0, "view": 1, "delete": 2}
 TABLE_CELL_TYPES = {"view_data_list"}
+FOOTNOTE_KEYS = {
+    "bottomText",
+    "bottom_text",
+    "footerText",
+    "footer_text",
+    "footnote",
+    "footNote",
+    "helperText",
+    "helper_text",
+    "helpText",
+    "help_text",
+    "note",
+    "noteText",
+    "note_text",
+    "description",
+    "hint",
+}
+FIELD_TYPE_KEYS = {
+    "type",
+    "fieldType",
+    "field_type",
+    "dataType",
+    "data_type",
+    "valueType",
+    "value_type",
+    "contentTypeFieldType",
+    "content_type_field_type",
+    "inputType",
+    "input_type",
+}
 
 
-def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
+def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | None = None) -> dict[str, Any]:
     """Analyze Alterios form JSON for view/form UX and action guardrails."""
     issues: list[dict[str, Any]] = []
     inventory: dict[str, Any] = {
@@ -30,6 +60,7 @@ def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
         "role_keys": [],
         "page_titles": [],
         "headers": [],
+        "field_footnotes": [],
     }
 
     if not str(form.get("pageTitle") or form.get("name") or "").strip():
@@ -48,6 +79,7 @@ def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
     role_keys: list[dict[str, Any]] = []
     page_titles: list[str] = []
     headers: list[str] = []
+    field_footnotes: list[dict[str, Any]] = []
 
     _collect_role_keys(form, role_keys)
     _collect_titles(form, page_titles, headers)
@@ -79,7 +111,7 @@ def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
                 cell_types[cell_type] += 1
                 _collect_style_keys(cell.get("styles"), style_keys)
                 _collect_data_source(cell, cell_path, data_sources)
-                _analyze_cell(cell, cell_path, issues)
+                _analyze_cell(cell, cell_path, issues, field_type_map or {}, field_footnotes)
                 _analyze_action_containers(cell.get("cellActionContainers"), f"{cell_path}.cellActionContainers", issues, action_icons)
                 _analyze_action_containers(
                     cell.get("valueActionContainers"),
@@ -101,6 +133,7 @@ def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
     inventory["role_keys"] = role_keys
     inventory["page_titles"] = sorted(set(page_titles))
     inventory["headers"] = sorted(set(headers))
+    inventory["field_footnotes"] = field_footnotes
 
     issue_counts = Counter(issue["code"] for issue in issues)
     severity_counts = Counter(issue["severity"] for issue in issues)
@@ -191,12 +224,19 @@ def _analyze_row_gaps(issues: list[dict[str, Any]], cells: list[Any], row_path: 
         )
 
 
-def _analyze_cell(cell: dict[str, Any], path: str, issues: list[dict[str, Any]]) -> None:
+def _analyze_cell(
+    cell: dict[str, Any],
+    path: str,
+    issues: list[dict[str, Any]],
+    field_type_map: dict[str, str],
+    field_footnotes: list[dict[str, Any]],
+) -> None:
     cell_type = str(cell.get("type") or "")
     if not cell_type:
         _add_issue(issues, "warning", "missing_cell_type", "Cell has no type.", path)
         return
     _analyze_cell_header(cell, cell_type, path, issues)
+    _analyze_displaying_field_footnotes(cell, path, issues, field_type_map, field_footnotes)
     if cell_type in DATA_CELL_TYPES and not _has_flexible_width(cell):
         _add_issue(
             issues,
@@ -247,6 +287,104 @@ def _analyze_cell(cell: dict[str, Any], path: str, issues: list[dict[str, Any]])
             )
         if not params.get("entity"):
             _add_issue(issues, "info", "comments_without_entity_scope", "Comments cell has no params.entity scope.", path)
+
+
+def _analyze_displaying_field_footnotes(
+    cell: dict[str, Any],
+    path: str,
+    issues: list[dict[str, Any]],
+    field_type_map: dict[str, str],
+    field_footnotes: list[dict[str, Any]],
+) -> None:
+    displaying = _dict_or_empty(cell.get("displaying"))
+    fields = displaying.get("fields")
+    if not isinstance(fields, dict):
+        return
+    for field_name, field_config in fields.items():
+        if not isinstance(field_config, dict) or field_config.get("hidden") is True:
+            continue
+        footnotes = _field_footnotes(field_config, f"{path}.displaying.fields.{field_name}")
+        if not footnotes:
+            continue
+        field_type = _displaying_field_type(str(field_name), field_config, field_type_map)
+        for footnote in footnotes:
+            item = {
+                "path": footnote["path"],
+                "field": str(field_name),
+                "key": footnote["key"],
+                "field_type": field_type or "<unknown>",
+            }
+            field_footnotes.append(item)
+            if not _is_date_type(field_type):
+                _add_issue(
+                    issues,
+                    "warning",
+                    "field_footnote_requires_date",
+                    "Persistent bottom helper/footnote text is allowed only for date fields; use label, tooltip, placeholder, or a help block for other fields.",
+                    footnote["path"],
+                    item,
+                )
+
+
+def _field_footnotes(field_config: dict[str, Any], path: str) -> list[dict[str, str]]:
+    found: list[dict[str, str]] = []
+
+    def walk(value: Any, current_path: str) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = f"{current_path}.{key}"
+                if str(key) in FOOTNOTE_KEYS and _has_visible_footnote_text(child):
+                    found.append({"path": child_path, "key": str(key)})
+                if isinstance(child, (dict, list)):
+                    walk(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                if isinstance(child, (dict, list)):
+                    walk(child, f"{current_path}[{index}]")
+
+    walk(field_config, path)
+    return found
+
+
+def _has_visible_footnote_text(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, dict):
+        text = value.get("text") or value.get("value") or value.get("title")
+        return isinstance(text, str) and bool(text.strip())
+    if isinstance(value, list):
+        return any(_has_visible_footnote_text(item) for item in value)
+    return False
+
+
+def _displaying_field_type(field_name: str, field_config: dict[str, Any], field_type_map: dict[str, str]) -> str:
+    mapped = field_type_map.get(field_name)
+    if mapped:
+        return str(mapped)
+    discovered = _find_type_value(field_config)
+    return str(discovered or "")
+
+
+def _find_type_value(value: Any) -> str:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key) in FIELD_TYPE_KEYS and isinstance(child, str) and child.strip():
+                return child
+        for child in value.values():
+            nested = _find_type_value(child)
+            if nested:
+                return nested
+    elif isinstance(value, list):
+        for child in value:
+            nested = _find_type_value(child)
+            if nested:
+                return nested
+    return ""
+
+
+def _is_date_type(field_type: str) -> bool:
+    normalized = str(field_type or "").strip().lower()
+    return normalized in {"date", "datetime", "date_time", "date-time"} or normalized.startswith("date:")
 
 
 def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues: list[dict[str, Any]]) -> None:

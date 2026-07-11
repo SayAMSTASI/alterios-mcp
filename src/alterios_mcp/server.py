@@ -5933,14 +5933,52 @@ def alterios_analyze_form_surface(
         form_body = _find_form(client, form_id=form_id)
         if not form_body:
             raise ValueError(f"Form {form_id!r} was not found.")
+        field_type_map = _form_field_type_map(client, form_body)
     else:
         form_body = form
+        field_type_map = {}
     if not isinstance(form_body, dict):
         raise ValueError("Form payload must be a JSON object.")
     return {
         "form": _resource_summary(form_body),
-        "surface": analyze_form_surface(form_body),
+        "surface": analyze_form_surface(form_body, field_type_map=field_type_map),
     }
+
+
+def _form_field_type_map(client: AlteriosClient, form: dict[str, Any]) -> dict[str, str]:
+    field_types: dict[str, str] = {}
+    for view_id in sorted(_form_view_ids(form)):
+        try:
+            body = client.view_fields_populated(view_id).body
+        except Exception:
+            continue
+        rows = body if isinstance(body, list) else []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            mname = row.get("mname")
+            if not mname:
+                continue
+            content_field = row.get("contentTypeField")
+            field_type = ""
+            if isinstance(content_field, dict):
+                field_type = str(content_field.get("type") or "")
+            if not field_type:
+                field_type = str(row.get("type") or "")
+            if field_type:
+                field_types[str(mname)] = field_type
+    return field_types
+
+
+def _form_view_ids(form: dict[str, Any]) -> set[str]:
+    view_ids: set[str] = set()
+    for value in _walk_values(form):
+        if not isinstance(value, dict):
+            continue
+        params = value.get("params")
+        if isinstance(params, dict) and params.get("viewId"):
+            view_ids.add(str(params["viewId"]))
+    return view_ids
 
 
 @mcp.tool()

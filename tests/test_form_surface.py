@@ -429,3 +429,118 @@ def test_form_surface_flags_non_table_cell_header() -> None:
     result = analyze_form_surface(form)
 
     assert result["issues_by_code"]["non_table_cell_header"] == 1
+
+
+def test_form_surface_flags_persistent_footnote_on_non_date_field() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {
+                                    "fields": {
+                                        "question_text": {
+                                            "title": "Question",
+                                            "hidden": False,
+                                            "bottomText": "Fill this field carefully.",
+                                        }
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, field_type_map={"question_text": "text"})
+
+    assert result["issues_by_code"]["field_footnote_requires_date"] == 1
+    assert result["inventory"]["field_footnotes"] == [
+        {
+            "path": "tabs[0].rows[0].cells[0].displaying.fields.question_text.bottomText",
+            "field": "question_text",
+            "key": "bottomText",
+            "field_type": "text",
+        }
+    ]
+
+
+def test_form_surface_allows_persistent_footnote_on_date_field() -> None:
+    form = {
+        "name": "Dates",
+        "pageTitle": "Dates",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {
+                                    "fields": {
+                                        "due_date": {
+                                            "title": "Due date",
+                                            "hidden": False,
+                                            "helperText": "Use the document date.",
+                                        }
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, field_type_map={"due_date": "date"})
+
+    assert "field_footnote_requires_date" not in result["issues_by_code"]
+    assert result["inventory"]["field_footnotes"][0]["field_type"] == "date"
+
+
+def test_form_surface_does_not_treat_tooltip_as_bottom_footnote() -> None:
+    form = {
+        "name": "Tooltip",
+        "pageTitle": "Tooltip",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {
+                                    "fields": {
+                                        "question_text": {
+                                            "title": "Question",
+                                            "hidden": False,
+                                            "tooltip": "Short help is allowed.",
+                                        }
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, field_type_map={"question_text": "text"})
+
+    assert "field_footnote_requires_date" not in result["issues_by_code"]
+    assert result["inventory"]["field_footnotes"] == []
