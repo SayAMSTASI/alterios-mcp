@@ -23,7 +23,7 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Treat a UUID-like `iconId` as a stored reference, not proof that the icon matches the action standard.
 - When inventorying file-manager icons from an elFinder URL, respect the selected folder exactly: `icons_folder_name=null` and `recurse=false` means current folder only. Do not descend into `public/icons` unless the user explicitly asks for that subfolder.
 - When choosing among project icons or action types, read `docs/alterios-icons-and-actions-catalog.md` and match the user action to the documented semantic before assigning `iconId`.
-- The reusable git icon library must use Google Fonts Icons downloaded with UI Size `16` and fill color `#4B77D1`; preserve the SVG `width`/`height` exactly as downloaded.
+- The reusable git icon library must use Google Fonts Icons downloaded with UI Size `16`, SVG `width="20px"`, `height="20px"`, and fill color `#4B77D1`.
 - For add/edit page actions, place `Закрыть` first with `keyboard_return`, then `Сохранить` with `save`.
 - For view/detail page actions, include only `Закрыть` with `keyboard_return` unless the form has a separate business action.
 - On a view/detail form, use an icon-only `edit_document` action with tooltip `Редактировать` to open the edit form for the current record. Do not add this action to the edit form itself.

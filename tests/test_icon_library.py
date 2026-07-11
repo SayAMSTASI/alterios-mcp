@@ -35,8 +35,8 @@ def test_project_icon_library_manifest_matches_svg_files() -> None:
 def test_project_icon_library_svg_dimensions_and_color_are_valid() -> None:
     for path in ICON_DIR.glob("*.svg"):
         text = path.read_text(encoding="utf-8")
-        assert re.search(r'width="[0-9]+px"', text), path.name
-        assert re.search(r'height="[0-9]+px"', text), path.name
+        assert re.search(r'width="20px"', text), path.name
+        assert re.search(r'height="20px"', text), path.name
         assert re.search(r'viewBox="0 -960 960 960"', text), path.name
 
         colors = {color.upper() for color in re.findall(r"#[0-9A-Fa-f]{6}", text)}

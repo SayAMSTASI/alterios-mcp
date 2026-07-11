@@ -9,14 +9,14 @@
 Стандарт:
 
 - иконка скачивается из Google Fonts Icons с UI Size `16`;
-- фактические SVG `width`/`height` сохраняются такими, как их отдает Google Fonts;
-- размер SVG вручную не переписывается;
+- SVG в git-библиотеке хранится с `width="20px"` и `height="20px"`;
 - `fill="#4B77D1"`;
 - иконки должны оставаться Google Fonts Icons;
 - `iconId` в Alterios должен ссылаться только на UUID файла, загруженного в целевой проект.
 
 ## Найдено до исправления
 
+- 1 из 39 SVG (`keyboard_return`) имел размер `24px` вместо `20px`.
 - 13 из 39 SVG имели цвет не `#4B77D1`:
   - `add_2`;
   - `attach_file_add`;
@@ -34,11 +34,11 @@
 
 ## Исправлено
 
-- Фактические `width`/`height` SVG оставлены в скачанном из Google Fonts виде.
+- Все 39 SVG приведены к `width="20px"` и `height="20px"`.
 - Все 39 SVG нормализованы до `fill="#4B77D1"`.
 - `manifest.json` пересчитан: `bytes`, `sha256`, правила `svg_size` и `svg_color`.
 - В `docs/alterios-icons-and-actions-catalog.md` добавлены визуальные превью всех 39 иконок.
-- Добавлен тест `tests/test_icon_library.py`, который проверяет manifest, наличие SVG dimensions, цвет `#4B77D1` и preview-ссылки в каталоге.
+- Добавлен тест `tests/test_icon_library.py`, который проверяет manifest, размер `20px`, цвет `#4B77D1` и preview-ссылки в каталоге.
 
 ## Важное правило применения
 

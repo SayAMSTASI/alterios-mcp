@@ -263,11 +263,11 @@
       "usage_hint": "Информационная подсказка, help/dialog без изменения данных."
     },
     {
-      "bytes": 198,
+      "bytes": 199,
       "filename": "keyboard_return.svg",
       "mime": "image/svg+xml",
       "semantic": "keyboard_return",
-      "sha256": "f8a6ee6ea5333307c419f3b3c6cff6f51cd0127251d3f89c9215e6bb82818c08",
+      "sha256": "4643819317f4bf19ae349ad0f5a17b2dddfb0eb8b54a685f618625ce13387088",
       "source_name": "keyboard_return.svg",
       "usage_hint": "Назад, закрыть, вернуться к предыдущей форме."
     },
@@ -358,7 +358,7 @@
     "catalog": "docs/alterios-icons-and-actions-catalog.md",
     "iconId": "Target project local file UUID only; never reuse source project file IDs.",
     "svg_color": "All library SVG files must use fill color #4B77D1.",
-    "svg_size": "Use SVG width/height exactly as downloaded from Google Fonts Icons with UI Size=16; do not rewrite dimensions manually."
+    "svg_size": "All library SVG files must use width=\"20px\" and height=\"20px\"; files are downloaded from Google Fonts Icons with UI Size 16."
   },
   "schema_version": 1,
   "source": "sanitized Alterios project public-folder icon export"
