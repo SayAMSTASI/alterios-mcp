@@ -115,18 +115,17 @@
     },
     "calendar": {
       "mode": "experimental/v2",
-      "status": "partial_backend_gap",
-      "frontend_settings": [
+      "status": "live_ui_verified",
+      "required_settings": [
         "engineVersion",
-        "startDate",
+        "title",
+        "startDate"
+      ],
+      "optional_settings": [
         "endDate",
         "bgColor"
       ],
-      "persisted_settings_observed": [
-        "engineVersion",
-        "bgColor"
-      ],
-      "validation": "do not mark complete until UI/HAR or alternate route confirms startDate/endDate persistence"
+      "validation": "UI edit page saves title/startDate/endDate/bgColor and preview renders month grid with events"
     },
     "classic_table": {
       "mode": "classic/legacy",
@@ -139,6 +138,8 @@
     "cards is not present in the confirmed frontend view.format enum",
     "get-data-simplified returns rows only; full get-data returns headers and settings",
     "when fieldNamePrefix is set, pass short field suffixes to create-field to avoid double prefixing",
-    "leaflet final geoFields should be saved after view fields are attached and read back"
+    "leaflet final geoFields should be saved after view fields are attached and read back",
+    "leaflet marker rendering needs GeoJSON Feature values, not bare Point geometry",
+    "calendar UI preview requires settings.title in addition to startDate"
   ]
 }

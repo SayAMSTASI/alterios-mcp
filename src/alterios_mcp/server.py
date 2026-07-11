@@ -1332,8 +1332,10 @@ def _validate_view_format_settings(format_name: str | None, settings: dict[str, 
     normalized_format = (format_name or "table").strip().lower()
     warnings: list[str] = []
     if normalized_format == "calendar":
+        if not settings.get("title"):
+            warnings.append("calendar UI preview requires settings.title to build visible event names.")
         if not settings.get("startDate"):
-            warnings.append("calendar format needs settings.startDate for UI rendering; current backend may drop it on save.")
+            warnings.append("calendar UI preview requires settings.startDate.")
         return warnings
     if normalized_format == "gantt":
         default_view = settings.get("defaultView")

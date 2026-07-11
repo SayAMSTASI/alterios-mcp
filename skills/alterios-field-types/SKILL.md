@@ -43,7 +43,9 @@ display cells.
   XLSX/CSV/documents.
 - Use `geo` for persisted geographic objects that must be shown in `leaflet`
   views; attach it to the view, read the populated view-field `mname`, then use
-  that mname in `settings.geoFields[].name`.
+  that mname in `settings.geoFields[].name`. Store marker values as GeoJSON
+  `Feature` objects; a bare `Point` geometry can be saved but does not render
+  marker icons in the UI preview.
 - Treat calculated fields as derived values; document expression, source mnames,
   and recalculation expectations.
 - Preserve existing fields unless cleanup is explicitly requested and narrowly

@@ -506,10 +506,12 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   полей и фильтров.
 - [docs/material-types-and-view-types-research.md](docs/material-types-and-view-types-research.md) -
   исследование типов материалов, полей, форматов `table`, `reference`, `grid`,
-  `list`, `gantt`, `leaflet`, календарного gap, relation joins и
+  `list`, `gantt`, `leaflet`, `calendar`, relation joins и
   legacy/classic исключений.
 - [docs/view-format-inventory.json](docs/view-format-inventory.json) -
   машинно-читаемая матрица форматов представлений и обязательных настроек.
+- [docs/view-format-ui-evidence-2026-07-11.md](docs/view-format-ui-evidence-2026-07-11.md) -
+  UI evidence по настройке и preview всех подтвержденных форматов представлений.
 - [docs/optimization-plan.md](docs/optimization-plan.md) - план оптимизации:
   сценарные tools, UI/report validation, write workflow и inventory cache/diff
   health.

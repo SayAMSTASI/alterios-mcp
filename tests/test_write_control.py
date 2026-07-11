@@ -817,7 +817,7 @@ def test_upsert_view_allows_explicit_legacy_mode_without_real_network() -> None:
     assert result["response"]["planned_payload"]["settings"] == {}
 
 
-def test_upsert_view_calendar_reports_missing_start_date_warning_without_real_network() -> None:
+def test_upsert_view_calendar_reports_incomplete_settings_warning_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:
             self.body = body
@@ -840,8 +840,40 @@ def test_upsert_view_calendar_reports_missing_start_date_warning_without_real_ne
 
     assert result["response"]["planned_payload"]["settings"] == {"bgColor": "status_color", "engineVersion": "v2"}
     assert result["response"]["format_warnings"] == [
-        "calendar format needs settings.startDate for UI rendering; current backend may drop it on save."
+        "calendar UI preview requires settings.title to build visible event names.",
+        "calendar UI preview requires settings.startDate.",
     ]
+
+
+def test_upsert_view_calendar_complete_settings_has_no_warning_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view(
+            "Calendar View",
+            format="calendar",
+            settings={"title": "title_mname", "startDate": "start_at", "endDate": "end_at", "bgColor": "status_color"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["response"]["planned_payload"]["settings"] == {
+        "title": "title_mname",
+        "startDate": "start_at",
+        "endDate": "end_at",
+        "bgColor": "status_color",
+        "engineVersion": "v2",
+    }
+    assert result["response"]["format_warnings"] == []
 
 
 def test_upsert_view_rejects_incomplete_gantt_settings_without_real_network() -> None:

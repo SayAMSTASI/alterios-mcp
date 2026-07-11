@@ -133,8 +133,13 @@
 - `list` - компактный раскрываемый список;
 - `gantt` - диаграмма Ганта по датам и ресурсам;
 - `leaflet` - карта по `geo`-полям;
-- `calendar` - календарный вывод, но текущий backend readback не сохраняет
-  `startDate/endDate`, поэтому нужен отдельный UI/HAR или route evidence.
+- `calendar` - календарный вывод по `title`, `startDate`, опциональным
+  `endDate` и `bgColor`.
+
+UI-проверка 2026-07-11 подтвердила настройку и preview для всех этих форматов.
+Для `leaflet` значения `geo` должны быть GeoJSON `Feature`, иначе маркеры не
+появятся. Для `reference` standalone preview не выводит строки; формат нужно
+проверять как источник выбора для `ref source=view`.
 
 Не использовать `cards` как подтвержденный формат без отдельного evidence:
 в актуальном frontend enum он не найден.

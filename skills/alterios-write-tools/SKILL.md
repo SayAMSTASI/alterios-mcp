@@ -34,8 +34,8 @@ For view write scenarios:
 - Legacy/classic views require an explicit `allow_legacy_mode=true` argument and documented evidence that the target scenario needs that mode.
 - Known frontend formats are `table`, `grid`, `list`, `leaflet`, `gantt`, `reference`, and `calendar`; do not invent other formats without UI/API evidence.
 - `gantt` write scenarios must validate `defaultView` (`day`, `week`, `month`, `quarter`, `year`) and `date1.field`/`date2.field` before live write.
-- `leaflet` write scenarios must validate `geoFields` after populated view fields are available; each geo field needs `name` and `markerIcons` (`default`, `img`, or `field`).
-- `calendar` currently has a known persistence gap: frontend reads `startDate`/`endDate`, but live backend readback preserved only `bgColor`/`engineVersion`. Return warnings and require UI/HAR or alternate-route evidence before declaring a calendar view complete.
+- `leaflet` write scenarios must validate `geoFields` after populated view fields are available; each geo field needs `name` and `markerIcons` (`default`, `img`, or `field`). Content values must be GeoJSON `Feature` objects for marker rendering.
+- `calendar` write scenarios must set `title` and `startDate` before declaring the view complete; `endDate` and `bgColor` are optional but UI-verified.
 - For system attributes such as `_id`, add the view field with the legacy add payload but save it with normalized `contentTypeId` and `contentAttribute`; remove null selector keys before save.
 - After code or schema changes to MCP tools, restart the running MCP process before relying on live tool output or available arguments.
 - Redaction must cover nested author/user/project metadata, emails, verification codes, tokens, passwords, cookies, api keys, participant ids, and support chat ids in audit/readback data.
