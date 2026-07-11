@@ -8,7 +8,7 @@
       "semantic": "add_2",
       "sha256": "559e83870606b730bbaef12df48fb7caf019dcf7346c6b259fe4bf8ac028f0a4",
       "source_name": "add_2_16dp_0277BD_FILL0_wght400_GRAD0_opsz20 (1)_0.svg",
-      "usage_hint": "Добавление записи или элемента; проектный вариант иконки add."
+      "usage_hint": "Добавить запись, строку, значение справочника или связанный элемент."
     },
     {
       "bytes": 431,
@@ -17,7 +17,7 @@
       "semantic": "analytics",
       "sha256": "d965929e7387b57b2582de86db26ddd96b1baeb90770e62b8ad6345eef884056",
       "source_name": "analytics_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Открытие аналитики, отчета, дашборда или расчетного среза."
+      "usage_hint": "Открыть аналитику, дашборд, расчетный срез, аналитический отчет."
     },
     {
       "bytes": 154,
@@ -26,7 +26,7 @@
       "semantic": "arrow_drop_down",
       "sha256": "bb9b298ee19d2e629af60efad0fc7baadb5556d0b49959d349ff1498577c3cd1",
       "source_name": "arrow_drop_down_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Раскрытие списка, выпадающего меню или компактного выбора."
+      "usage_hint": "Раскрыть список, компактный выбор, выпадающее меню."
     },
     {
       "bytes": 181,
@@ -35,7 +35,7 @@
       "semantic": "arrow_outward",
       "sha256": "9f03bf258205899fbf563c063eab1f27738f18ca1dcc19f37c5537ef019871ed",
       "source_name": "arrow_outward_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Переход наружу, открытие в новой вкладке или внешний переход."
+      "usage_hint": "Открыть внешний ресурс, новую вкладку, переход за пределы текущей формы."
     },
     {
       "bytes": 457,
@@ -44,7 +44,7 @@
       "semantic": "attach_file_add",
       "sha256": "ef3d8953deae31c5139b266466161aed6eb6dbb89b9149a5d442fcac7db6424d",
       "source_name": "attach_file_add_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Добавление файла, вложения или загрузка в file-field."
+      "usage_hint": "Загрузить файл, добавить вложение, открыть file-field."
     },
     {
       "bytes": 871,
@@ -53,7 +53,7 @@
       "semantic": "automation",
       "sha256": "d5383b6553e38b83ee76f8999731c0edd7fd3bf7329cd0ab97d32f3094448efc",
       "source_name": "automation_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Автоматизация, запуск сценария, робота, скрипта или фоновой обработки."
+      "usage_hint": "Запустить автоматическую обработку, робота, пакетный сценарий, фоновую операцию."
     },
     {
       "bytes": 617,
@@ -62,7 +62,7 @@
       "semantic": "build",
       "sha256": "2a36219b24f60e7604c5c03b6c90fc2b59d2a6c050c880772dc7134b467faff0",
       "source_name": "build_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Настройка, техническое обслуживание или сборка параметров."
+      "usage_hint": "Настроить параметры, выполнить техническое обслуживание, открыть техническую настройку."
     },
     {
       "bytes": 371,
@@ -71,7 +71,7 @@
       "semantic": "calendar_check",
       "sha256": "1fc66acbd68d21945489c135f55eac293e95f5bf0a9b132b176f1c717d0afa9b",
       "source_name": "calendar_check_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Проверка даты, календарного срока, планового события или дедлайна."
+      "usage_hint": "Проверить дату, срок, календарное событие, дедлайн."
     },
     {
       "bytes": 492,
@@ -80,7 +80,7 @@
       "semantic": "category",
       "sha256": "bd7433f753b0bf1f24eb49c4ef592bdbcbc492f1723663456ac6ff42f32e64c4",
       "source_name": "category_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Категория, классификатор, тип или группировка сущностей."
+      "usage_hint": "Категория, классификатор, тип, группа сущностей."
     },
     {
       "bytes": 382,
@@ -89,7 +89,7 @@
       "semantic": "chat",
       "sha256": "d2c27d742d8c72538532613fb8b5b0b5ea12dd5ed01044a713e570c07636d0a5",
       "source_name": "chat_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Комментарии, обсуждение, чат, обратная связь или поддержка."
+      "usage_hint": "Комментарии, обсуждение, обратная связь."
     },
     {
       "bytes": 269,
@@ -98,7 +98,7 @@
       "semantic": "checklist",
       "sha256": "2e111d80414dc4ff426504d8a4afe7eb29552d7fdd79f0768a297ca9406f4f7f",
       "source_name": "checklist_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Массовый выбор, bulk-действие или пакетная обработка строк."
+      "usage_hint": "Множественный выбор, bulk-действие, пакетная обработка строк."
     },
     {
       "bytes": 410,
@@ -107,7 +107,7 @@
       "semantic": "content_copy",
       "sha256": "9c121c1047646d84608385964091e571e10603b1fc83ff3071c4eea1bcb6a7dc",
       "source_name": "content_copy_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Копирование, дублирование записи или перенос настроек по образцу."
+      "usage_hint": "Копировать, дублировать запись, перенести настройки по образцу."
     },
     {
       "bytes": 410,
@@ -116,7 +116,7 @@
       "semantic": "content_copy_17dp",
       "sha256": "9c121c1047646d84608385964091e571e10603b1fc83ff3071c4eea1bcb6a7dc",
       "source_name": "content_copy_17dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Копирование, дублирование записи или перенос настроек по образцу."
+      "usage_hint": "Альтернативный проектный вариант копирования для сохранения локального стиля."
     },
     {
       "bytes": 340,
@@ -125,7 +125,7 @@
       "semantic": "delete",
       "sha256": "d360844e9c9d45c9dffb2bf0bcbc9eee6926065e4dd77c35ca5c3b6186fe4042",
       "source_name": "delete_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Удаление. Должно применяться только для destructive-действий."
+      "usage_hint": "Удалить запись, связь, строку, объект."
     },
     {
       "bytes": 495,
@@ -134,7 +134,7 @@
       "semantic": "design_services",
       "sha256": "bc25c93bf517ba03082e5bc27fa896909a990b39f6bd0e789684a0c58fae6080",
       "source_name": "design_services_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Настройка конструктора, дизайна формы или пользовательского интерфейса."
+      "usage_hint": "Настройка конструктора, дизайна формы, UX/UI конфигурации."
     },
     {
       "bytes": 376,
@@ -143,7 +143,7 @@
       "semantic": "directory_sync",
       "sha256": "85022179c2b6bc3306a35e209a3ca7e617b2c8cf8341819121d3fdfb21944a16",
       "source_name": "directory_sync_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Синхронизация справочника, каталога, файлов или связанных данных."
+      "usage_hint": "Синхронизация справочника, каталога, файлов, связанных данных."
     },
     {
       "bytes": 711,
@@ -152,7 +152,7 @@
       "semantic": "docs",
       "sha256": "5aa9531f948e37f922176895e9f9209a53d3b7b209d4e0a931402042254304d5",
       "source_name": "docs_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Документы, инструкции, регламенты или пакет файлов."
+      "usage_hint": "Документы, инструкции, регламенты, пакет файлов."
     },
     {
       "bytes": 301,
@@ -161,7 +161,7 @@
       "semantic": "download",
       "sha256": "dd7dae2d7e5a1c54b64f03a0aaa041d41a55df51dc18d4d00d60b9fbacfcab40",
       "source_name": "download_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Скачивание файла, экспорт или выгрузка результата."
+      "usage_hint": "Скачать файл, экспортировать результат, выгрузить данные."
     },
     {
       "bytes": 449,
@@ -170,7 +170,7 @@
       "semantic": "dynamic_form",
       "sha256": "f0a7c09507a32374070d23c53d29eb957f1c548c58bd1eb88968936d663b48ef",
       "source_name": "dynamic_form_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Динамическая форма, форма ввода или настройка формы."
+      "usage_hint": "Открыть динамическую форму, форму ввода, форму настройки."
     },
     {
       "bytes": 360,
@@ -179,7 +179,7 @@
       "semantic": "edit",
       "sha256": "7567a6664acd440d928a09cca4988a154439f99cc02c2adf9fcb62fa5d6e7aa2",
       "source_name": "edit_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Редактирование существующей записи."
+      "usage_hint": "Редактировать существующую запись."
     },
     {
       "bytes": 541,
@@ -188,7 +188,7 @@
       "semantic": "edit_document",
       "sha256": "a83dacd118ed7146194b15ff7bf650cff4a8e35a631a363bac215c955211f1d6",
       "source_name": "edit_document_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Редактирование документа, шаблона, текста или печатной формы."
+      "usage_hint": "Редактировать документ, шаблон, текст, печатную форму."
     },
     {
       "bytes": 647,
@@ -197,7 +197,7 @@
       "semantic": "error",
       "sha256": "2d15188b9ed7cf86c3f2d5781955a26c0bd4778154b7ed4d1ae0266daacd8656",
       "source_name": "error_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Ошибка, проблема валидации, предупреждение или критичный статус."
+      "usage_hint": "Ошибка, предупреждение, проблема валидации, критичный статус."
     },
     {
       "bytes": 394,
@@ -206,7 +206,7 @@
       "semantic": "event_note",
       "sha256": "61e55582e73c6147957df75813fc765cc396f10adf5563a3ef88207da688c3d6",
       "source_name": "event_note_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Событие, запись журнала, протокол или календарная заметка."
+      "usage_hint": "Событие, запись журнала, протокол, календарная заметка."
     },
     {
       "bytes": 394,
@@ -215,7 +215,7 @@
       "semantic": "experiment",
       "sha256": "8c1d79e32517fc19b0e069721f9315201fb89bf8513531cae4570999a9c6ae69",
       "source_name": "experiment_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Экспериментальный режим, тестовая функция или лабораторная проверка."
+      "usage_hint": "Экспериментальный режим, тестовая функция, лабораторная проверка."
     },
     {
       "bytes": 817,
@@ -224,7 +224,7 @@
       "semantic": "extension",
       "sha256": "efaa5ac8fee382005ac4af81e88d0a1f9d37ce1f4fcfa9fcf8661d63844eda01",
       "source_name": "extension_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Расширение, модуль, плагин или подключаемая функция."
+      "usage_hint": "Расширение, модуль, плагин, подключаемая функция."
     },
     {
       "bytes": 1676,
@@ -233,7 +233,7 @@
       "semantic": "forms_apps_script",
       "sha256": "6497756beb77f5c939b2a18d086c93dae9f1e251177de7ba60250df8be811221",
       "source_name": "forms_apps_script_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Скрипт формы, обработчик, пользовательское приложение или связка forms/scripts."
+      "usage_hint": "Ручной скрипт формы, обработчик, связка forms/scripts."
     },
     {
       "bytes": 468,
@@ -242,7 +242,7 @@
       "semantic": "free_cancellation",
       "sha256": "8f85c831322427557990d51b5ce2884b7aafca6e6f0e85d2a7cb30361648c95e",
       "source_name": "free_cancellation_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Отмена, аннулирование, сброс выбранного действия или безопасный отказ."
+      "usage_hint": "Отмена, аннулирование, сброс выбранного действия, безопасный отказ."
     },
     {
       "bytes": 519,
@@ -251,7 +251,7 @@
       "semantic": "history",
       "sha256": "8d155743b313b64e8c8c25ad12e58230e1852e3263c000b59975d1e50a18ce2c",
       "source_name": "history.svg",
-      "usage_hint": "История изменений, журнал действий, аудит или предыдущие версии."
+      "usage_hint": "История изменений, журнал действий, аудит, предыдущие версии."
     },
     {
       "bytes": 646,
@@ -269,7 +269,7 @@
       "semantic": "keyboard_return",
       "sha256": "1295a0f434be7d87c3c7d01be249223e0cef8937df1dfd45b20146d6a094c9ac",
       "source_name": "keyboard_return.svg",
-      "usage_hint": "Возврат/закрытие, когда в текущем проекте уже принят такой стиль."
+      "usage_hint": "Назад, закрыть, вернуться к предыдущей форме."
     },
     {
       "bytes": 913,
@@ -278,7 +278,7 @@
       "semantic": "list_alt_add",
       "sha256": "0cf07e2f6725b7019eb97f135e866a55eb0fc93604e087fc1e0b6b2f7767a732",
       "source_name": "list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Добавление строки/записи из списка или создание связанного элемента."
+      "usage_hint": "Добавить строку из списка, создать связанный элемент из related list."
     },
     {
       "bytes": 457,
@@ -287,7 +287,7 @@
       "semantic": "menu",
       "sha256": "7f81762992554738eaca08f97c9aac410f6f2194aa56cd58d8ea32d1c6e53163",
       "source_name": "menu.svg",
-      "usage_hint": "Главное меню, боковое меню или раскрытие навигации; для строковых действий лучше more_vert."
+      "usage_hint": "Меню действий строки или компактное меню дополнительных операций."
     },
     {
       "bytes": 652,
@@ -296,7 +296,7 @@
       "semantic": "person_add",
       "sha256": "3effb8a4108aa483113de4464b3bff16a86f467a0d8297f73e18d4df706e0090",
       "source_name": "person_add_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Добавление пользователя, сотрудника, участника или ответственного."
+      "usage_hint": "Добавить пользователя, сотрудника, участника, ответственного."
     },
     {
       "bytes": 652,
@@ -305,7 +305,7 @@
       "semantic": "person_check",
       "sha256": "d0f18a26feb6adb346d9878eb4a7b8f3c7bab7f88da6827ed48fb890848117aa",
       "source_name": "person_check_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Проверка, подтверждение, назначение или согласование пользователя."
+      "usage_hint": "Проверить, подтвердить, назначить или согласовать пользователя."
     },
     {
       "bytes": 736,
@@ -314,7 +314,7 @@
       "semantic": "preview",
       "sha256": "416a2240c61176be3cba9cd2c707f04eceb5725a1c9c6efa134d72cf07386a59",
       "source_name": "preview_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Предпросмотр записи, печатной формы или результата перед применением."
+      "usage_hint": "Просмотр записи, предпросмотр формы, просмотр результата без изменения."
     },
     {
       "bytes": 526,
@@ -323,7 +323,7 @@
       "semantic": "print",
       "sha256": "0952707b9ed7a7d0afe334721a820fed064058c97983c9045230e4b5bb24c84f",
       "source_name": "print_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20_0_0.svg",
-      "usage_hint": "Печать формы, печатная форма или PDF/вывод на печать."
+      "usage_hint": "Печать формы, печатная форма, PDF/вывод на печать."
     },
     {
       "bytes": 540,
@@ -332,7 +332,7 @@
       "semantic": "recycling",
       "sha256": "dcb5930da39e37a4d403f9d5d1adbf07e549dc2c485ac89c95cf8d4c0a2cffb6",
       "source_name": "recycling_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Повторное использование, переработка, возврат в цикл или переобработка."
+      "usage_hint": "Повторное использование, переработка, возврат в цикл, переобработка."
     },
     {
       "bytes": 299,
@@ -341,7 +341,7 @@
       "semantic": "rule",
       "sha256": "26b3c8749d5b0903cf7cfd66b005c80f072469752d0b5c81bff830615e22800a",
       "source_name": "rule_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Правило, проверка, регламент, условие или валидатор."
+      "usage_hint": "Правило, проверка, регламент, условие, валидатор."
     },
     {
       "bytes": 452,
@@ -350,11 +350,12 @@
       "semantic": "save",
       "sha256": "607db7bc43a34cc31d154638dc6295ffc7efad847720d61aa5d3ab1b3f2b120b",
       "source_name": "save_16dp.svg",
-      "usage_hint": "Сохранение формы, записи или настроек."
+      "usage_hint": "Сохранить форму, запись, настройки."
     }
   ],
   "rules": {
     "before_write": "Inventory target project icons first, then upload only missing library icons.",
+    "catalog": "docs/alterios-icons-and-actions-catalog.md",
     "iconId": "Target project local file UUID only; never reuse source project file IDs."
   },
   "schema_version": 1,

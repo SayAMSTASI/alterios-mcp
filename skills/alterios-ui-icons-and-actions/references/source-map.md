@@ -3,6 +3,7 @@
 Use these repo documents as evidence sources:
 
 - `../../../docs/alterios-icon-standards.md`: canonical icon names, size, color, and UI-action meanings.
+- `../../../docs/alterios-icons-and-actions-catalog.md`: full project icon catalog and action-type behavior principles.
 - `../../../docs/icon-usage-matrix.json`: generated live `iconId` usage matrix.
 - `../../../docs/form-surface-ux-and-icons.md`: form/action placement guardrails.
 - `../../../docs/form-surface-inventory.json`: action and form locations for icon validation.

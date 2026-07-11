@@ -22,6 +22,7 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Do not replace an existing icon if it already matches the action meaning and local style.
 - Treat a UUID-like `iconId` as a stored reference, not proof that the icon matches the action standard.
 - When inventorying file-manager icons from an elFinder URL, respect the selected folder exactly: `icons_folder_name=null` and `recurse=false` means current folder only. Do not descend into `public/icons` unless the user explicitly asks for that subfolder.
+- When choosing among project icons or action types, read `docs/alterios-icons-and-actions-catalog.md` and match the user action to the documented semantic before assigning `iconId`.
 
 ## Review Steps
 
@@ -36,4 +37,4 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 
 ## References
 
-Read `references/source-map.md`, then open the icon standard and icon usage matrix only when icon validation is needed.
+Read `references/source-map.md`, then open the full icon/action catalog for icon selection or action behavior, and the usage matrix only when existing `iconId` values must be resolved.
