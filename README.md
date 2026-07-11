@@ -172,6 +172,7 @@ task-form, script refs, BPMN/formKey и сохраняет `plan_id`; apply по
 
 - `alterios-project-base-inventory`;
 - `alterios-business-requirements-analyst`;
+- `alterios-field-types`;
 - `alterios-form-view-surface`;
 - `alterios-ui-icons-and-actions`;
 - `alterios-script-bpmn-flow`;
@@ -503,6 +504,9 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
 - [docs/business-requirements-analyst-agent.md](docs/business-requirements-analyst-agent.md) -
   агент аналитика требований, постановка/ТРЗ, правила для представлений, связей,
   полей и фильтров.
+- [docs/material-types-and-view-types-research.md](docs/material-types-and-view-types-research.md) -
+  исследование типов материалов, полей, `table`/`reference` представлений,
+  relation joins и legacy/classic исключений.
 - [docs/optimization-plan.md](docs/optimization-plan.md) - план оптимизации:
   сценарные tools, UI/report validation, write workflow и inventory cache/diff
   health.

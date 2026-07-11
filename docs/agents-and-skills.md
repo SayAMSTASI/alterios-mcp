@@ -354,6 +354,7 @@ docs, JSON-матрицы, тесты и кодовые области.
 |---|---|---|---|
 | `alterios-project-base-inventory` | После deep inventory project-base matrix | Project Base Explorer | Профиль, project_id, listandcount, object totals, route/readback evidence |
 | `alterios-business-requirements-analyst` | После появления Stage 19 и документационного workflow | Business/System Analyst | Постановка/ТРЗ, сценарии, view/form/process/report requirements, acceptance criteria |
+| `alterios-field-types` | После live-проверки типов полей и relation joins | Data Model Engineer | Persisted field types, relation settings, short mnames, material descriptions, field/view/form separation |
 | `alterios-form-view-surface` | После `docs/form-surface-inventory.md` и JSON-матрицы | Form Surface Engineer | View links, form tabs/actions, no-gap layout, F-pattern, roles/source/styles |
 | `alterios-ui-icons-and-actions` | После `docs/icon-usage-matrix.json` и UTF-8 icon standard | UI Icons & Actions Reviewer | Google Fonts Icons, size 16, `#4B77D1`, action meaning, iconId validation |
 | `alterios-script-bpmn-flow` | После `docs/script-bpmn-linkage.md` и parser refs | Script/BPMN Flow Integrator | Script types, form actions, BPMN formKey/listeners/script refs, side effects |
@@ -408,5 +409,5 @@ Artifacts:
 - Не смешиваем runtime service names и manual script UUID.
 - Не считаем JSON-save достаточной проверкой для форм и отчетов, если результат
   должен быть виден оператору в UI.
-- Не расширяем число skills сверх первого набора из 8, пока не станет понятно,
+- Не расширяем число skills сверх проверенного repo-owned набора, пока не станет понятно,
   где реально есть дублирование или новая область ответственности.

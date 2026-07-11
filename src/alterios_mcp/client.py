@@ -433,6 +433,7 @@ class AlteriosClient:
         *,
         attribute: str | None = None,
         content_type_field_id: str | None = None,
+        content_type_id: str | None = None,
     ) -> AlteriosResponse:
         if bool(attribute) == bool(content_type_field_id):
             raise ValueError("Pass exactly one of attribute or content_type_field_id.")
@@ -1112,8 +1113,14 @@ def _is_sensitive_key_name(key: str) -> bool:
     normalized = key.lower().replace("-", "_")
     compact = normalized.replace("_", "")
     return (
-        normalized in {"api_key", "apikey", "authorization", "secret", "token"}
+        normalized in {"api_key", "apikey", "authorization", "secret", "token", "cookie", "set_cookie"}
+        or compact in {"emailconfirmationcode", "emailverificationcode"}
+        or "email" in normalized
         or "password" in normalized
+        or normalized in {"author_name", "authorname"}
+        or normalized == "project"
+        or normalized in {"project_name", "projectname", "participants_ids", "telegram_support_group_ids"}
+        or compact in {"participantsids", "telegramsupportgroupids"}
         or "secret" in normalized
         or compact.endswith("apikey")
         or normalized.endswith("_token")

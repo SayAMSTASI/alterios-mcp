@@ -28,6 +28,14 @@ For material-module write scenarios, enforce the configured UX contract:
 
 Existing report write coverage includes `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`; use these before adding another report write tool.
 
+For view write scenarios:
+
+- `alterios_upsert_view` must default to experimental/v2 by writing `settings.engineVersion = "v2"`.
+- Legacy/classic views require an explicit `allow_legacy_mode=true` argument and documented evidence that the target scenario needs that mode.
+- For system attributes such as `_id`, add the view field with the legacy add payload but save it with normalized `contentTypeId` and `contentAttribute`; remove null selector keys before save.
+- After code or schema changes to MCP tools, restart the running MCP process before relying on live tool output or available arguments.
+- Redaction must cover nested author/user/project metadata, emails, verification codes, tokens, passwords, cookies, api keys, participant ids, and support chat ids in audit/readback data.
+
 ## Boundaries
 
 - Do not mix destructive/security flows into normal write tools.

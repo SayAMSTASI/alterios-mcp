@@ -21,6 +21,15 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 10. For views, use the Alterios experimental mode as the default required mode. Treat a non-experimental view configuration as a blocker unless the user explicitly asks for legacy behavior.
 11. After writes, verify API readback and UI-visible behavior when the result is user-facing.
 
+## View Types And Modes
+
+- Confirmed live view formats are `table` and `reference` in experimental/v2. A joined `table` view is also confirmed when the join uses real view-field mnames.
+- `settings.engineVersion = "v2"` is the default for new views. Empty settings or missing `engineVersion` are legacy/classic and require explicit evidence plus an explicit legacy flag in the write tool.
+- Treat `cards` and other unverified formats as unknown until there is UI/API evidence for the current Alterios instance.
+- For relation views, use short content field suffixes and `fieldNamePrefix` before fields are created. Long generated mnames can break joins through backend SQL alias truncation.
+- Read populated view fields before writing join conditions; do not infer `_id` aliases. Backends can expose the related id as `_id0` or another generated mname.
+- Validate a view through both populated fields and `get-data` or `get-data-simplified`; a successful save is not enough.
+
 ## Layout Rules
 
 - Keep list/add/edit/detail/task/main forms distinct.

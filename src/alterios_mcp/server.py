@@ -1385,15 +1385,75 @@ def _find_view_field(
             continue
         if content_type_field_id and field.get("contentTypeFieldId") == content_type_field_id:
             return field
-        if attribute and (field.get("attribute") == attribute or field.get("mname") == attribute):
+        if attribute and (
+            field.get("attribute") == attribute
+            or field.get("contentAttribute") == attribute
+            or field.get("mname") == attribute
+        ):
             return field
     return None
+
+
+def _view_entity_main_content_type_id(entity: dict[str, Any] | None) -> str | None:
+    if not isinstance(entity, dict):
+        return None
+    config = entity.get("config")
+    if not isinstance(config, dict):
+        return None
+    content_type_ids = config.get("contentTypesIds")
+    if isinstance(content_type_ids, list):
+        for item in content_type_ids:
+            normalized = str(item or "").strip()
+            if normalized:
+                return normalized
+    content_type_id = config.get("contentTypeId")
+    if content_type_id:
+        return str(content_type_id).strip() or None
+    return None
+
+
+def _view_entity_field_add_request(entity: dict[str, Any] | None, *, attribute: str | None, content_type_field_id: str | None) -> dict[str, Any]:
+    entity_id = str((entity or {}).get("_id") or "").strip()
+    if not entity_id:
+        raise ValueError("View entity readback does not contain _id.")
+    request: dict[str, Any] = {"entityId": entity_id}
+    if content_type_field_id:
+        request["contentTypeFieldId"] = content_type_field_id
+        return request
+    if not attribute:
+        return request
+    request["attribute"] = attribute
+    return request
+
+
+def _normalize_view_field_payload_for_entity(
+    payload: dict[str, Any],
+    entity: dict[str, Any] | None,
+    *,
+    attribute: str | None,
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    if (entity or {}).get("type") != "content" or normalized.get("contentTypeFieldId"):
+        return normalized
+    effective_attribute = attribute or normalized.get("contentAttribute") or normalized.get("attribute")
+    if not effective_attribute:
+        return normalized
+    content_type_id = _view_entity_main_content_type_id(entity)
+    if not content_type_id:
+        return normalized
+    normalized["contentTypeId"] = content_type_id
+    normalized["contentAttribute"] = effective_attribute
+    normalized.pop("attribute", None)
+    return normalized
 
 
 def _view_field_save_payload(field: dict[str, Any]) -> dict[str, Any]:
     payload = dict(strip_alterios_metadata(field))
     for key in ("contentType", "contentTypeField", "relatedViewField", "diagramsNames"):
         payload.pop(key, None)
+    for key in ("attribute", "contentAttribute", "contentTypeFieldId", "contentTypeId", "processAttribute", "taskAttribute"):
+        if payload.get(key) is None:
+            payload.pop(key, None)
     return payload
 
 
@@ -5090,6 +5150,7 @@ def alterios_upsert_view(
     format: str | None = None,
     settings: dict[str, Any] | None = None,
     strict: bool | None = None,
+    allow_legacy_mode: bool = False,
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
     profile: str | None = None,
@@ -5105,9 +5166,10 @@ def alterios_upsert_view(
     merged_settings = dict((existing or {}).get("settings") or {})
     if settings is not None:
         merged_settings.update(settings)
-    if merged_settings.get("engineVersion") not in (None, "v2"):
+    if not allow_legacy_mode and merged_settings.get("engineVersion") not in (None, "v2"):
         raise ValueError("Alterios views must use experimental mode: settings.engineVersion must be 'v2'.")
-    merged_settings["engineVersion"] = "v2"
+    if not allow_legacy_mode:
+        merged_settings["engineVersion"] = "v2"
     payload = {
         **(existing or {}),
         "name": name,
@@ -5122,7 +5184,7 @@ def alterios_upsert_view(
         method="PATCH" if existing else "POST",
         path=f"/api/views/{existing.get('_id')}" if existing else "/api/views",
         summary="Create or update an Alterios view with preflight and readback.",
-        request={"_id": payload.get("_id"), "name": name},
+        request={"_id": payload.get("_id"), "name": name, "allowLegacyMode": allow_legacy_mode},
     )
     audit = build_write_audit(
         profile=profile,
@@ -5240,6 +5302,9 @@ def alterios_upsert_view_field(
     if not view:
         raise ValueError(f"View {view_id!r} was not found.")
     _assert_managed_or_allowed(view, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+    entity = _find_view_entity(client, view_id=view_id, entity_id=entity_id)
+    if not entity:
+        raise ValueError(f"View entity {entity_id!r} was not found in view {view_id!r}.")
     existing = _find_view_field(
         client,
         view_id=view_id,
@@ -5248,7 +5313,11 @@ def alterios_upsert_view_field(
         attribute=attribute,
         content_type_field_id=content_type_field_id,
     )
-    add_request = {"entityId": entity_id, "attribute": attribute, "contentTypeFieldId": content_type_field_id}
+    add_request = _view_entity_field_add_request(
+        entity,
+        attribute=attribute,
+        content_type_field_id=content_type_field_id,
+    )
     payload = dict(existing or {})
     if existing:
         if alias is not None:
@@ -5280,7 +5349,11 @@ def alterios_upsert_view_field(
         "will_add_field": existing is None,
         "add_request": {key: value for key, value in add_request.items() if value is not None},
         "diff": _resource_diff(existing, payload, ("alias", "mname", "order", "settings")) if existing else [],
-        "planned_payload": _view_field_save_payload(payload) if existing else None,
+        "planned_payload": (
+            _view_field_save_payload(_normalize_view_field_payload_for_entity(payload, entity, attribute=attribute))
+            if existing
+            else None
+        ),
     }
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
@@ -5291,6 +5364,7 @@ def alterios_upsert_view_field(
             entity_id,
             attribute=attribute,
             content_type_field_id=content_type_field_id,
+            content_type_id=add_request.get("contentTypeId"),
         ).as_dict()
         existing = _find_view_field(
             client,
@@ -5310,6 +5384,7 @@ def alterios_upsert_view_field(
         payload["order"] = order
     if settings is not None:
         payload["settings"] = settings
+    payload = _normalize_view_field_payload_for_entity(payload, entity, attribute=attribute)
     saved = client.save_view_field(_view_field_save_payload(payload)).as_dict()
     readback = _find_view_field(client, view_id=view_id, view_field_id=payload.get("_id"))
     response_payload.update({"added": add_response, "saved": saved, "readback": readback})

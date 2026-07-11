@@ -59,6 +59,7 @@ def test_dry_run_audit_redacts_sensitive_request_values() -> None:
                 "password": "secret-password",
                 "repassword": "secret-password",
                 "passwordRecoverCode": "recover-code",
+                "emailConfirmationCode": "email-code",
                 "clientSecret": "client-secret",
                 "name": "demo",
             }
@@ -78,10 +79,35 @@ def test_dry_run_audit_redacts_sensitive_request_values() -> None:
     assert audit["operation"]["request"]["body"]["password"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["repassword"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["passwordRecoverCode"] == "<redacted>"
+    assert audit["operation"]["request"]["body"]["emailConfirmationCode"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["clientSecret"] == "<redacted>"
     assert audit["operation"]["request"]["body"]["name"] == "demo"
     assert redact_sensitive({"planned_payload": {"repassword": "secret-password"}}) == {
         "planned_payload": {"repassword": "<redacted>"}
+    }
+    assert redact_sensitive({"readback": {"author": {"emailConfirmationCode": "email-code"}}}) == {
+        "readback": {"author": {"emailConfirmationCode": "<redacted>"}}
+    }
+    assert redact_sensitive(
+        {
+            "readback": {
+                "author": {"email": "person@example.test"},
+                "authorName": "Person Name",
+                "contentType": {
+                    "projectName": "Business Project",
+                    "project": {"participantsIds": ["user-1"], "telegramSupportGroupIds": ["group-1"]},
+                },
+            }
+        }
+    ) == {
+        "readback": {
+            "author": {"email": "<redacted>"},
+            "authorName": "<redacted>",
+            "contentType": {
+                "projectName": "<redacted>",
+                "project": "<redacted>",
+            },
+        }
     }
 
 
@@ -699,7 +725,7 @@ def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
     assert result["dry_run"] is True
     assert result["audit"]["operation"]["kind"] == "view"
     assert result["audit"]["operation"]["target_ids"] == ["view-1"]
-    assert result["audit"]["operation"]["request"] == {"_id": "view-1", "name": "View"}
+    assert result["audit"]["operation"]["request"] == {"_id": "view-1", "name": "View", "allowLegacyMode": False}
     assert result["response"]["preflight"]["_id"] == "view-1"
     assert {"field": "settings", "before": {}, "after": {"engineVersion": "v2"}, "changed": True} in result["response"]["diff"]
     assert {"field": "format", "before": "cards", "after": "cards", "changed": False} in result["response"]["diff"]
@@ -763,6 +789,32 @@ def test_upsert_view_rejects_non_experimental_mode_without_real_network() -> Non
             profile="vniimt",
             project_id="project-1",
         )
+
+
+def test_upsert_view_allows_explicit_legacy_mode_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view(
+            "Legacy View",
+            settings={},
+            allow_legacy_mode=True,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["audit"]["operation"]["request"] == {"_id": None, "name": "Legacy View", "allowLegacyMode": True}
+    assert result["response"]["planned_payload"]["settings"] == {}
 
 
 def test_upsert_view_rejects_unmanaged_existing_object_without_flag() -> None:
@@ -868,6 +920,17 @@ def test_upsert_view_field_execution_adds_then_saves_without_real_network() -> N
         def view_by_id(self, view_id: str) -> FakeResponse:
             return FakeResponse({"_id": view_id, "name": "View", "description": "Codex-managed: view"})
 
+        def view_entities(self, view_id: str) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {
+                        "_id": "entity-1",
+                        "type": "content",
+                        "config": {"contentTypesIds": ["content-type-1"]},
+                    }
+                ]
+            )
+
         def view_fields_populated(self, view_id: str) -> FakeResponse:
             if not self.added:
                 return FakeResponse([])
@@ -890,9 +953,11 @@ def test_upsert_view_field_execution_adds_then_saves_without_real_network() -> N
             *,
             attribute: str | None = None,
             content_type_field_id: str | None = None,
+            content_type_id: str | None = None,
         ) -> FakeResponse:
             assert entity_id == "entity-1"
             assert content_type_field_id == "field-1"
+            assert content_type_id is None
             self.added = True
             return FakeResponse({"_id": "vf-1"})
 
@@ -924,6 +989,90 @@ def test_upsert_view_field_execution_adds_then_saves_without_real_network() -> N
     assert result["response"]["added"]["body"] == {"_id": "vf-1"}
     assert result["response"]["saved"]["body"] == {"_id": "vf-1", "saved": True}
     assert result["response"]["readback"]["_id"] == "vf-1"
+
+
+def test_upsert_view_field_content_attribute_uses_content_attribute_payload_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.added = False
+            self.content_type_id = "content-type-1"
+
+        def view_by_id(self, view_id: str) -> FakeResponse:
+            return FakeResponse({"_id": view_id, "name": "View", "description": "Codex-managed: view"})
+
+        def view_entities(self, view_id: str) -> FakeResponse:
+            return FakeResponse(
+                [
+                    {
+                        "_id": "entity-1",
+                        "type": "content",
+                        "config": {"contentTypesIds": [self.content_type_id]},
+                    }
+                ]
+            )
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            if not self.added:
+                return FakeResponse([])
+            return FakeResponse(
+                [
+                    {
+                        "_id": "vf-1",
+                        "entityId": "entity-1",
+                        "contentAttribute": "_id",
+                        "mname": "_id",
+                    }
+                ]
+            )
+
+        def add_view_entity_field(
+            self,
+            entity_id: str,
+            *,
+            attribute: str | None = None,
+            content_type_field_id: str | None = None,
+            content_type_id: str | None = None,
+        ) -> FakeResponse:
+            assert entity_id == "entity-1"
+            assert attribute == "_id"
+            assert content_type_field_id is None
+            assert content_type_id is None
+            self.added = True
+            return FakeResponse({"_id": "vf-1"})
+
+        def save_view_field(self, payload: dict[str, object]) -> FakeResponse:
+            assert payload["_id"] == "vf-1"
+            assert payload["alias"] == "ID"
+            assert payload["contentTypeId"] == self.content_type_id
+            assert payload["contentAttribute"] == "_id"
+            assert "attribute" not in payload
+            return FakeResponse({"_id": "vf-1", "saved": True})
+
+    fake_client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=fake_client),
+    ):
+        result = server.alterios_upsert_view_field(
+            "view-1",
+            "entity-1",
+            attribute="_id",
+            alias="ID",
+            dry_run=False,
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["add_request"] == {"entityId": "entity-1", "attribute": "_id"}
+    assert result["response"]["readback"]["contentAttribute"] == "_id"
 
 
 def test_upsert_script_dry_run_uses_put_route_and_redacts_secret_without_real_network() -> None:
@@ -1444,7 +1593,7 @@ def test_upsert_user_dry_run_is_security_write_without_real_network() -> None:
     assert result["audit"]["operation"]["kind"] == "user"
     assert result["audit"]["operation"]["risk_level"] == "security"
     assert result["audit"]["operation"]["path"] == "/api/users/user-1"
-    assert result["response"]["preflight"]["email"] == "user@example.test"
+    assert result["response"]["preflight"]["email"] == "<redacted>"
     assert result["response"]["planned_payload"]["isActive"] is False
 
 
@@ -1499,7 +1648,7 @@ def test_delete_user_dry_run_uses_ui_observed_body_delete_path_without_real_netw
     assert result["audit"]["operation"]["method"] == "DELETE"
     assert result["audit"]["operation"]["path"] == "/api/users"
     assert result["audit"]["operation"]["request"]["_id"] == "user-1"
-    assert result["response"]["preflight"]["email"] == "user@example.test"
+    assert result["response"]["preflight"]["email"] == "<redacted>"
 
 
 def test_security_upsert_audit_strips_readback_metadata_target_ids_without_real_network() -> None:
@@ -1958,6 +2107,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             *,
             attribute: str | None = None,
             content_type_field_id: str | None = None,
+            content_type_id: str | None = None,
         ) -> FakeResponse:
             view_id = next(
                 view_id
@@ -1966,7 +2116,10 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             )
             item: dict[str, object] = {"_id": self._new_id("view_field"), "entityId": entity_id}
             if attribute:
-                item.update({"attribute": attribute, "mname": attribute})
+                if content_type_id:
+                    item.update({"contentTypeId": content_type_id, "contentAttribute": attribute, "mname": attribute})
+                else:
+                    item.update({"attribute": attribute, "mname": attribute})
             if content_type_field_id:
                 field = self.fields[content_type_field_id]
                 view_mname = str(field["mname"])

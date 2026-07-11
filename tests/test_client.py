@@ -417,6 +417,7 @@ def test_view_entity_and_field_write_routes_without_network() -> None:
     with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
         client.save_view_entity({"_id": "entity-1", "name": "Entity", "updatedBy": "ignored"})
         client.add_view_entity_field("entity-1", content_type_field_id="field-1")
+        client.add_view_entity_field("entity-1", attribute="_id", content_type_id="content-type-1")
         client.save_view_field({"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}})
 
     requests = [call.args[0] for call in send.call_args_list]
@@ -427,8 +428,11 @@ def test_view_entity_and_field_write_routes_without_network() -> None:
     assert requests[1].url == "https://alterios.example/api/view-entities/add-one-field"
     assert requests[1].body == {"entityId": "entity-1", "contentTypeFieldId": "field-1"}
     assert requests[2].method == "POST"
-    assert requests[2].url == "https://alterios.example/api/view-fields/save"
-    assert requests[2].body == {"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}}
+    assert requests[2].url == "https://alterios.example/api/view-entities/add-one-field"
+    assert requests[2].body == {"entityId": "entity-1", "attribute": "_id"}
+    assert requests[3].method == "POST"
+    assert requests[3].url == "https://alterios.example/api/view-fields/save"
+    assert requests[3].body == {"_id": "vf-1", "alias": "Title", "contentType": {"name": "ignored"}}
 
 
 def test_script_diagram_report_process_and_task_write_routes_without_network() -> None:

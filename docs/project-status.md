@@ -1,6 +1,6 @@
 # Статус проекта Alterios MCP
 
-Обновлено: 2026-07-10
+Обновлено: 2026-07-11
 
 ## Текущая сводка
 
@@ -101,7 +101,8 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | Build. Replay smoke command | Added `alterios-replay-smoke` CLI and read-only MCP tool `alterios_replay_smoke` for post-update checks: MCP tool count, write-gate blocking, dry-run `plan_id` creation/match/mismatch, redaction, form-surface validation, Stimulsoft layout validation, risk classification, and optional read-only live discovery. | current | Local CLI smoke returned 6 checks, 0 failed; `tests/test_replay_smoke.py`: 3 passed; no live write executed. |
 | Security. Address redaction and stage-17 skip | Removed hardcoded real workspace ids/base URLs from README/docs/sandbox script, added tracked-file sensitive-address regression test, and marked stage 17 skipped/deferred with stage 18 as next. | current | Real Alterios domain scan: none; known workspace-id scan: none; secret-pattern scan: none; `pytest`: 143 passed; `git diff --check` OK; local replay smoke: 6 checks, 0 failed. |
 | Build. Project health preflight | Added `alterios-project-health` CLI and read-only MCP tool `alterios_project_health` with local inventory cache, snapshot diff, and health summary for forms/views/scripts/BPMN/reports before writes. | current | `pytest`: 146 passed; `py_compile` OK; local replay smoke: 75 tools, 6 checks, 0 failed; CLI `--help` OK; real-domain/workspace-id/secret scan clean; no live write executed. |
-| Design. Requirements analyst and Stage 19 workflow | Added Business/System Analyst / Аналитик требований, repo-owned skill `alterios-business-requirements-analyst`, documented view relation/field/filter rules, and made `alterios_project_health` an explicit Stage 19 gate before live scenario apply. | current | `pytest`: 146 passed; skill validation: 9/9 valid; local replay smoke: 6 checks, 0 failed; `git diff --check` OK; real-domain/workspace-id/secret scan clean; repo skills installed with `--replace`; no live write executed. |
+| Design. Requirements analyst and Stage 19 workflow | Added Business/System Analyst / Аналитик требований, repo-owned skill `alterios-business-requirements-analyst`, documented view relation/field/filter rules, and made `alterios_project_health` an explicit Stage 19 gate before live scenario apply. | current | `pytest`: 146 passed; skill validation passed for repo-owned set; local replay smoke: 6 checks, 0 failed; `git diff --check` OK; real-domain/workspace-id/secret scan clean; repo skills installed with `--replace`; no live write executed. |
+| Research. Material fields and view modes | Live sandbox research created material types, field variants, experimental `table`/`reference` views, a relation joined table, a documented legacy/classic table exception, and a UI form with tabs for each checked view type. Added repo-owned `alterios-field-types` and view-mode/write-contract rules. | current | Pre-write `alterios_project_health` returned ok with warnings only; view data smoke returned sandbox rows for v2 table/reference/join and classic table; form-surface analyzer returned 0 issues; targeted view/write tests passed before doc sync. Running MCP process must be restarted before relying on new tool schema/redaction live. |
 
 ## Активный этап
 
@@ -132,6 +133,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | 2 | Forward-test and install repo-owned skills. | Done | Three read-only subagent scenarios covered inventory/PM, form/icons/BPMN, and write/report/safety; installer copies skills to the local Codex skills dir and rewrites installed source maps to absolute repo paths. |
 | 2 | Add Documentation Scribe / Писарь agent for ГОСТ-oriented instructions. | Done | Added docs-only agent, local playbook, handoff format, and documentation pipeline. It reuses installed `gost-documentation-builder` instead of creating a duplicate repo-owned skill. |
 | 2 | Add Business/System Analyst / Аналитик требований agent and skill. | Done | Added analyst role, repo-owned skill `alterios-business-requirements-analyst`, постановка/ТРЗ playbook, view relation/field/filter rules, and Stage 19 handoff. |
+| 2 | Add repo-owned field types skill and view mode research. | Done | Added `alterios-field-types`, documented live field/view/relation findings, and updated form/write skills with experimental-v2 default plus explicit legacy exception rules. |
 | 2 | Expand Stimulsoft validator with rendered PDF/image comparison once export/render tooling is available. | Deferred | Current validator is static preflight; final acceptance still needs Stimulsoft render/UI proof. |
 | 2 | Prepare administrator instruction. | Done | Published `docs/administrator-guide.md` and linked it from README. User instruction is not produced in this closeout because the current request asked for administrator instruction only. |
 | 2 | Expand user/configurator scenarios. | Done | Published `docs/expanded-user-scenarios.md`. Follow-up implementation added typed users/user-groups/roles/delete wrappers, form-listener patching, bulk selected-row update, and native publish planning. |
