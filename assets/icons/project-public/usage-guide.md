@@ -38,7 +38,7 @@
 | `history` | `history.svg` | История изменений, журнал действий, аудит, предыдущие версии. |
 | `info` | `info_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg` | Информационная подсказка, help/dialog без изменения данных. |
 | `keyboard_return` | `keyboard_return.svg` | Назад, закрыть, вернуться к предыдущей форме. |
-| `list_alt_add` | `list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg` | Добавить строку из списка, создать связанный элемент из related list. |
+| `list_alt_add` | `list_alt_add_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg` | Массовое изменение или добавление строк из списка; создать связанный элемент из related list. |
 | `menu` | `menu.svg` | Меню действий строки или компактное меню дополнительных операций. |
 | `person_add` | `person_add_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg` | Добавить пользователя, сотрудника, участника, ответственного. |
 | `person_check` | `person_check_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg` | Проверить, подтвердить, назначить или согласовать пользователя. |

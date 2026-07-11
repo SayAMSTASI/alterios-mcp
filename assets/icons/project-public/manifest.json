@@ -272,13 +272,13 @@
       "usage_hint": "Назад, закрыть, вернуться к предыдущей форме."
     },
     {
-      "bytes": 913,
-      "filename": "list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
+      "bytes": 914,
+      "filename": "list_alt_add_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "list_alt_add",
-      "sha256": "95f5d082343523655067781b289fe7d92133cb8be0cca073d8da493ca68cd14b",
-      "source_name": "list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
-      "usage_hint": "Добавить строку из списка, создать связанный элемент из related list."
+      "sha256": "193e883c34142279a87d61fd08f8e54f9be372ec055a71482507a2929d4f2712",
+      "source_name": "list_alt_add_16dp_4B77D1_FILL0_wght400_GRAD0_opsz20.svg",
+      "usage_hint": "Массовое изменение или добавление строк из списка; создать связанный элемент из related list."
     },
     {
       "bytes": 457,
