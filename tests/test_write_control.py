@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -2881,3 +2882,128 @@ def test_export_project_icons_defaults_to_selected_folder_only(tmp_path) -> None
     manifest = tmp_path / result["artifacts"]["manifest"]
     assert "file-save" in manifest.read_text(encoding="utf-8")
     assert "file-print" not in manifest.read_text(encoding="utf-8")
+
+
+def test_ensure_project_icon_library_dry_run_inventories_before_upload(tmp_path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir()
+    (library_dir / "save_16dp.svg").write_text('<svg viewBox="0 0 16 16"></svg>', encoding="utf-8")
+    (library_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "icons": [{"semantic": "save", "filename": "save_16dp.svg", "mime": "image/svg+xml"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeIconLibraryClient:
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            assert target == "public_L3B1YmxpYw"
+            return FakeResponse({"cwd": {"hash": target, "name": "public", "mime": "directory"}, "files": []})
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            return FakeResponse([])
+
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconLibraryClient):
+        result = server.alterios_ensure_project_icon_library(
+            semantics=["save"],
+            library_dir=str(library_dir),
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is True
+    assert result["response"]["principle"]["analyze_project_before_upload"] is True
+    assert result["response"]["inventory"]["filesystem_icon_count"] == 0
+    assert result["response"]["icons"][0]["planned_action"] == "upload_library_icon"
+    assert result["plan"]["plan_id"].startswith("wp_")
+
+
+def test_ensure_project_icon_library_execution_uploads_missing_and_writes_registry(tmp_path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir()
+    icon_data = b'<svg viewBox="0 0 16 16"></svg>'
+    (library_dir / "save_16dp.svg").write_bytes(icon_data)
+    (library_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "icons": [{"semantic": "save", "filename": "save_16dp.svg", "mime": "image/svg+xml"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeIconLibraryClient:
+        uploads: list[dict[str, object]] = []
+
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            return FakeResponse({"cwd": {"hash": target, "name": "public", "mime": "directory"}, "files": []})
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            return FakeResponse([{"_id": file_ids[0], "filename": "save_16dp.svg"}])
+
+        def upload_icon(self, data: bytes, *, filename: str, mime_type: str | None = None) -> FakeResponse:
+            self.uploads.append({"data": data, "filename": filename, "mime_type": mime_type})
+            return FakeResponse({"_id": "22222222-2222-4222-8222-222222222222", "filename": filename})
+
+    artifacts_dir = tmp_path / "artifacts"
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(artifacts_dir),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconLibraryClient):
+        dry_run = server.alterios_ensure_project_icon_library(
+            semantics=["save"],
+            library_dir=str(library_dir),
+            profile="artx",
+            project_id="project-1",
+        )
+
+    with (
+        patch.dict("os.environ", {**env, "ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "AlteriosClient", FakeIconLibraryClient),
+    ):
+        result = server.alterios_ensure_project_icon_library(
+            semantics=["save"],
+            library_dir=str(library_dir),
+            dry_run=False,
+            plan_id=dry_run["plan"]["plan_id"],
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["icon_ids"]["save"] == "22222222-2222-4222-8222-222222222222"
+    assert FakeIconLibraryClient.uploads == [
+        {"data": icon_data, "filename": "save_16dp.svg", "mime_type": "image/svg+xml"}
+    ]
+    registry_path = artifacts_dir / result["response"]["inventory"]["registry"]["path"]
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    assert registry["icons"]["save"]["source"] == "repo_icon_library"
+    assert registry["icons"]["save"]["file_id"] == "22222222-2222-4222-8222-222222222222"

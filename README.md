@@ -416,6 +416,25 @@ alterios_export_project_icons(
 )
 ```
 
+Git-библиотека проектных иконок хранится в `assets/icons/project-public`.
+В ней лежат SVG из прямой папки `public`, но без исходных fileId проекта.
+Перед добавлением иконок в формы или группы используйте сценарный tool:
+
+```powershell
+# 1. Dry-run: проверить registry и файловый менеджер целевого проекта.
+alterios_ensure_project_icon_library(
+  profile="artx",
+  project_id="<project-id>",
+  semantics=["save", "edit", "delete", "menu"]
+)
+
+# 2. Apply: тот же вызов с dry_run=false и plan_id при ALTERIOS_MCP_ALLOW_WRITE=1.
+```
+
+Правило: `iconId` нельзя переносить между проектами. Если нужной иконки нет
+в целевом проекте, MCP загружает SVG из `assets/icons/project-public` в этот
+проект и использует только новый UUID, возвращенный Alterios.
+
 Если нужны иконки из подпапки, ее нужно указать явно:
 `icons_folder_name="icons"`. По умолчанию export уважает выбранный
 `folder_hash` и не спускается в подпапки. Для выбора одной иконки используйте

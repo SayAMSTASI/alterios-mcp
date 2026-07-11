@@ -557,6 +557,40 @@ def test_file_elfinder_builds_expected_query_without_network() -> None:
     assert parse_qs(parsed.query) == {"cmd": ["open"], "target": ["public_hash"], "tree": ["1"]}
 
 
+def test_download_file_url_encodes_elfinder_paths_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+    opened_urls: list[str] = []
+
+    class FakeUrlopenResponse:
+        headers = {"Content-Type": "image/svg+xml"}
+
+        def __enter__(self) -> "FakeUrlopenResponse":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"<svg></svg>"
+
+    def fake_urlopen(request: object, timeout: float) -> FakeUrlopenResponse:
+        opened_urls.append(request.full_url)  # type: ignore[attr-defined]
+        assert timeout == config.timeout_seconds
+        return FakeUrlopenResponse()
+
+    with patch("alterios_mcp.client.urlopen", side_effect=fake_urlopen):
+        data, content_type = client.download_file_url("/files/add icon (1).svg")
+
+    assert data == b"<svg></svg>"
+    assert content_type == "image/svg+xml"
+    assert opened_urls == ["https://alterios.example/files/add%20icon%20%281%29.svg"]
+
+
 def test_content_by_id_uses_id_filter_and_returns_single_row_without_network() -> None:
     config = AlteriosConfig(
         base_url="https://alterios.example",

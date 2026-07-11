@@ -504,6 +504,36 @@ class AlteriosClient:
         except URLError as exc:
             raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
 
+    def download_file_url(self, file_url: str) -> tuple[bytes, str]:
+        if not file_url.strip():
+            raise ValueError("file_url must not be empty")
+        missing = self.config.missing_for_project_call()
+        if missing:
+            raise AlteriosConfigError(f"Missing required configuration: {', '.join(missing)}")
+        parsed = urlsplit(file_url)
+        if parsed.scheme and parsed.netloc:
+            url = urlunsplit((parsed.scheme, parsed.netloc, quote(parsed.path, safe="/%"), parsed.query, parsed.fragment))
+        else:
+            relative = urlsplit("/" + file_url.lstrip("/"))
+            url = self.config.base_url.rstrip("/") + urlunsplit(
+                ("", "", quote(relative.path, safe="/%"), relative.query, relative.fragment)
+            )
+        headers = dict(self._headers())
+        headers["Accept"] = "*/*"
+        headers.pop("Content-Type", None)
+        request = Request(url, headers=headers, method="GET")
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                return response.read(), response.headers.get("Content-Type", "")
+        except HTTPError as exc:
+            content_type = exc.headers.get("Content-Type", "") if exc.headers else ""
+            parsed_body = parse_response_body(exc.read(), content_type)
+            raise AlteriosRequestError(f"HTTP {exc.code}: {safe_error(parsed_body)}") from exc
+        except TimeoutError as exc:
+            raise AlteriosRequestError("Network error: timed out") from exc
+        except URLError as exc:
+            raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
+
     def content_by_id(self, content_id: str) -> AlteriosResponse:
         if not content_id.strip():
             raise ValueError("content_id must not be empty")
@@ -594,14 +624,15 @@ class AlteriosClient:
         except URLError as exc:
             raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
 
-    def upload_icon(self, data: bytes, *, filename: str) -> AlteriosResponse:
+    def upload_icon(self, data: bytes, *, filename: str, mime_type: str | None = None) -> AlteriosResponse:
         if not data:
             raise ValueError("icon data must not be empty")
         if not filename.strip():
             raise ValueError("filename must not be empty")
 
         boundary = "----CodexAlteriosBoundary" + uuid.uuid4().hex
-        body = build_multipart(boundary, "upload", filename, "image/svg+xml", data)
+        resolved_mime_type = mime_type or mimetypes.guess_type(filename)[0] or "image/svg+xml"
+        body = build_multipart(boundary, "upload", filename, resolved_mime_type, data)
         headers = dict(self._headers())
         headers.update(
             {

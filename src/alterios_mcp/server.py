@@ -4,6 +4,7 @@ import base64
 import binascii
 import hashlib
 import json
+import mimetypes
 import os
 import re
 import time
@@ -282,6 +283,7 @@ def _file_values(value: Any) -> list[Any]:
 MANAGED_MARKER = "Codex-managed"
 
 PROJECT_ICON_SCHEMA_VERSION = 1
+PROJECT_PUBLIC_FOLDER_HASH = "public_L3B1YmxpYw"
 PROJECT_ICON_DEFAULTS = {
     "save": "save",
     "back": "arrow_back",
@@ -303,6 +305,7 @@ PROJECT_ICON_DEFAULTS = {
     "filter": "filter_alt",
 }
 PROJECT_ICON_FOLDER_HASH = "public_L3B1YmxpYy9pY29ucw"
+PROJECT_ICON_LIBRARY_RELATIVE_DIR = Path("assets") / "icons" / "project-public"
 PROJECT_ICON_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"}
 PROJECT_ICON_USAGE_HINTS = {
     "add": "Добавление записи, строки, вкладки, вложения или нового элемента.",
@@ -386,6 +389,33 @@ def _project_icon_operation(
         method="POST",
         path="/api/file/upload/icon",
         summary="Ensure Google Fonts Icons are uploaded into the target Alterios project file manager and return project-local UUID iconId values.",
+        request=request,
+    )
+
+
+def _project_icon_library_operation(
+    *,
+    library_dir: str,
+    semantics: list[str],
+    folder_hash: str,
+    icons_folder_name: str | None,
+    recurse: bool,
+    force_upload: bool,
+) -> WriteOperation:
+    request = {
+        "library_dir": library_dir,
+        "semantics": semantics,
+        "folder_hash": folder_hash,
+        "icons_folder_name": icons_folder_name,
+        "recurse": recurse,
+        "force_upload": force_upload,
+    }
+    return _resource_operation(
+        name="POST /api/file/upload/icon",
+        kind="project_icon_library",
+        method="POST",
+        path="/api/file/upload/icon",
+        summary="Ensure repo-stored Alterios project icon files are materialized into the target project file manager and return project-local iconId UUID values.",
         request=request,
     )
 
@@ -608,6 +638,130 @@ def _safe_download_filename(file_id: str, name: str) -> str:
     safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "icon"
     safe_suffix = re.sub(r"[^A-Za-z0-9.]+", "", suffix) or ".bin"
     return f"{file_id}_{safe_stem}{safe_suffix}"
+
+
+def _safe_icon_library_filename(name: str) -> str:
+    suffix = Path(name).suffix.lower() or ".bin"
+    stem = re.sub(r"^[0-9a-fA-F-]{36}_", "", Path(name).stem)
+    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "icon"
+    safe_suffix = re.sub(r"[^A-Za-z0-9.]+", "", suffix) or ".bin"
+    return f"{safe_stem}{safe_suffix}"
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _project_icon_library_dir(library_dir: str | None = None) -> Path:
+    if library_dir:
+        return Path(library_dir).expanduser().resolve()
+    return (_repo_root() / PROJECT_ICON_LIBRARY_RELATIVE_DIR).resolve()
+
+
+def _normalize_icon_semantic_list(semantics: list[str] | None) -> set[str] | None:
+    if semantics is None:
+        return None
+    selected: set[str] = set()
+    for raw in semantics:
+        semantic = str(raw or "").strip().lower()
+        if not semantic:
+            continue
+        if not ICON_SEMANTIC_RE.fullmatch(semantic):
+            raise ValueError(f"Invalid icon semantic {semantic!r}. Use lower-case ascii letters, digits, and underscores.")
+        selected.add(semantic)
+    return selected or None
+
+
+def _icon_mime_type(filename: str) -> str:
+    return mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+
+def _downloaded_icon_payload_valid(data: bytes, *, filename: str, content_type: str) -> bool:
+    if not data:
+        return False
+    prefix = data[:512].lstrip().lower()
+    if prefix.startswith(b"<!doctype html") or prefix.startswith(b"<html") or b"<html" in prefix[:128]:
+        return False
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".svg" or "svg" in content_type.lower():
+        return b"<svg" in prefix or b"<svg" in data[:4096].lower()
+    return True
+
+
+def _download_elfinder_icon_file(client: AlteriosClient, icon: dict[str, Any]) -> tuple[bytes, str, str]:
+    filename = str(icon.get("name") or "icon")
+    source = ""
+    if icon.get("url"):
+        source = str(icon["url"])
+        data, content_type = client.download_file_url(source)
+    else:
+        source = str(icon["file_id"])
+        data, content_type = client.download_file(source)
+    if not _downloaded_icon_payload_valid(data, filename=filename, content_type=content_type):
+        raise ValueError(
+            f"Downloaded icon {filename!r} from {source!r} is not a valid icon payload; "
+            "the response looks empty or HTML."
+        )
+    return data, content_type, source
+
+
+def _read_project_icon_library(
+    *,
+    library_dir: str | None = None,
+    semantics: list[str] | None = None,
+) -> tuple[Path, list[dict[str, Any]]]:
+    base_dir = _project_icon_library_dir(library_dir)
+    selected = _normalize_icon_semantic_list(semantics)
+    if not base_dir.exists():
+        raise ValueError(f"Project icon library directory was not found: {base_dir}")
+
+    manifest_path = base_dir / "manifest.json"
+    manifest_icons: list[dict[str, Any]] = []
+    if manifest_path.exists():
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        raw_icons = payload.get("icons") if isinstance(payload, dict) else None
+        if not isinstance(raw_icons, list):
+            raise ValueError(f"Invalid icon library manifest: {manifest_path}")
+        for raw in raw_icons:
+            if isinstance(raw, dict):
+                manifest_icons.append(raw)
+    else:
+        for path in sorted(base_dir.iterdir()):
+            if path.is_file() and path.suffix.lower() in PROJECT_ICON_EXTENSIONS:
+                manifest_icons.append({"semantic": _icon_semantic_guess_from_filename(path.name), "filename": path.name})
+
+    icons_by_semantic: dict[str, dict[str, Any]] = {}
+    for raw in manifest_icons:
+        filename = _safe_icon_library_filename(str(raw.get("filename") or raw.get("name") or ""))
+        path = base_dir / filename
+        semantic = str(raw.get("semantic") or _icon_semantic_guess_from_filename(filename)).strip().lower()
+        if not ICON_SEMANTIC_RE.fullmatch(semantic):
+            raise ValueError(f"Invalid icon semantic {semantic!r} in {manifest_path if manifest_path.exists() else base_dir}.")
+        if selected and semantic not in selected:
+            continue
+        if not path.is_file():
+            raise ValueError(f"Icon library file for semantic {semantic!r} was not found: {path}")
+        data = path.read_bytes()
+        content_type = str(raw.get("mime") or _icon_mime_type(filename))
+        if not _downloaded_icon_payload_valid(data, filename=filename, content_type=content_type):
+            raise ValueError(f"Icon library file {path} is not a valid icon payload.")
+        icons_by_semantic[semantic] = {
+            "semantic": semantic,
+            "filename": filename,
+            "path": path,
+            "mime": content_type,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+            "usage_hint": raw.get("usage_hint") or _icon_usage_hint(semantic),
+        }
+
+    if selected:
+        missing = sorted(selected.difference(icons_by_semantic))
+        if missing:
+            raise ValueError(f"Icon library does not contain requested semantics: {', '.join(missing)}")
+    if not icons_by_semantic:
+        raise ValueError(f"Icon library contains no icon files: {base_dir}")
+    return base_dir, [icons_by_semantic[key] for key in sorted(icons_by_semantic)]
 
 
 def _icon_semantic_guess_from_filename(name: str) -> str:
@@ -2901,6 +3055,22 @@ def alterios_resolve_project_icon(
     registry_icons = registry.setdefault("icons", {})
     entry = registry_icons.get(semantic)
     file_id = str((entry or {}).get("file_id") or "") if isinstance(entry, dict) else ""
+    if (
+        isinstance(entry, dict)
+        and file_id
+        and entry.get("source") in {"project_file_manager", "repo_icon_library"}
+        and _project_icon_file_exists(client, file_id)
+    ):
+        return {
+            "target": {"profile": target_profile, "project_id": target_project_id},
+            "semantic": semantic,
+            "google_name": google_name,
+            "resolved": True,
+            "source": "registry",
+            "registry_source": entry.get("source"),
+            "icon_id": file_id,
+            "registry": {"path": _relative_artifact_path(_project_icon_registry_path(profile=target_profile, project_id=target_project_id))},
+        }
     if _registry_icon_current(entry, google_name=google_name, size=16, color="#4B77D1", style="materialsymbolsoutlined") and _project_icon_file_exists(client, file_id):
         return {
             "target": {"profile": target_profile, "project_id": target_project_id},
@@ -3026,12 +3196,13 @@ def alterios_export_project_icons(
         for icon in icons:
             file_id = str(icon["file_id"])
             filename = _safe_download_filename(file_id, str(icon.get("name") or "icon"))
-            data, content_type = client.download_file(file_id)
+            data, content_type, download_source = _download_elfinder_icon_file(client, icon)
             file_path = files_dir / filename
             file_path.write_bytes(data)
             icon["download"] = {
                 "path": _relative_artifact_path(file_path),
                 "content_type": content_type,
+                "source": download_source,
                 "sha256": hashlib.sha256(data).hexdigest(),
                 "bytes": len(data),
             }
@@ -3222,6 +3393,217 @@ def alterios_ensure_project_icons(
             "registry": {
                 "path": registry_path_result,
                 **_icon_registry_summary(registry),
+            },
+            "icons": ensured_icons,
+            "icon_ids": {item["semantic"]: item["file_id"] for item in ensured_icons},
+        }
+    )
+    return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
+
+
+@mcp.tool()
+def alterios_ensure_project_icon_library(
+    semantics: list[str] | None = None,
+    library_dir: str | None = None,
+    folder_hash: str | None = None,
+    icons_folder_name: str | None = None,
+    recurse: bool = False,
+    force_upload: bool = False,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Ensure repo-stored project icons exist in one Alterios project and return project-local iconId values."""
+    base_dir, library_icons = _read_project_icon_library(library_dir=library_dir, semantics=semantics)
+    selected_semantics = [str(icon["semantic"]) for icon in library_icons]
+    scan_hash = folder_hash or PROJECT_PUBLIC_FOLDER_HASH
+    operation = _project_icon_library_operation(
+        library_dir=str(base_dir),
+        semantics=selected_semantics,
+        folder_hash=scan_hash,
+        icons_folder_name=icons_folder_name,
+        recurse=recurse,
+        force_upload=force_upload,
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    target = audit.as_dict()["target"]
+    target_profile = str(target["profile"])
+    target_project_id = str(target["project_id"])
+    config = AlteriosConfig.from_env(profile=profile).with_project_id(project_id)
+    missing = config.missing_for_project_call()
+    if missing:
+        raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+    client = AlteriosClient(config)
+
+    registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+    registry_icons = registry.setdefault("icons", {})
+    resolved_hash, folder_info = _resolve_elfinder_icon_folder(
+        client,
+        folder_hash=scan_hash,
+        icons_folder_name=icons_folder_name,
+    )
+    filesystem_icons, directories = _collect_elfinder_icon_items(
+        client,
+        folder_hash=resolved_hash,
+        recurse=recurse,
+        max_files=5000,
+    )
+
+    planned_icons: list[dict[str, Any]] = []
+    for library_icon in library_icons:
+        semantic = str(library_icon["semantic"])
+        entry = registry_icons.get(semantic)
+        file_id = str((entry or {}).get("file_id") or "") if isinstance(entry, dict) else ""
+        reusable_registry = (
+            not force_upload
+            and isinstance(entry, dict)
+            and entry.get("source") == "repo_icon_library"
+            and entry.get("sha256") == library_icon["sha256"]
+            and file_id
+            and _project_icon_file_exists(client, file_id)
+        )
+        candidates = _filesystem_icon_candidates(filesystem_icons, semantic=semantic, google_name=semantic)
+        selected_candidate = candidates[0] if candidates else None
+        if reusable_registry:
+            planned_action = "reuse_registry"
+            planned_file_id = file_id
+        elif selected_candidate and not force_upload:
+            planned_action = "register_project_file"
+            planned_file_id = selected_candidate.get("file_id")
+        else:
+            planned_action = "upload_library_icon"
+            planned_file_id = None
+        planned_icons.append(
+            {
+                "semantic": semantic,
+                "filename": library_icon["filename"],
+                "mime": library_icon["mime"],
+                "sha256": library_icon["sha256"],
+                "planned_action": planned_action,
+                "file_id": planned_file_id,
+                "filesystem_candidate_count": len(candidates),
+                "filesystem_sample": candidates[:3],
+            }
+        )
+
+    registry_path = _project_icon_registry_path(profile=target_profile, project_id=target_project_id)
+    response_payload: dict[str, Any] = {
+        "principle": {
+            "source": "repo project icon library",
+            "analyze_project_before_upload": True,
+            "upload_only_missing": not force_upload,
+            "icon_id_rule": "Use only target-project-local file UUID values as iconId; never copy iconId values between projects.",
+        },
+        "library": {
+            "path": str(base_dir),
+            "icon_count": len(library_icons),
+            "semantics": selected_semantics,
+        },
+        "inventory": {
+            "folder": folder_info,
+            "recurse": recurse,
+            "filesystem_icon_count": len(filesystem_icons),
+            "filesystem_directory_count": len(directories),
+            "registry": {
+                "path": _relative_artifact_path(registry_path),
+                **_icon_registry_summary(registry),
+            },
+        },
+        "icons": planned_icons,
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+
+    assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    if not plan_id:
+        raise ValueError("plan_id is required when dry_run=false for alterios_ensure_project_icon_library.")
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+
+    ensured_icons: list[dict[str, Any]] = []
+    for planned in planned_icons:
+        semantic = str(planned["semantic"])
+        library_icon = next(icon for icon in library_icons if icon["semantic"] == semantic)
+        if planned["planned_action"] == "reuse_registry" and planned.get("file_id"):
+            ensured_icons.append(
+                {
+                    "semantic": semantic,
+                    "file_id": planned["file_id"],
+                    "filename": library_icon["filename"],
+                    "action": "reused_registry",
+                }
+            )
+            continue
+        if planned["planned_action"] == "register_project_file" and planned.get("file_id"):
+            selected = (planned.get("filesystem_sample") or [{}])[0]
+            registry_icons[semantic] = {
+                "semantic": semantic,
+                "file_id": planned["file_id"],
+                "filename": selected.get("name") or library_icon["filename"],
+                "mime": selected.get("mime") or library_icon["mime"],
+                "source": "project_file_manager",
+                "matched_by": "semantic_guess",
+                "hash": selected.get("hash"),
+                "library_sha256": library_icon["sha256"],
+            }
+            ensured_icons.append(
+                {
+                    "semantic": semantic,
+                    "file_id": planned["file_id"],
+                    "filename": selected.get("name") or library_icon["filename"],
+                    "action": "registered_project_file",
+                }
+            )
+            continue
+
+        data = Path(library_icon["path"]).read_bytes()
+        uploaded = client.upload_icon(
+            data,
+            filename=str(library_icon["filename"]),
+            mime_type=str(library_icon["mime"]),
+        ).as_dict()
+        uploaded_id = _extract_response_id(uploaded)
+        if not uploaded_id:
+            raise ValueError(f"Icon upload for {semantic!r} returned no file id.")
+        metadata = client.file_metadata([uploaded_id]).as_dict()
+        registry_icons[semantic] = {
+            "semantic": semantic,
+            "file_id": uploaded_id,
+            "filename": library_icon["filename"],
+            "mime": library_icon["mime"],
+            "source": "repo_icon_library",
+            "library_path": str(Path(library_icon["path"]).relative_to(base_dir)),
+            "sha256": library_icon["sha256"],
+        }
+        ensured_icons.append(
+            {
+                "semantic": semantic,
+                "file_id": uploaded_id,
+                "filename": library_icon["filename"],
+                "action": "uploaded_library_icon",
+                "metadata": metadata,
+            }
+        )
+
+    registry_path_result = _write_project_icon_registry(
+        profile=target_profile,
+        project_id=target_project_id,
+        registry=registry,
+    )
+    response_payload.update(
+        {
+            "inventory": {
+                **response_payload["inventory"],
+                "registry": {
+                    "path": registry_path_result,
+                    **_icon_registry_summary(registry),
+                },
             },
             "icons": ensured_icons,
             "icon_ids": {item["semantic"]: item["file_id"] for item in ensured_icons},
