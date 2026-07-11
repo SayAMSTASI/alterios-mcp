@@ -281,12 +281,45 @@ def _analyze_action_containers(
         if not isinstance(container, dict):
             _add_issue(issues, "warning", "invalid_action_container", "Action container is not an object.", container_path)
             continue
+        container_type = str(container.get("type") or "").lower()
+        if row_actions and container_type == "menu":
+            container_icon = _action_icon(container)
+            if container_icon:
+                action_icons.append(container_icon)
+            nested = container.get("containers")
+            if not isinstance(nested, list) or not nested:
+                _add_issue(
+                    issues,
+                    "warning",
+                    "row_menu_missing_containers",
+                    "Row menu must contain nested action containers in containers[].",
+                    container_path,
+                )
+                continue
+            if not _row_menu_has_default_view(nested):
+                _add_issue(
+                    issues,
+                    "warning",
+                    "row_menu_default_view_missing",
+                    "Row menu should mark the view action container as default.",
+                    container_path,
+                )
+            _analyze_action_containers(nested, f"{container_path}.containers", issues, action_icons, row_actions=True)
+            continue
         actions = container.get("actions")
         if actions is None:
             actions = [container] if _looks_like_action(container) else []
         if not isinstance(actions, list):
             _add_issue(issues, "warning", "invalid_action_list", "Container actions value is not a list.", container_path)
             continue
+        if row_actions and len(actions) > 1:
+            _add_issue(
+                issues,
+                "warning",
+                "row_action_container_should_be_menu",
+                "A row menu must use type=menu with nested containers[]; do not place multiple row actions in one action container.",
+                container_path,
+            )
         if row_actions and len(actions) > 3:
             _add_issue(
                 issues,
@@ -297,9 +330,10 @@ def _analyze_action_containers(
             )
         container_icon = _action_icon(container)
         container_title = str(container.get("title") or container.get("name") or "").strip()
+        is_nested_menu_item = row_actions and ".containers" in path
         if container_icon:
             action_icons.append(container_icon)
-        if container_icon and container_title:
+        if container_icon and container_title and not is_nested_menu_item:
             _add_issue(
                 issues,
                 "info",
@@ -358,6 +392,20 @@ def _analyze_action_containers(
                 path,
                 {"observed": [category for category, _ in known_order]},
             )
+
+
+def _row_menu_has_default_view(containers: list[Any]) -> bool:
+    for container in containers:
+        if not isinstance(container, dict) or container.get("default") is not True:
+            continue
+        actions = container.get("actions")
+        if not isinstance(actions, list):
+            actions = [container] if _looks_like_action(container) else []
+        if any(isinstance(action, dict) and _action_category(action, container) == "view" for action in actions):
+            return True
+        if not actions and _action_category(container) == "view":
+            return True
+    return False
 
 
 def _action_icon(action: dict[str, Any]) -> str:

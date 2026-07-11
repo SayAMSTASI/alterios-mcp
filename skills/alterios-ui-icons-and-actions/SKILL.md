@@ -30,6 +30,8 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - For script or processing actions, use `forms_apps_script`.
 - If an element has more than three actions, group them behind `menu`.
 - In list value actions, use a `menu` action and include `Редактировать`, `Просмотр`, and `Удалить` with icons.
+- For list row menus, use the verified Alterios JSON contract: the outer value action container has `type: "menu"`, a project-local `more_vert`/`menu` icon, empty `actions: []`, and nested `containers[]`; each menu item is its own `type: "action"` container with `title`, `iconId`, and `actions[]`. Mark the nested `Просмотр` container as `default: true`.
+- Do not model row menus as one `type: "action"` container with several `actions[]`; that shape may save but does not create the expected nested menu UI.
 - For dictionary/reference lists, add a bulk edit action only after confirming that the fields offered for bulk output are not relation fields.
 - If a surface is intentionally custom or unusual, confirm with the user before replacing its action model.
 

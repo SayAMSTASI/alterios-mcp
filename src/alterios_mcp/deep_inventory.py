@@ -523,6 +523,21 @@ def _action_rows(
     cell_type: Any,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    nested_containers = container.get("containers")
+    if str(container.get("type") or "").lower() == "menu" and isinstance(nested_containers, list):
+        for nested_index, nested_container in enumerate(nested_containers):
+            if isinstance(nested_container, dict):
+                rows.extend(
+                    _action_rows(
+                        nested_container,
+                        f"{path}.containers[{nested_index}]",
+                        scope,
+                        form_id,
+                        form_name,
+                        cell_type,
+                    )
+                )
+        return rows
     actions = container.get("actions")
     if not isinstance(actions, list):
         actions = [container]

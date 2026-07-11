@@ -107,6 +107,76 @@ def test_deep_inventory_links_forms_scripts_bpmn_and_icons() -> None:
     assert icons["totals"]["icon_usages"] >= 2
 
 
+def test_deep_inventory_flattens_nested_row_menu_actions() -> None:
+    result = build_deep_inventory(
+        forms=[
+            {
+                "_id": "form-list",
+                "name": "Questions",
+                "pageTitle": "Questions",
+                "tabs": [
+                    {
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "view_data_list",
+                                        "params": {"viewId": "view-1"},
+                                        "styles": {"width": "100%"},
+                                        "displaying": {"fields": {"title": {}}},
+                                        "valueActionContainers": [
+                                            {
+                                                "type": "menu",
+                                                "iconId": "more_vert",
+                                                "actions": [],
+                                                "containers": [
+                                                    {
+                                                        "type": "action",
+                                                        "title": "Edit",
+                                                        "iconId": "edit",
+                                                        "actions": [{"_id": "form-edit", "type": "forms"}],
+                                                    },
+                                                    {
+                                                        "type": "action",
+                                                        "title": "View",
+                                                        "iconId": "preview",
+                                                        "default": True,
+                                                        "actions": [{"_id": "form-view", "type": "forms"}],
+                                                    },
+                                                    {
+                                                        "type": "action",
+                                                        "title": "Delete",
+                                                        "iconId": "delete",
+                                                        "actions": [{"type": "delete_contents"}],
+                                                    },
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+            }
+        ],
+        scripts=[],
+        diagrams=[],
+        groups=[],
+        profile="test",
+        project_id="project-1",
+        generated_at="2026-07-10T00:00:00+00:00",
+    )
+
+    actions = result["form_surface_inventory"]["action_matrix"]
+    titles = [action["title"] for action in actions]
+
+    assert titles == ["Edit", "View", "Delete"]
+    assert actions[1]["default"] is True
+    assert actions[1]["target_form_id"] == "form-view"
+    assert actions[2]["category"] == "delete"
+
+
 def test_deep_inventory_does_not_export_script_body_or_api_key() -> None:
     result = build_deep_inventory(
         forms=[],

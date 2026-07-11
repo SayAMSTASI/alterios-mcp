@@ -32,6 +32,7 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - For list forms, set `pageTitle` to `{наименование сущности во множественном роде}`.
 - For view/detail and edit forms, set `pageTitle` to `{наименование сущности в единственном роде}`.
 - Check field order, labels, `displaying`, required status, and source field meaning before treating a field cell as finished.
+- Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip/help, placeholder, or separate help block instead of always-visible bottom text.
 - Use `view_data_list` for related rows and validate the real relation field.
 - Validate view filters explicitly: static filters, user filters, role-dependent filters, and `openId`/`dataId` current-record filters have different acceptance checks.
 - Always add a field-based filter for form-embedded views/lists. A `view_data` or `view_data_list` cell must be constrained by the relevant source field, relation field, or `dataId: [openId]`; unfiltered embedded lists are allowed only when the user explicitly needs a global list.
@@ -42,6 +43,7 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - Make save behavior context-aware: terminal hierarchy forms use save-and-back; non-terminal forms save in place.
 - On view/detail forms, add an icon-only `Редактировать` action using the edit-document semantic when editing the current record is allowed. Do not add that self-edit action to edit forms.
 - Keep element actions on view/detail and edit forms semantically consistent; the edit form only omits the transition to edit itself.
+- For list value actions, the default row action is `Просмотр`. Use an outer `type: "menu"` value action container with nested `containers[]`, and set `default: true` on the nested `Просмотр` action container.
 - If an existing interface is intentionally unusual, ask before changing its interaction model.
 
 ## References

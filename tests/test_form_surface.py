@@ -168,6 +168,104 @@ def test_form_surface_accepts_icon_on_action_container() -> None:
     assert result["inventory"]["action_icons"] == ["edit"]
 
 
+def test_form_surface_accepts_nested_row_menu_with_default_view() -> None:
+    form = {
+        "name": "Questions",
+        "pageTitle": "Questions",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "iconId": "more_vert",
+                                        "tooltip": "Menu",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Edit",
+                                                "iconId": "edit",
+                                                "actions": [{"type": "forms", "name": "Edit form"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "View",
+                                                "iconId": "preview",
+                                                "default": True,
+                                                "actions": [{"type": "forms", "name": "View form"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "Delete",
+                                                "iconId": "delete",
+                                                "actions": [{"type": "delete_contents"}],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["ok"] is True
+    assert "row_menu_missing_containers" not in result["issues_by_code"]
+    assert "row_menu_default_view_missing" not in result["issues_by_code"]
+    assert "row_action_container_should_be_menu" not in result["issues_by_code"]
+    assert result["inventory"]["action_icons"] == ["delete", "edit", "more_vert", "preview"]
+
+
+def test_form_surface_flags_multiple_row_actions_inside_plain_action_container() -> None:
+    form = {
+        "name": "Questions",
+        "pageTitle": "Questions",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "action",
+                                        "iconId": "more_vert",
+                                        "actions": [
+                                            {"type": "forms", "title": "Edit", "iconId": "edit"},
+                                            {"type": "forms", "title": "View", "iconId": "preview"},
+                                            {"type": "delete_contents", "title": "Delete", "iconId": "delete"},
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["issues_by_code"]["row_action_container_should_be_menu"] == 1
+
+
 def test_form_surface_collects_roles_styles_and_report_source() -> None:
     form = {
         "name": "Report",
