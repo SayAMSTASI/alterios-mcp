@@ -21,7 +21,10 @@ display cells.
    user-facing hint. Do not leave purpose/help empty.
 5. For relation work, design short field suffixes and `fieldNamePrefix` before
    creating fields; view joins can break when generated mnames are too long.
-6. After writes, verify actual returned `mname`, `type`, `settings`, form field
+6. When `fieldNamePrefix` is set, pass short field suffixes to create-field; do
+   not pass an already fully prefixed/generated mname, because the backend can
+   prepend the prefix again.
+7. After writes, verify actual returned `mname`, `type`, `settings`, form field
    binding, view field binding, and view data smoke.
 
 ## Key Rules
@@ -38,6 +41,9 @@ display cells.
   proof.
 - Use `spreadsheet` for in-system editable cell data; use `file` for uploaded
   XLSX/CSV/documents.
+- Use `geo` for persisted geographic objects that must be shown in `leaflet`
+  views; attach it to the view, read the populated view-field `mname`, then use
+  that mname in `settings.geoFields[].name`.
 - Treat calculated fields as derived values; document expression, source mnames,
   and recalculation expectations.
 - Preserve existing fields unless cleanup is explicitly requested and narrowly

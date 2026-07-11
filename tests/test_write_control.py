@@ -702,7 +702,7 @@ def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
                             "_id": "view-1",
                             "name": "View",
                             "description": "Codex-managed: existing",
-                            "format": "cards",
+                            "format": "grid",
                             "settings": {},
                             "strict": True,
                         }
@@ -728,7 +728,7 @@ def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
     assert result["audit"]["operation"]["request"] == {"_id": "view-1", "name": "View", "allowLegacyMode": False}
     assert result["response"]["preflight"]["_id"] == "view-1"
     assert {"field": "settings", "before": {}, "after": {"engineVersion": "v2"}, "changed": True} in result["response"]["diff"]
-    assert {"field": "format", "before": "cards", "after": "cards", "changed": False} in result["response"]["diff"]
+    assert {"field": "format", "before": "grid", "after": "grid", "changed": False} in result["response"]["diff"]
     assert {"field": "strict", "before": True, "after": True, "changed": False} in result["response"]["diff"]
 
 
@@ -815,6 +815,79 @@ def test_upsert_view_allows_explicit_legacy_mode_without_real_network() -> None:
     assert result["dry_run"] is True
     assert result["audit"]["operation"]["request"] == {"_id": None, "name": "Legacy View", "allowLegacyMode": True}
     assert result["response"]["planned_payload"]["settings"] == {}
+
+
+def test_upsert_view_calendar_reports_missing_start_date_warning_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view(
+            "Calendar View",
+            format="calendar",
+            settings={"bgColor": "status_color"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert result["response"]["planned_payload"]["settings"] == {"bgColor": "status_color", "engineVersion": "v2"}
+    assert result["response"]["format_warnings"] == [
+        "calendar format needs settings.startDate for UI rendering; current backend may drop it on save."
+    ]
+
+
+def test_upsert_view_rejects_incomplete_gantt_settings_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="gantt view requires settings.defaultView"),
+    ):
+        server.alterios_upsert_view(
+            "Gantt View",
+            format="gantt",
+            settings={"date1": {"field": "started_at", "offset": 0}, "date2": {"field": "finished_at", "offset": 0}},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
+def test_upsert_view_rejects_leaflet_geo_without_marker_icons_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match=r"geoFields\[0\]\.markerIcons"),
+    ):
+        server.alterios_upsert_view(
+            "Map View",
+            format="leaflet",
+            settings={"geoFields": [{"name": "geo"}]},
+            profile="vniimt",
+            project_id="project-1",
+        )
 
 
 def test_upsert_view_rejects_unmanaged_existing_object_without_flag() -> None:

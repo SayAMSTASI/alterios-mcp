@@ -1,0 +1,144 @@
+{
+  "generated_at": "2026-07-11",
+  "source": "sandbox live probing plus Alterios frontend enum extraction",
+  "redaction": {
+    "real_base_urls_included": false,
+    "real_project_ids_included": false,
+    "tokens_included": false
+  },
+  "frontend_formats": [
+    "table",
+    "grid",
+    "list",
+    "leaflet",
+    "gantt",
+    "reference",
+    "calendar"
+  ],
+  "non_paginable_formats": [
+    "leaflet",
+    "calendar"
+  ],
+  "formats": {
+    "table": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [],
+      "validation": "read populated view fields and get-data or get-data-simplified"
+    },
+    "reference": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [],
+      "validation": "use as ref source=view and verify selector source data"
+    },
+    "grid": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [
+        "desc",
+        "iconField",
+        "iconWidth",
+        "iconHeight"
+      ],
+      "validation": "get-data returns rows, headers, and settings"
+    },
+    "list": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [],
+      "validation": "get-data returns rows; frontend config component is empty"
+    },
+    "gantt": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion",
+        "defaultView",
+        "date1.field",
+        "date2.field"
+      ],
+      "optional_settings": [
+        "plannedDate1",
+        "plannedDate2",
+        "title",
+        "resource",
+        "completion",
+        "showDate",
+        "showDuration",
+        "showPlannedDate",
+        "showResource",
+        "showCompletion"
+      ],
+      "allowed_default_view": [
+        "day",
+        "week",
+        "month",
+        "quarter",
+        "year"
+      ],
+      "validation": "readback preserves gantt settings and get-data returns rows"
+    },
+    "leaflet": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion",
+        "geoFields[].name",
+        "geoFields[].markerIcons"
+      ],
+      "optional_settings": [
+        "tileLayers",
+        "featureLayers",
+        "defaultMarkerSource",
+        "minZoom",
+        "maxZoom"
+      ],
+      "allowed_marker_icons": [
+        "default",
+        "img",
+        "field"
+      ],
+      "validation": "geoFields name uses populated view-field mname without field_ prefix; get-data returns rows"
+    },
+    "calendar": {
+      "mode": "experimental/v2",
+      "status": "partial_backend_gap",
+      "frontend_settings": [
+        "engineVersion",
+        "startDate",
+        "endDate",
+        "bgColor"
+      ],
+      "persisted_settings_observed": [
+        "engineVersion",
+        "bgColor"
+      ],
+      "validation": "do not mark complete until UI/HAR or alternate route confirms startDate/endDate persistence"
+    },
+    "classic_table": {
+      "mode": "classic/legacy",
+      "status": "live_verified_exception",
+      "required_settings": [],
+      "validation": "requires allow_legacy_mode=true and documented evidence"
+    }
+  },
+  "gotchas": [
+    "cards is not present in the confirmed frontend view.format enum",
+    "get-data-simplified returns rows only; full get-data returns headers and settings",
+    "when fieldNamePrefix is set, pass short field suffixes to create-field to avoid double prefixing",
+    "leaflet final geoFields should be saved after view fields are attached and read back"
+  ]
+}

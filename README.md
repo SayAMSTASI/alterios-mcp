@@ -505,8 +505,11 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   агент аналитика требований, постановка/ТРЗ, правила для представлений, связей,
   полей и фильтров.
 - [docs/material-types-and-view-types-research.md](docs/material-types-and-view-types-research.md) -
-  исследование типов материалов, полей, `table`/`reference` представлений,
-  relation joins и legacy/classic исключений.
+  исследование типов материалов, полей, форматов `table`, `reference`, `grid`,
+  `list`, `gantt`, `leaflet`, календарного gap, relation joins и
+  legacy/classic исключений.
+- [docs/view-format-inventory.json](docs/view-format-inventory.json) -
+  машинно-читаемая матрица форматов представлений и обязательных настроек.
 - [docs/optimization-plan.md](docs/optimization-plan.md) - план оптимизации:
   сценарные tools, UI/report validation, write workflow и inventory cache/diff
   health.

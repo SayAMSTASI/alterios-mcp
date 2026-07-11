@@ -23,9 +23,16 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 
 ## View Types And Modes
 
-- Confirmed live view formats are `table` and `reference` in experimental/v2. A joined `table` view is also confirmed when the join uses real view-field mnames.
+- Confirmed frontend `view.format` values are `table`, `grid`, `list`, `leaflet`, `gantt`, `reference`, and `calendar`.
+- Confirmed live experimental/v2 formats are `table`, `reference`, `grid`, `list`, `gantt`, and `leaflet`. A joined `table` view is also confirmed when the join uses real view-field mnames.
+- Treat `calendar` as partially confirmed: the frontend formatter reads `settings.startDate`, `settings.endDate`, and `settings.bgColor`, but current backend view save/readback preserved only `bgColor` and `engineVersion` in live probing. Do not mark a calendar view complete without UI/HAR evidence or an alternate route that persists date settings.
 - `settings.engineVersion = "v2"` is the default for new views. Empty settings or missing `engineVersion` are legacy/classic and require explicit evidence plus an explicit legacy flag in the write tool.
-- Treat `cards` and other unverified formats as unknown until there is UI/API evidence for the current Alterios instance.
+- Treat `cards` as unconfirmed: it is not present in the confirmed frontend enum.
+- `grid` settings can include `desc`, `iconField`, `iconWidth`, and `iconHeight`.
+- `list` has no separate config UI in the confirmed frontend build; use `engineVersion=v2` and verify through `get-data`.
+- `gantt` requires `defaultView` (`day`, `week`, `month`, `quarter`, or `year`) plus `date1.field` and `date2.field`; optional settings include `plannedDate1`, `plannedDate2`, `title`, `resource`, `completion`, and show flags.
+- `leaflet` requires a `geo` content field attached to the view, then `settings.geoFields[]` saved by populated view-field `mname`; `markerIcons` is required and must be `default`, `img`, or `field`.
+- `get-data-simplified` returns rows only for these formats; use full `get-data` when headers/settings evidence matters.
 - For relation views, use short content field suffixes and `fieldNamePrefix` before fields are created. Long generated mnames can break joins through backend SQL alias truncation.
 - Read populated view fields before writing join conditions; do not infer `_id` aliases. Backends can expose the related id as `_id0` or another generated mname.
 - Validate a view through both populated fields and `get-data` or `get-data-simplified`; a successful save is not enough.

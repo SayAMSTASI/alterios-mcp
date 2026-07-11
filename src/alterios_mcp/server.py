@@ -1323,6 +1323,60 @@ def _find_view(
     return None
 
 
+VIEW_DEFAULT_RANGES = {"day", "week", "month", "quarter", "year"}
+LEAFLET_MARKER_ICON_SOURCES = {"default", "img", "field"}
+
+
+def _validate_view_format_settings(format_name: str | None, settings: dict[str, Any]) -> list[str]:
+    """Return non-blocking warnings and raise for settings known to produce broken views."""
+    normalized_format = (format_name or "table").strip().lower()
+    warnings: list[str] = []
+    if normalized_format == "calendar":
+        if not settings.get("startDate"):
+            warnings.append("calendar format needs settings.startDate for UI rendering; current backend may drop it on save.")
+        return warnings
+    if normalized_format == "gantt":
+        default_view = settings.get("defaultView")
+        if default_view not in VIEW_DEFAULT_RANGES:
+            raise ValueError("gantt view requires settings.defaultView to be one of: day, week, month, quarter, year.")
+        for key in ("date1", "date2"):
+            value = settings.get(key)
+            if not isinstance(value, dict) or not str(value.get("field") or "").strip():
+                raise ValueError(f"gantt view requires settings.{key}.field.")
+        return warnings
+    if normalized_format == "leaflet":
+        geo_fields = settings.get("geoFields") or []
+        if not isinstance(geo_fields, list):
+            raise ValueError("leaflet view requires settings.geoFields to be a list.")
+        for index, geo_field in enumerate(geo_fields):
+            if not isinstance(geo_field, dict):
+                raise ValueError(f"leaflet view geoFields[{index}] must be an object.")
+            if not str(geo_field.get("name") or "").strip():
+                raise ValueError(f"leaflet view geoFields[{index}].name is required.")
+            marker_icons = geo_field.get("markerIcons")
+            if marker_icons not in LEAFLET_MARKER_ICON_SOURCES:
+                raise ValueError(
+                    f"leaflet view geoFields[{index}].markerIcons must be one of: default, img, field."
+                )
+        return warnings
+    return warnings
+
+
+def _view_format_readback_warnings(
+    format_name: str | None,
+    requested_settings: dict[str, Any],
+    readback_settings: dict[str, Any] | None,
+) -> list[str]:
+    normalized_format = (format_name or "table").strip().lower()
+    readback_settings = readback_settings or {}
+    warnings: list[str] = []
+    if normalized_format == "calendar":
+        for key in ("startDate", "endDate"):
+            if requested_settings.get(key) and readback_settings.get(key) != requested_settings.get(key):
+                warnings.append(f"calendar settings.{key} was requested but was not present in readback.")
+    return warnings
+
+
 def _find_form(
     client: AlteriosClient,
     *,
@@ -5170,11 +5224,13 @@ def alterios_upsert_view(
         raise ValueError("Alterios views must use experimental mode: settings.engineVersion must be 'v2'.")
     if not allow_legacy_mode:
         merged_settings["engineVersion"] = "v2"
+    effective_format = format if format is not None else (existing or {}).get("format") or "table"
+    format_warnings = _validate_view_format_settings(effective_format, merged_settings)
     payload = {
         **(existing or {}),
         "name": name,
         "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp view.",
-        "format": format if format is not None else (existing or {}).get("format") or "table",
+        "format": effective_format,
         "settings": merged_settings,
         "strict": strict if strict is not None else (existing or {}).get("strict") or False,
     }
@@ -5197,6 +5253,7 @@ def alterios_upsert_view(
     response_payload: dict[str, Any] = {
         "preflight": _resource_summary(existing),
         "diff": diff,
+        "format_warnings": format_warnings,
         "planned_payload": strip_alterios_metadata(payload),
     }
     if dry_run:
@@ -5205,7 +5262,15 @@ def alterios_upsert_view(
     saved = client.save_view(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback_body = client.view_by_id(saved_id).as_dict() if saved_id else {"body": _find_view(client, name=name)}
-    response_payload.update({"saved": saved, "readback": readback_body})
+    readback_resource = readback_body.get("body") if isinstance(readback_body, dict) else None
+    readback_settings = readback_resource.get("settings") if isinstance(readback_resource, dict) else None
+    response_payload.update(
+        {
+            "saved": saved,
+            "readback": readback_body,
+            "readback_warnings": _view_format_readback_warnings(effective_format, merged_settings, readback_settings),
+        }
+    )
     return controlled_write_result(audit=audit, response=response_payload)
 
 
