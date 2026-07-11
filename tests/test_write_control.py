@@ -1088,7 +1088,7 @@ def test_server_lists_configured_profiles_without_secrets() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",
         "ALTERIOS_PROFILES": "vniimt, artx",
-        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
         "ALTERIOS_VNIIMT_API_TOKEN": "vniimt-token",
         "ALTERIOS_ARTX_BASE_URL": "http://artx.local",
         "ALTERIOS_ARTX_API_TOKEN": "artx-token",
@@ -2629,3 +2629,255 @@ def test_ensure_project_icons_execution_uploads_and_writes_registry(tmp_path) ->
     registry_path = tmp_path / result["response"]["registry"]["path"]
     assert registry_path.exists()
     assert "11111111-1111-4111-8111-111111111111" in registry_path.read_text(encoding="utf-8")
+
+
+def test_list_project_icons_reads_filesystem_and_writes_artifact(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "content_type": "application/json", "body": self.body}
+
+    class FakeIconFilesClient:
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            assert command == "open"
+            if target == "public_root":
+                return FakeResponse(
+                    {
+                        "files": [
+                            {"hash": "icons_hash", "name": "icons", "mime": "directory", "phash": "public_root"},
+                        ]
+                    }
+                )
+            if target == "icons_hash":
+                return FakeResponse(
+                    {
+                        "cwd": {"hash": "icons_hash", "name": "icons", "mime": "directory"},
+                        "files": [
+                            {
+                                "hash": "add_hash",
+                                "id": "file-add",
+                                "name": "add_24dp_4B77D1_FILL0_wght400_GRAD0_opsz24.svg",
+                                "mime": "image/svg+xml",
+                                "phash": "icons_hash",
+                                "size": 182,
+                                "url": "/files/icons/add.svg",
+                            },
+                            {
+                                "hash": "doc_hash",
+                                "id": "file-doc",
+                                "name": "description.png",
+                                "mime": "image/png",
+                                "phash": "icons_hash",
+                                "size": 177,
+                                "url": "/files/icons/description.png",
+                            },
+                        ],
+                    }
+                )
+            raise AssertionError(f"Unexpected target {target!r}")
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            return FakeResponse([{"_id": file_ids[0]}])
+
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconFilesClient):
+        result = server.alterios_list_project_icons(
+            folder_hash="#elf_public_root",
+            icons_folder_name="icons",
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["filesystem"]["icon_count"] == 2
+    assert result["filesystem"]["catalog"][0]["semantic"] == "add"
+    artifact_path = tmp_path / result["filesystem"]["artifact"]
+    assert artifact_path.exists()
+
+
+def test_resolve_project_icon_registers_existing_filesystem_match(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeIconFilesClient:
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            if target == "public_root":
+                return FakeResponse(
+                    {"files": [{"hash": "icons_hash", "name": "icons", "mime": "directory", "phash": "public_root"}]}
+                )
+            if target == "icons_hash":
+                return FakeResponse(
+                    {
+                        "files": [
+                            {
+                                "hash": "add_hash",
+                                "id": "file-add",
+                                "name": "add_24dp_4B77D1_FILL0_wght400_GRAD0_opsz24.svg",
+                                "mime": "image/svg+xml",
+                                "phash": "icons_hash",
+                            }
+                        ]
+                    }
+                )
+            raise AssertionError(f"Unexpected target {target!r}")
+
+        def file_metadata(self, file_ids: list[str]) -> FakeResponse:
+            return FakeResponse([{"_id": file_ids[0]}])
+
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconFilesClient):
+        result = server.alterios_resolve_project_icon(
+            semantic="add",
+            folder_hash="public_root",
+            icons_folder_name="icons",
+            allow_upload=False,
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["resolved"] is True
+    assert result["source"] == "filesystem"
+    assert result["icon_id"] == "file-add"
+    registry_path = tmp_path / "project-icons" / "artx" / "project-1" / "registry.json"
+    registry = registry_path.read_text(encoding="utf-8")
+    assert "file-add" in registry
+    assert "project_file_manager" in registry
+
+
+def test_export_project_icons_downloads_files_and_usage_guide(tmp_path) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeIconFilesClient:
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            if target == "public_root":
+                return FakeResponse(
+                    {"files": [{"hash": "icons_hash", "name": "icons", "mime": "directory", "phash": "public_root"}]}
+                )
+            if target == "icons_hash":
+                return FakeResponse(
+                    {
+                        "files": [
+                            {
+                                "hash": "print_hash",
+                                "id": "file-print",
+                                "name": "print_24dp_4B77D1_FILL0_wght400_GRAD0_opsz24.svg",
+                                "mime": "image/svg+xml",
+                                "phash": "icons_hash",
+                            }
+                        ]
+                    }
+                )
+            raise AssertionError(f"Unexpected target {target!r}")
+
+        def download_file(self, file_id: str) -> tuple[bytes, str]:
+            assert file_id == "file-print"
+            return b"<svg></svg>", "image/svg+xml"
+
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconFilesClient):
+        result = server.alterios_export_project_icons(
+            folder_hash="public_root",
+            icons_folder_name="icons",
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["icon_count"] == 1
+    manifest = tmp_path / result["artifacts"]["manifest"]
+    guide = tmp_path / result["artifacts"]["usage_guide"]
+    assert manifest.exists()
+    assert guide.exists()
+    assert "Печать формы" in guide.read_text(encoding="utf-8")
+    downloaded = list((tmp_path / result["artifacts"]["files_dir"]).glob("file-print_*.svg"))
+    assert len(downloaded) == 1
+
+
+def test_export_project_icons_defaults_to_selected_folder_only(tmp_path) -> None:
+    opened_targets: list[str | None] = []
+
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeIconFilesClient:
+        def __init__(self, _config: object) -> None:
+            pass
+
+        def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, object] | None = None) -> FakeResponse:
+            opened_targets.append(target)
+            if target == "public_root":
+                return FakeResponse(
+                    {
+                        "files": [
+                            {"hash": "icons_hash", "name": "icons", "mime": "directory", "phash": "public_root"},
+                            {
+                                "hash": "save_hash",
+                                "id": "file-save",
+                                "name": "save_16dp.svg",
+                                "mime": "image/svg+xml",
+                                "phash": "public_root",
+                            },
+                        ]
+                    }
+                )
+            if target == "icons_hash":
+                return FakeResponse(
+                    {
+                        "files": [
+                            {
+                                "hash": "print_hash",
+                                "id": "file-print",
+                                "name": "print_16dp.svg",
+                                "mime": "image/svg+xml",
+                                "phash": "icons_hash",
+                            }
+                        ]
+                    }
+                )
+            raise AssertionError(f"Unexpected target {target!r}")
+
+        def download_file(self, file_id: str) -> tuple[bytes, str]:
+            return b"<svg></svg>", "image/svg+xml"
+
+    env = {
+        "ALTERIOS_ARTX_BASE_URL": "https://alterios.example",
+        "ALTERIOS_ARTX_API_TOKEN": "secret",
+        "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path),
+    }
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "AlteriosClient", FakeIconFilesClient):
+        result = server.alterios_export_project_icons(
+            folder_hash="public_root",
+            profile="artx",
+            project_id="project-1",
+        )
+
+    assert result["icon_count"] == 1
+    assert opened_targets == ["public_root", "public_root"]
+    manifest = tmp_path / result["artifacts"]["manifest"]
+    assert "file-save" in manifest.read_text(encoding="utf-8")
+    assert "file-print" not in manifest.read_text(encoding="utf-8")

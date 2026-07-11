@@ -394,6 +394,35 @@ alterios_ensure_project_icons(
 `visibility` и другие Google icon names. Registry хранится отдельно для каждого
 `profile + project_id` в `artifacts/project-icons/...`.
 
+Для проверки уже загруженных проектных иконок используйте read-only tools:
+
+```powershell
+# Снять иконки только из выбранной папки elFinder, без подпапок.
+alterios_list_project_icons(
+  profile="<profile>",
+  project_id="<project-id>",
+  folder_hash="elf_public_L3B1YmxpYw",
+  icons_folder_name=null,
+  recurse=false
+)
+
+# Скачать файлы и сформировать локальный справочник "когда какую использовать".
+alterios_export_project_icons(
+  profile="<profile>",
+  project_id="<project-id>",
+  folder_hash="elf_public_L3B1YmxpYw",
+  icons_folder_name=null,
+  recurse=false
+)
+```
+
+Если нужны иконки из подпапки, ее нужно указать явно:
+`icons_folder_name="icons"`. По умолчанию export уважает выбранный
+`folder_hash` и не спускается в подпапки. Для выбора одной иконки используйте
+`alterios_resolve_project_icon`: он сначала проверяет registry, затем
+файловый менеджер, и только после этого строит upload-plan через
+`alterios_ensure_project_icons`.
+
 ### Связать форму, скрипт и BPMN
 
 MCP может показать, какие действия формы запускают скрипты, какие userTask

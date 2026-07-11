@@ -19,6 +19,7 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Use the returned project-local UUID values as `iconId`; never leave raw Google icon names such as `save`, `more_vert`, or `visibility` in saved Alterios JSON.
 - Do not replace an existing icon if it already matches the action meaning and local style.
 - Treat a UUID-like `iconId` as a stored reference, not proof that the icon matches the action standard.
+- When inventorying file-manager icons from an elFinder URL, respect the selected folder exactly: `icons_folder_name=null` and `recurse=false` means current folder only. Do not descend into `public/icons` unless the user explicitly asks for that subfolder.
 
 ## Review Steps
 
@@ -28,7 +29,8 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 4. Check that labels, icons, and menu placement match the user workflow.
 5. If a needed icon is missing from the project registry, call `alterios_ensure_project_icons` in dry-run first; apply only with the saved `plan_id` and write gate.
 6. If `iconId` is UUID-like, resolve it through the icon usage matrix or verified registry/readback before claiming it matches the semantic icon; otherwise mark it unresolved.
-7. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
+7. For project file-manager catalogs, use `alterios_list_project_icons` or `alterios_export_project_icons` before guessing from raw filenames; record whether the source was current folder, named subfolder, or recursive tree.
+8. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
 
 ## References
 

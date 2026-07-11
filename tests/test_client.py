@@ -50,7 +50,7 @@ def test_profile_overrides_shared_settings() -> None:
     env = {
         "ALTERIOS_PROFILE": "vniimt",
         "ALTERIOS_ENDPOINT_TEMPLATE": "{base_url}/api/scripts/execute-manual",
-        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
         "ALTERIOS_VNIIMT_API_TOKEN": "profile-token",
         "ALTERIOS_VNIIMT_PROJECT_ID": "profile-project",
         "ALTERIOS_VNIIMT_AUTH_HEADER": "x-api-key",
@@ -61,7 +61,7 @@ def test_profile_overrides_shared_settings() -> None:
         config = AlteriosConfig.from_env(dotenv_path=None)
 
     assert config.profile == "vniimt"
-    assert config.base_url == "http://lims.vniimt.local"
+    assert config.base_url == "https://vniimt.example"
     assert config.api_token == "profile-token"
     assert config.project_id == "profile-project"
     assert config.auth_header == "x-api-key"
@@ -72,7 +72,7 @@ def test_discover_profile_names_from_explicit_list_and_prefixes() -> None:
     values = {
         "ALTERIOS_PROFILE": "vniimt",
         "ALTERIOS_PROFILES": "artx-prod; demo",
-        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
         "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
         "ALTERIOS_EXTRA_INSTANCE_API_TOKEN": "token",
     }
@@ -85,7 +85,7 @@ def test_configured_profiles_returns_redacted_multi_instance_inventory() -> None
         "ALTERIOS_PROFILE": "vniimt",
         "ALTERIOS_PROFILES": "vniimt, artx-prod",
         "ALTERIOS_ENDPOINT_TEMPLATE": "{base_url}/api/scripts/execute-manual",
-        "ALTERIOS_VNIIMT_BASE_URL": "http://lims.vniimt.local",
+        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
         "ALTERIOS_VNIIMT_API_TOKEN": "vniimt-token",
         "ALTERIOS_VNIIMT_PROJECT_ID": "vniimt-project",
         "ALTERIOS_VNIIMT_AUTH_HEADER": "x-api-key",
@@ -155,7 +155,7 @@ def test_alterios_dotenv_path_overrides_default_dotenv(tmp_path) -> None:
         "\n".join(
             [
                 "ALTERIOS_PROFILE=vniimt",
-                "ALTERIOS_VNIIMT_BASE_URL=http://lims.vniimt.local",
+                "ALTERIOS_VNIIMT_BASE_URL=https://vniimt.example",
                 "ALTERIOS_VNIIMT_API_TOKEN=profile-token",
                 "ALTERIOS_VNIIMT_PROJECT_ID=profile-project",
             ]
@@ -167,7 +167,7 @@ def test_alterios_dotenv_path_overrides_default_dotenv(tmp_path) -> None:
         config = AlteriosConfig.from_env()
 
     assert config.profile == "vniimt"
-    assert config.base_url == "http://lims.vniimt.local"
+    assert config.base_url == "https://vniimt.example"
     assert config.api_token == "profile-token"
     assert config.project_id == "profile-project"
 
@@ -539,6 +539,22 @@ def test_file_metadata_requires_ids_and_repeats_query_without_network() -> None:
     parsed = urlparse(send.call_args.args[0].url)
     assert parsed.path == "/api/file/list"
     assert parse_qs(parsed.query) == {"id": ["file-1", "file-2"]}
+
+
+def test_file_elfinder_builds_expected_query_without_network() -> None:
+    config = AlteriosConfig(
+        base_url="https://alterios.example",
+        api_token="secret-token",
+        project_id="project-1",
+    )
+    client = AlteriosClient(config)
+
+    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
+        client.file_elfinder(command="open", target="public_hash", extra={"tree": "1"})
+
+    parsed = urlparse(send.call_args.args[0].url)
+    assert parsed.path == "/api/file/elfinder"
+    assert parse_qs(parsed.query) == {"cmd": ["open"], "target": ["public_hash"], "tree": ["1"]}
 
 
 def test_content_by_id_uses_id_filter_and_returns_single_row_without_network() -> None:

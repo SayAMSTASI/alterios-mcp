@@ -470,6 +470,40 @@ class AlteriosClient:
             raise ValueError("file_ids must contain at least one file id")
         return self.request("GET", "/api/file/list", params={"id": file_ids})
 
+    def file_elfinder(self, *, command: str = "open", target: str | None = None, extra: dict[str, Any] | None = None) -> AlteriosResponse:
+        command = command.strip()
+        if not command:
+            raise ValueError("elFinder command must not be empty")
+        params: dict[str, Any] = {"cmd": command}
+        if target:
+            params["target"] = target
+        if extra:
+            params.update(extra)
+        return self.request("GET", "/api/file/elfinder", params=params)
+
+    def download_file(self, file_id: str) -> tuple[bytes, str]:
+        if not file_id.strip():
+            raise ValueError("file_id must not be empty")
+        missing = self.config.missing_for_project_call()
+        if missing:
+            raise AlteriosConfigError(f"Missing required configuration: {', '.join(missing)}")
+        request = Request(
+            self.config.base_url.rstrip("/") + f"/api/file/download/{path_segment(file_id)}",
+            headers=self._headers(),
+            method="GET",
+        )
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                return response.read(), response.headers.get("Content-Type", "")
+        except HTTPError as exc:
+            content_type = exc.headers.get("Content-Type", "") if exc.headers else ""
+            parsed_body = parse_response_body(exc.read(), content_type)
+            raise AlteriosRequestError(f"HTTP {exc.code}: {safe_error(parsed_body)}") from exc
+        except TimeoutError as exc:
+            raise AlteriosRequestError("Network error: timed out") from exc
+        except URLError as exc:
+            raise AlteriosRequestError(f"Network error: {exc.reason}") from exc
+
     def content_by_id(self, content_id: str) -> AlteriosResponse:
         if not content_id.strip():
             raise ValueError("content_id must not be empty")

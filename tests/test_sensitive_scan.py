@@ -6,6 +6,7 @@ from pathlib import Path
 
 SENSITIVE_LITERALS = (
     "lims." + "artx.ru",
+    "lims." + "vniimt.local",
     "4e247a6b-55ef-4665-b88c-" + "3c156fee19ba",
     "40466687-b093-4d80-b4f2-" + "ba0ed0245bfa",
 )

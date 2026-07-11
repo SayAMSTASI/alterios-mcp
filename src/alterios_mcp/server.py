@@ -302,6 +302,64 @@ PROJECT_ICON_DEFAULTS = {
     "search": "search",
     "filter": "filter_alt",
 }
+PROJECT_ICON_FOLDER_HASH = "public_L3B1YmxpYy9pY29ucw"
+PROJECT_ICON_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"}
+PROJECT_ICON_USAGE_HINTS = {
+    "add": "Добавление записи, строки, вкладки, вложения или нового элемента.",
+    "add_2": "Добавление записи или элемента; проектный вариант иконки add.",
+    "add_task": "Добавление задачи или этапа процесса.",
+    "analytics": "Открытие аналитики, отчета, дашборда или расчетного среза.",
+    "arrow_back": "Возврат на предыдущую форму или к списку.",
+    "arrow_drop_down": "Раскрытие списка, выпадающего меню или компактного выбора.",
+    "arrow_outward": "Переход наружу, открытие в новой вкладке или внешний переход.",
+    "attach_file": "Работа с файлами, вложениями и file-field.",
+    "attach_file_add": "Добавление файла, вложения или загрузка в file-field.",
+    "automation": "Автоматизация, запуск сценария, робота, скрипта или фоновой обработки.",
+    "build": "Настройка, техническое обслуживание или сборка параметров.",
+    "calendar_check": "Проверка даты, календарного срока, планового события или дедлайна.",
+    "cancel": "Отмена, отрицательный результат, признак Н или отклонение.",
+    "category": "Категория, классификатор, тип или группировка сущностей.",
+    "chat": "Комментарии, обсуждение, чат, обратная связь или поддержка.",
+    "check_circle": "Подтверждение, успешный результат, признак С или согласование.",
+    "checklist": "Массовый выбор, bulk-действие или пакетная обработка строк.",
+    "close": "Закрытие формы, диалога или панели без дополнительного действия.",
+    "content_copy": "Копирование, дублирование записи или перенос настроек по образцу.",
+    "delete": "Удаление. Должно применяться только для destructive-действий.",
+    "description": "Описание, документ, карточка описания или справочный текст.",
+    "design_services": "Настройка конструктора, дизайна формы или пользовательского интерфейса.",
+    "directory_sync": "Синхронизация справочника, каталога, файлов или связанных данных.",
+    "docs": "Документы, инструкции, регламенты или пакет файлов.",
+    "download": "Скачивание файла, экспорт или выгрузка результата.",
+    "dynamic_form": "Динамическая форма, форма ввода или настройка формы.",
+    "edit": "Редактирование существующей записи.",
+    "edit_document": "Редактирование документа, шаблона, текста или печатной формы.",
+    "error": "Ошибка, проблема валидации, предупреждение или критичный статус.",
+    "event_note": "Событие, запись журнала, протокол или календарная заметка.",
+    "experiment": "Экспериментальный режим, тестовая функция или лабораторная проверка.",
+    "extension": "Расширение, модуль, плагин или подключаемая функция.",
+    "filter_alt": "Фильтр списка, формы или представления.",
+    "folder": "Группа, раздел меню, каталог или контейнер объектов.",
+    "forms_apps_script": "Скрипт формы, обработчик, пользовательское приложение или связка forms/scripts.",
+    "free_cancellation": "Отмена, аннулирование, сброс выбранного действия или безопасный отказ.",
+    "help": "Справка, вопрос, неопределенный результат или пояснение НП.",
+    "history": "История изменений, журнал действий, аудит или предыдущие версии.",
+    "info": "Информационная подсказка, help/dialog без изменения данных.",
+    "keyboard_return": "Возврат/закрытие, когда в текущем проекте уже принят такой стиль.",
+    "list_alt_add": "Добавление строки/записи из списка или создание связанного элемента.",
+    "menu": "Главное меню, боковое меню или раскрытие навигации; для строковых действий лучше more_vert.",
+    "more_vert": "Меню дополнительных действий строки или элемента.",
+    "person_add": "Добавление пользователя, сотрудника, участника или ответственного.",
+    "person_check": "Проверка, подтверждение, назначение или согласование пользователя.",
+    "preview": "Предпросмотр записи, печатной формы или результата перед применением.",
+    "print": "Печать формы, печатная форма или PDF/вывод на печать.",
+    "recycling": "Повторное использование, переработка, возврат в цикл или переобработка.",
+    "rule": "Правило, проверка, регламент, условие или валидатор.",
+    "save": "Сохранение формы, записи или настроек.",
+    "search": "Поиск по списку или данным.",
+    "sync": "Синхронизация, обновление, повторное чтение или пересчет.",
+    "task_alt": "Задача процесса, завершение/контроль task.",
+    "visibility": "Просмотр записи без редактирования.",
+}
 ICON_SEMANTIC_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 GOOGLE_ICON_NAME_RE = re.compile(r"^[a-z0-9_]{1,80}$")
 ICON_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -498,6 +556,265 @@ def _icon_registry_summary(registry: dict[str, Any]) -> dict[str, Any]:
         "icon_count": len(icons),
         "semantics": sorted(str(key) for key in icons.keys()),
     }
+
+
+def _normalize_elfinder_hash(value: str | None) -> str:
+    normalized = (value or PROJECT_ICON_FOLDER_HASH).strip()
+    if normalized.startswith("#"):
+        normalized = normalized[1:]
+    if normalized.startswith("elf_"):
+        normalized = normalized[4:]
+    if not normalized:
+        raise ValueError("elFinder folder hash must not be empty.")
+    return normalized
+
+
+def _file_item_id(item: dict[str, Any]) -> str:
+    return str(item.get("id") or item.get("_id") or "").strip()
+
+
+def _repair_mojibake_text(value: str) -> str:
+    if not any(marker in value for marker in ("Ð", "Ñ", "Ã")):
+        return value
+    try:
+        repaired = value.encode("latin1").decode("utf-8")
+    except UnicodeError:
+        return value
+    return repaired if repaired.strip() else value
+
+
+def _file_item_name(item: dict[str, Any]) -> str:
+    return _repair_mojibake_text(str(item.get("name") or item.get("filename") or "").strip())
+
+
+def _file_item_extension(item: dict[str, Any]) -> str:
+    return Path(_file_item_name(item)).suffix.lower()
+
+
+def _is_icon_file_item(item: dict[str, Any]) -> bool:
+    if not isinstance(item, dict):
+        return False
+    if item.get("mime") == "directory":
+        return False
+    if not _file_item_id(item):
+        return False
+    mime = str(item.get("mime") or "").lower()
+    return mime.startswith("image/") or _file_item_extension(item) in PROJECT_ICON_EXTENSIONS
+
+
+def _safe_download_filename(file_id: str, name: str) -> str:
+    suffix = Path(name).suffix
+    stem = Path(name).stem or "icon"
+    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "icon"
+    safe_suffix = re.sub(r"[^A-Za-z0-9.]+", "", suffix) or ".bin"
+    return f"{file_id}_{safe_stem}{safe_suffix}"
+
+
+def _icon_semantic_guess_from_filename(name: str) -> str:
+    stem = Path(name).stem.lower()
+    stem = re.sub(r"_[0-9]+$", "", stem)
+    stem = re.sub(r"[^a-z0-9_ -]+", "_", stem)
+    stem = re.sub(r"[-\s]+", "_", stem)
+    stem = re.sub(r"_\d{2}dp(_.*)?$", "", stem)
+    stem = re.sub(r"_[0-9a-f]{6}_fill[01]_wght[0-9]+_grad-?[0-9]+_opsz[0-9]+(_.*)?$", "", stem)
+    stem = re.sub(r"_+", "_", stem).strip("_")
+    if stem in {"content_copy_17dp"}:
+        stem = "content_copy"
+    return stem or "icon"
+
+
+def _icon_usage_hint(semantic: str) -> str:
+    return PROJECT_ICON_USAGE_HINTS.get(
+        semantic,
+        "Использовать только после проверки смысла действия; назначение выведено из имени файла.",
+    )
+
+
+def _summarize_elfinder_icon_item(item: dict[str, Any]) -> dict[str, Any]:
+    file_id = _file_item_id(item)
+    name = _file_item_name(item)
+    semantic = _icon_semantic_guess_from_filename(name)
+    return {
+        "file_id": file_id,
+        "name": name,
+        "semantic_guess": semantic,
+        "usage_hint": _icon_usage_hint(semantic),
+        "mime": item.get("mime"),
+        "size": item.get("size"),
+        "hash": item.get("hash"),
+        "phash": item.get("phash"),
+        "url": item.get("url"),
+        "extension": _file_item_extension(item),
+    }
+
+
+def _elfinder_files(body: Any) -> list[dict[str, Any]]:
+    if not isinstance(body, dict):
+        return []
+    return [item for item in body.get("files") or [] if isinstance(item, dict)]
+
+
+def _elfinder_direct_children(body: Any, parent_hash: str) -> list[dict[str, Any]]:
+    return [item for item in _elfinder_files(body) if item.get("phash") == parent_hash]
+
+
+def _find_child_folder(body: Any, *, parent_hash: str, folder_name: str) -> dict[str, Any] | None:
+    expected = folder_name.strip().lower()
+    for item in _elfinder_direct_children(body, parent_hash):
+        if item.get("mime") == "directory" and _file_item_name(item).lower() == expected:
+            return item
+    return None
+
+
+def _resolve_elfinder_icon_folder(client: AlteriosClient, *, folder_hash: str, icons_folder_name: str | None) -> tuple[str, dict[str, Any]]:
+    normalized = _normalize_elfinder_hash(folder_hash)
+    body = client.file_elfinder(command="open", target=normalized).body
+    cwd = body.get("cwd") if isinstance(body, dict) else None
+    cwd_name = _file_item_name(cwd) if isinstance(cwd, dict) else None
+    if not icons_folder_name:
+        return normalized, {"source_hash": normalized, "folder_hash": normalized, "folder_name": cwd_name}
+    if isinstance(cwd, dict) and _file_item_name(cwd).lower() == icons_folder_name.strip().lower():
+        return normalized, {"source_hash": normalized, "folder_hash": normalized, "folder_name": _file_item_name(cwd)}
+    folder = _find_child_folder(body, parent_hash=normalized, folder_name=icons_folder_name)
+    if not folder or not folder.get("hash"):
+        raise ValueError(f"Folder {icons_folder_name!r} was not found under elFinder target {normalized!r}.")
+    return str(folder["hash"]), {
+        "source_hash": normalized,
+        "folder_hash": str(folder["hash"]),
+        "folder_name": _file_item_name(folder),
+    }
+
+
+def _collect_elfinder_icon_items(
+    client: AlteriosClient,
+    *,
+    folder_hash: str,
+    recurse: bool,
+    max_files: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    queue = [folder_hash]
+    seen_dirs: set[str] = set()
+    icons: list[dict[str, Any]] = []
+    directories: list[dict[str, Any]] = []
+    while queue:
+        current_hash = queue.pop(0)
+        if current_hash in seen_dirs:
+            continue
+        seen_dirs.add(current_hash)
+        body = client.file_elfinder(command="open", target=current_hash).body
+        for item in _elfinder_direct_children(body, current_hash):
+            if item.get("mime") == "directory":
+                directories.append(
+                    {
+                        "hash": item.get("hash"),
+                        "name": _file_item_name(item),
+                        "phash": item.get("phash"),
+                    }
+                )
+                if recurse and item.get("hash"):
+                    queue.append(str(item["hash"]))
+                continue
+            if _is_icon_file_item(item):
+                icons.append(_summarize_elfinder_icon_item(item))
+                if len(icons) > max_files:
+                    raise ValueError(f"Refusing to process more than {max_files} icon files.")
+    return icons, directories
+
+
+def _group_icon_catalog(icons: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for icon in icons:
+        semantic = str(icon.get("semantic_guess") or "icon")
+        group = grouped.setdefault(
+            semantic,
+            {
+                "semantic": semantic,
+                "usage_hint": _icon_usage_hint(semantic),
+                "count": 0,
+                "representative_file_id": icon.get("file_id"),
+                "representative_name": icon.get("name"),
+                "mimes": set(),
+            },
+        )
+        group["count"] += 1
+        if icon.get("mime"):
+            group["mimes"].add(str(icon["mime"]))
+    result: list[dict[str, Any]] = []
+    for semantic in sorted(grouped):
+        group = grouped[semantic]
+        result.append(
+            {
+                **{key: value for key, value in group.items() if key != "mimes"},
+                "mimes": sorted(group["mimes"]),
+                "standard_semantic": semantic in PROJECT_ICON_DEFAULTS,
+                "standard_google_name": PROJECT_ICON_DEFAULTS.get(semantic),
+            }
+        )
+    return result
+
+
+def _write_icon_usage_guide(path: Path, *, profile: str, project_id: str, catalog: list[dict[str, Any]], icons: list[dict[str, Any]]) -> None:
+    lines = [
+        "# Каталог иконок проекта",
+        "",
+        "Файл сгенерирован MCP по файловому менеджеру Alterios. Реальные адреса и токены не сохраняются.",
+        "",
+        f"- profile: `{profile}`",
+        f"- project_id: `{project_id}`",
+        f"- уникальных назначений: {len(catalog)}",
+        f"- файлов иконок: {len(icons)}",
+        "",
+        "## Правила",
+        "",
+        "- `iconId` в формах, группах и действиях должен быть UUID файла из проекта.",
+        "- Для новых действий сначала использовать стандарт Google Fonts Icons: size 16, color #4B77D1.",
+        "- Существующую проектную иконку можно переиспользовать, если ее смысл совпадает с действием.",
+        "- Если назначение выведено только из имени файла, перед применением нужно проверить UI-смысл.",
+        "",
+        "## Когда какую использовать",
+        "",
+        "| Семантика | Когда использовать | Файлов | Пример |",
+        "|---|---|---:|---|",
+    ]
+    for item in catalog:
+        lines.append(
+            "| "
+            + str(item["semantic"]).replace("|", "\\|")
+            + " | "
+            + str(item["usage_hint"]).replace("|", "\\|")
+            + " | "
+            + str(item["count"])
+            + " | "
+            + str(item.get("representative_name") or "").replace("|", "\\|")
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Файлы",
+            "",
+            "| iconId | Файл | Семантика | Когда использовать |",
+            "|---|---|---|---|",
+        ]
+    )
+    for icon in icons:
+        lines.append(
+            "| "
+            + str(icon.get("file_id") or "").replace("|", "\\|")
+            + " | "
+            + str(icon.get("name") or "").replace("|", "\\|")
+            + " | "
+            + str(icon.get("semantic_guess") or "").replace("|", "\\|")
+            + " | "
+            + str(icon.get("usage_hint") or "").replace("|", "\\|")
+            + " |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _filesystem_icon_candidates(icons: list[dict[str, Any]], *, semantic: str, google_name: str) -> list[dict[str, Any]]:
+    wanted = {semantic, google_name}
+    return [icon for icon in icons if str(icon.get("semantic_guess") or "") in wanted]
 
 
 def _resource_operation(
@@ -2457,6 +2774,306 @@ def alterios_file_metadata(
 ) -> dict[str, Any]:
     """Read Alterios file metadata for one or more file IDs."""
     return _client(profile, project_id).file_metadata(file_ids).as_dict()
+
+
+@mcp.tool()
+def alterios_list_project_icons(
+    folder_hash: str | None = None,
+    icons_folder_name: str | None = None,
+    recurse: bool = False,
+    verify_registry: bool = True,
+    save_artifact: bool = True,
+    max_files: int = 5000,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Inventory project-local MCP icon registry and optionally elFinder file-manager icons."""
+    config = AlteriosConfig.from_env(profile=profile).with_project_id(project_id)
+    missing = config.missing_for_project_call()
+    if missing:
+        raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+    target_profile = config.profile or "<default>"
+    target_project_id = config.project_id
+    registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+    registry_icons = registry.get("icons") or {}
+    client = AlteriosClient(config)
+
+    registry_rows = []
+    for semantic in sorted(registry_icons):
+        entry = registry_icons[semantic]
+        file_id = str((entry or {}).get("file_id") or "") if isinstance(entry, dict) else ""
+        registry_rows.append(
+            {
+                "semantic": semantic,
+                "google_name": entry.get("google_name") if isinstance(entry, dict) else None,
+                "file_id": file_id or None,
+                "filename": entry.get("filename") if isinstance(entry, dict) else None,
+                "source": entry.get("source") if isinstance(entry, dict) else None,
+                "exists": _project_icon_file_exists(client, file_id) if verify_registry and file_id else None,
+            }
+        )
+
+    filesystem: dict[str, Any] | None = None
+    if folder_hash or icons_folder_name:
+        resolved_hash, folder_info = _resolve_elfinder_icon_folder(
+            client,
+            folder_hash=folder_hash or PROJECT_ICON_FOLDER_HASH,
+            icons_folder_name=icons_folder_name,
+        )
+        icons, directories = _collect_elfinder_icon_items(
+            client,
+            folder_hash=resolved_hash,
+            recurse=recurse,
+            max_files=max_files,
+        )
+        catalog = _group_icon_catalog(icons)
+        filesystem = {
+            "folder": folder_info,
+            "recurse": recurse,
+            "icon_count": len(icons),
+            "directory_count": len(directories),
+            "icons": icons,
+            "catalog": catalog,
+        }
+        if save_artifact:
+            out_dir = artifact_root() / "project-icons" / _safe_artifact_component(target_profile) / _safe_artifact_component(target_project_id)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = out_dir / "filesystem-icons.json"
+            manifest_path.write_text(json.dumps(filesystem, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            filesystem["artifact"] = _relative_artifact_path(manifest_path)
+
+    coverage = []
+    filesystem_icons = (filesystem or {}).get("icons") or []
+    for semantic, google_name in sorted(PROJECT_ICON_DEFAULTS.items()):
+        registry_entry = registry_icons.get(semantic)
+        candidates = _filesystem_icon_candidates(filesystem_icons, semantic=semantic, google_name=google_name) if filesystem else []
+        coverage.append(
+            {
+                "semantic": semantic,
+                "google_name": google_name,
+                "registry_file_id": registry_entry.get("file_id") if isinstance(registry_entry, dict) else None,
+                "filesystem_candidate_count": len(candidates),
+                "filesystem_sample": candidates[:3],
+            }
+        )
+
+    return {
+        "target": {"profile": target_profile, "project_id": target_project_id},
+        "registry": {
+            "path": _relative_artifact_path(_project_icon_registry_path(profile=target_profile, project_id=target_project_id)),
+            **_icon_registry_summary(registry),
+            "icons": registry_rows,
+        },
+        "filesystem": filesystem,
+        "standard_coverage": coverage,
+    }
+
+
+@mcp.tool()
+def alterios_resolve_project_icon(
+    semantic: str,
+    google_name: str | None = None,
+    folder_hash: str | None = None,
+    icons_folder_name: str | None = None,
+    recurse: bool = False,
+    save_registry_match: bool = True,
+    allow_upload: bool = True,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Resolve one semantic icon to a project-local iconId using registry, file-manager scan, or guarded upload."""
+    spec = _normalize_project_icon_specs(
+        [{"semantic": semantic, "google_name": google_name or ""}],
+        include_defaults=False,
+    )[0]
+    semantic = spec["semantic"]
+    google_name = spec["google_name"]
+    config = AlteriosConfig.from_env(profile=profile).with_project_id(project_id)
+    missing = config.missing_for_project_call()
+    if missing:
+        raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+    target_profile = config.profile or "<default>"
+    target_project_id = config.project_id
+    client = AlteriosClient(config)
+    registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+    registry_icons = registry.setdefault("icons", {})
+    entry = registry_icons.get(semantic)
+    file_id = str((entry or {}).get("file_id") or "") if isinstance(entry, dict) else ""
+    if _registry_icon_current(entry, google_name=google_name, size=16, color="#4B77D1", style="materialsymbolsoutlined") and _project_icon_file_exists(client, file_id):
+        return {
+            "target": {"profile": target_profile, "project_id": target_project_id},
+            "semantic": semantic,
+            "google_name": google_name,
+            "resolved": True,
+            "source": "registry",
+            "icon_id": file_id,
+            "registry": {"path": _relative_artifact_path(_project_icon_registry_path(profile=target_profile, project_id=target_project_id))},
+        }
+
+    filesystem_candidates: list[dict[str, Any]] = []
+    folder_info = None
+    if folder_hash or icons_folder_name:
+        resolved_hash, folder_info = _resolve_elfinder_icon_folder(
+            client,
+            folder_hash=folder_hash or PROJECT_ICON_FOLDER_HASH,
+            icons_folder_name=icons_folder_name,
+        )
+        filesystem_icons, _directories = _collect_elfinder_icon_items(
+            client,
+            folder_hash=resolved_hash,
+            recurse=recurse,
+            max_files=5000,
+        )
+        filesystem_candidates = _filesystem_icon_candidates(filesystem_icons, semantic=semantic, google_name=google_name)
+        if filesystem_candidates:
+            selected = filesystem_candidates[0]
+            if save_registry_match:
+                registry_icons[semantic] = {
+                    "semantic": semantic,
+                    "google_name": google_name,
+                    "file_id": selected["file_id"],
+                    "filename": selected["name"],
+                    "size": 16,
+                    "color": "#4B77D1",
+                    "style": "materialsymbolsoutlined",
+                    "source": "project_file_manager",
+                    "matched_by": "semantic_guess",
+                    "hash": selected.get("hash"),
+                    "url": selected.get("url"),
+                }
+                _write_project_icon_registry(profile=target_profile, project_id=target_project_id, registry=registry)
+            return {
+                "target": {"profile": target_profile, "project_id": target_project_id},
+                "semantic": semantic,
+                "google_name": google_name,
+                "resolved": True,
+                "source": "filesystem",
+                "icon_id": selected["file_id"],
+                "selected": selected,
+                "candidate_count": len(filesystem_candidates),
+                "folder": folder_info,
+                "registry_updated": save_registry_match,
+            }
+
+    if not allow_upload:
+        return {
+            "target": {"profile": target_profile, "project_id": target_project_id},
+            "semantic": semantic,
+            "google_name": google_name,
+            "resolved": False,
+            "source": "not_found",
+            "filesystem_candidates": filesystem_candidates,
+            "folder": folder_info,
+        }
+
+    upload_plan = alterios_ensure_project_icons(
+        icon_specs=[{"semantic": semantic, "google_name": google_name}],
+        include_defaults=False,
+        dry_run=dry_run,
+        plan_id=plan_id,
+        profile=profile,
+        project_id=project_id,
+    )
+    return {
+        "target": {"profile": target_profile, "project_id": target_project_id},
+        "semantic": semantic,
+        "google_name": google_name,
+        "resolved": not dry_run,
+        "source": "upload_plan" if dry_run else "uploaded",
+        "upload": upload_plan,
+        "filesystem_candidates": filesystem_candidates,
+        "folder": folder_info,
+    }
+
+
+@mcp.tool()
+def alterios_export_project_icons(
+    folder_hash: str | None = None,
+    icons_folder_name: str | None = None,
+    recurse: bool = False,
+    download_files: bool = True,
+    max_files: int = 5000,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Export icons from an Alterios elFinder folder to local artifacts with a generated usage guide."""
+    config = AlteriosConfig.from_env(profile=profile).with_project_id(project_id)
+    missing = config.missing_for_project_call()
+    if missing:
+        raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+    target_profile = config.profile or "<default>"
+    target_project_id = config.project_id
+    client = AlteriosClient(config)
+    resolved_hash, folder_info = _resolve_elfinder_icon_folder(
+        client,
+        folder_hash=folder_hash or PROJECT_ICON_FOLDER_HASH,
+        icons_folder_name=icons_folder_name,
+    )
+    icons, directories = _collect_elfinder_icon_items(
+        client,
+        folder_hash=resolved_hash,
+        recurse=recurse,
+        max_files=max_files,
+    )
+    catalog = _group_icon_catalog(icons)
+    out_dir = _icon_export_directory(profile=target_profile, project_id=target_project_id, folder_info=folder_info)
+    files_dir = out_dir / "files"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if download_files:
+        files_dir.mkdir(parents=True, exist_ok=True)
+        for icon in icons:
+            file_id = str(icon["file_id"])
+            filename = _safe_download_filename(file_id, str(icon.get("name") or "icon"))
+            data, content_type = client.download_file(file_id)
+            file_path = files_dir / filename
+            file_path.write_bytes(data)
+            icon["download"] = {
+                "path": _relative_artifact_path(file_path),
+                "content_type": content_type,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "bytes": len(data),
+            }
+    manifest = {
+        "target": {"profile": target_profile, "project_id": target_project_id},
+        "folder": folder_info,
+        "recurse": recurse,
+        "download_files": download_files,
+        "icon_count": len(icons),
+        "directory_count": len(directories),
+        "icons": icons,
+        "catalog": catalog,
+    }
+    manifest_path = out_dir / "exported-icons.json"
+    guide_path = out_dir / "icon-usage-guide.md"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_icon_usage_guide(guide_path, profile=target_profile, project_id=target_project_id, catalog=catalog, icons=icons)
+    return {
+        "target": {"profile": target_profile, "project_id": target_project_id},
+        "folder": folder_info,
+        "icon_count": len(icons),
+        "unique_semantics": len(catalog),
+        "downloaded": download_files,
+        "artifacts": {
+            "manifest": _relative_artifact_path(manifest_path),
+            "usage_guide": _relative_artifact_path(guide_path),
+            "files_dir": _relative_artifact_path(files_dir) if download_files else None,
+        },
+        "catalog_sample": catalog[:20],
+    }
+
+
+def _icon_export_directory(*, profile: str, project_id: str, folder_info: dict[str, Any]) -> Path:
+    folder_slug = _safe_artifact_component(str(folder_info.get("folder_name") or folder_info.get("folder_hash") or "folder"))
+    return (
+        artifact_root()
+        / "project-icons"
+        / _safe_artifact_component(profile)
+        / _safe_artifact_component(project_id)
+        / "exports"
+        / folder_slug
+    )
 
 
 @mcp.tool()

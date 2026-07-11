@@ -42,7 +42,7 @@ def test_encode_filter_is_stable_url_encoded_json() -> None:
 def test_discovery_cli_lists_profiles_without_network(monkeypatch, capsys) -> None:
     monkeypatch.setenv("ALTERIOS_PROFILE", "vniimt")
     monkeypatch.setenv("ALTERIOS_PROFILES", "vniimt, artx")
-    monkeypatch.setenv("ALTERIOS_VNIIMT_BASE_URL", "http://lims.vniimt.local")
+    monkeypatch.setenv("ALTERIOS_VNIIMT_BASE_URL", "https://vniimt.example")
     monkeypatch.setenv("ALTERIOS_VNIIMT_API_TOKEN", "vniimt-token")
     monkeypatch.setenv("ALTERIOS_ARTX_BASE_URL", "http://artx.local")
     monkeypatch.setenv("ALTERIOS_ARTX_API_TOKEN", "artx-token")
