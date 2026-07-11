@@ -706,6 +706,65 @@ def test_upsert_view_dry_run_returns_diff_without_real_network() -> None:
     assert {"field": "strict", "before": True, "after": True, "changed": False} in result["response"]["diff"]
 
 
+def test_upsert_view_defaults_to_experimental_mode_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse(
+                [
+                    [
+                        {
+                            "_id": "view-1",
+                            "name": "View",
+                            "description": "Codex-managed: existing",
+                            "format": "table",
+                            "settings": {},
+                            "strict": False,
+                        }
+                    ],
+                    1,
+                ]
+            )
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        result = server.alterios_upsert_view(
+            "View",
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert {"field": "settings", "before": {}, "after": {"engineVersion": "v2"}, "changed": True} in result["response"]["diff"]
+    assert result["response"]["planned_payload"]["settings"] == {"engineVersion": "v2"}
+
+
+def test_upsert_view_rejects_non_experimental_mode_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_views(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+        pytest.raises(ValueError, match="experimental mode"),
+    ):
+        server.alterios_upsert_view(
+            "View",
+            settings={"engineVersion": "legacy"},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+
 def test_upsert_view_rejects_unmanaged_existing_object_without_flag() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:

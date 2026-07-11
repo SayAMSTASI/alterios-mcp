@@ -4831,12 +4831,18 @@ def alterios_upsert_view(
     existing = _find_view(client, view_id=view_id, name=name)
     if existing:
         _assert_managed_or_allowed(existing, kind="View", allow_unmanaged_update=allow_unmanaged_update)
+    merged_settings = dict((existing or {}).get("settings") or {})
+    if settings is not None:
+        merged_settings.update(settings)
+    if merged_settings.get("engineVersion") not in (None, "v2"):
+        raise ValueError("Alterios views must use experimental mode: settings.engineVersion must be 'v2'.")
+    merged_settings["engineVersion"] = "v2"
     payload = {
         **(existing or {}),
         "name": name,
         "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp view.",
         "format": format if format is not None else (existing or {}).get("format") or "table",
-        "settings": settings if settings is not None else (existing or {}).get("settings") or {},
+        "settings": merged_settings,
         "strict": strict if strict is not None else (existing or {}).get("strict") or False,
     }
     operation = _resource_operation(
