@@ -23,6 +23,15 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Treat a UUID-like `iconId` as a stored reference, not proof that the icon matches the action standard.
 - When inventorying file-manager icons from an elFinder URL, respect the selected folder exactly: `icons_folder_name=null` and `recurse=false` means current folder only. Do not descend into `public/icons` unless the user explicitly asks for that subfolder.
 - When choosing among project icons or action types, read `docs/alterios-icons-and-actions-catalog.md` and match the user action to the documented semantic before assigning `iconId`.
+- The reusable git icon library must use Google Fonts Icons downloaded with UI Size `16` and fill color `#4B77D1`; preserve the SVG `width`/`height` exactly as downloaded.
+- For add/edit page actions, place `Закрыть` first with `keyboard_return`, then `Сохранить` with `save`.
+- For view/detail page actions, include only `Закрыть` with `keyboard_return` unless the form has a separate business action.
+- On a view/detail form, use an icon-only `edit_document` action with tooltip `Редактировать` to open the edit form for the current record. Do not add this action to the edit form itself.
+- For script or processing actions, use `forms_apps_script`.
+- If an element has more than three actions, group them behind `menu`.
+- In list value actions, use a `menu` action and include `Редактировать`, `Просмотр`, and `Удалить` with icons.
+- For dictionary/reference lists, add a bulk edit action only after confirming that the fields offered for bulk output are not relation fields.
+- If a surface is intentionally custom or unusual, confirm with the user before replacing its action model.
 
 ## Review Steps
 
@@ -33,7 +42,8 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 5. If a needed icon is missing from the project registry, call `alterios_ensure_project_icon_library` in dry-run first for project-standard icons, or `alterios_ensure_project_icons` for pure Google Fonts icons; apply only with the saved `plan_id` and write gate.
 6. If `iconId` is UUID-like, resolve it through the icon usage matrix or verified registry/readback before claiming it matches the semantic icon; otherwise mark it unresolved.
 7. For project file-manager catalogs, use `alterios_list_project_icons` or `alterios_export_project_icons` before guessing from raw filenames; record whether the source was current folder, named subfolder, or recursive tree.
-8. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
+8. Validate local library SVG size/color before adding or replacing icons in a project.
+9. Return a correction list with target object id, current icon, proposed icon, reason, and verification method.
 
 ## References
 

@@ -6,7 +6,7 @@
       "filename": "add_2_16dp_0277BD_FILL0_wght400_GRAD0_opsz20_1__0.svg",
       "mime": "image/svg+xml",
       "semantic": "add_2",
-      "sha256": "559e83870606b730bbaef12df48fb7caf019dcf7346c6b259fe4bf8ac028f0a4",
+      "sha256": "ba9c5ef7ad33b0f9f6faf6179b225e3b8abf634f76036d91cdb05afcec6ce6a0",
       "source_name": "add_2_16dp_0277BD_FILL0_wght400_GRAD0_opsz20 (1)_0.svg",
       "usage_hint": "Добавить запись, строку, значение справочника или связанный элемент."
     },
@@ -42,7 +42,7 @@
       "filename": "attach_file_add_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "attach_file_add",
-      "sha256": "ef3d8953deae31c5139b266466161aed6eb6dbb89b9149a5d442fcac7db6424d",
+      "sha256": "a0c9844d90fb861fc0b6b41005770ecd09645b6196c079f083168e89fdb68b31",
       "source_name": "attach_file_add_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Загрузить файл, добавить вложение, открыть file-field."
     },
@@ -69,7 +69,7 @@
       "filename": "calendar_check_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "calendar_check",
-      "sha256": "1fc66acbd68d21945489c135f55eac293e95f5bf0a9b132b176f1c717d0afa9b",
+      "sha256": "39de3f27674e7a1fb4b54a0540ec6fec6a7ddcf4114a9cd92b0b2b2254b0d346",
       "source_name": "calendar_check_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Проверить дату, срок, календарное событие, дедлайн."
     },
@@ -123,7 +123,7 @@
       "filename": "delete_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "delete",
-      "sha256": "d360844e9c9d45c9dffb2bf0bcbc9eee6926065e4dd77c35ca5c3b6186fe4042",
+      "sha256": "dfae2aeb76859490ba18fc347204a900d39c92da6ec3357a33978a115c01232e",
       "source_name": "delete_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Удалить запись, связь, строку, объект."
     },
@@ -141,7 +141,7 @@
       "filename": "directory_sync_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "directory_sync",
-      "sha256": "85022179c2b6bc3306a35e209a3ca7e617b2c8cf8341819121d3fdfb21944a16",
+      "sha256": "7b10cad737ad06151022481ca47df65fa332eca10cf18f8aae984cd85ddcf444",
       "source_name": "directory_sync_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Синхронизация справочника, каталога, файлов, связанных данных."
     },
@@ -177,7 +177,7 @@
       "filename": "edit_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "edit",
-      "sha256": "7567a6664acd440d928a09cca4988a154439f99cc02c2adf9fcb62fa5d6e7aa2",
+      "sha256": "460f634b02ccc13b396e60f518f3efce1c53e49357938faa530e2f7fcfd9485f",
       "source_name": "edit_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Редактировать существующую запись."
     },
@@ -249,7 +249,7 @@
       "filename": "history.svg",
       "mime": "image/svg+xml",
       "semantic": "history",
-      "sha256": "8d155743b313b64e8c8c25ad12e58230e1852e3263c000b59975d1e50a18ce2c",
+      "sha256": "3f193c8eb7dcfbf973811eec60ac67c24ae82f328bba9a63fa7aba113b0f31a8",
       "source_name": "history.svg",
       "usage_hint": "История изменений, журнал действий, аудит, предыдущие версии."
     },
@@ -258,7 +258,7 @@
       "filename": "info_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "info",
-      "sha256": "08a9de33f949b2d19d7b49e80c6fe2f7d44bfae73d25fb6be92274e487df552e",
+      "sha256": "5c8a8b2e95c08052d19bfd54a24030c400a9dec0f7b267946e55c3ef8d13ef95",
       "source_name": "info_16dp_5084C1_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Информационная подсказка, help/dialog без изменения данных."
     },
@@ -267,7 +267,7 @@
       "filename": "keyboard_return.svg",
       "mime": "image/svg+xml",
       "semantic": "keyboard_return",
-      "sha256": "1295a0f434be7d87c3c7d01be249223e0cef8937df1dfd45b20146d6a094c9ac",
+      "sha256": "f8a6ee6ea5333307c419f3b3c6cff6f51cd0127251d3f89c9215e6bb82818c08",
       "source_name": "keyboard_return.svg",
       "usage_hint": "Назад, закрыть, вернуться к предыдущей форме."
     },
@@ -276,7 +276,7 @@
       "filename": "list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "list_alt_add",
-      "sha256": "0cf07e2f6725b7019eb97f135e866a55eb0fc93604e087fc1e0b6b2f7767a732",
+      "sha256": "95f5d082343523655067781b289fe7d92133cb8be0cca073d8da493ca68cd14b",
       "source_name": "list_alt_add_16dp_2854C5_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Добавить строку из списка, создать связанный элемент из related list."
     },
@@ -285,7 +285,7 @@
       "filename": "menu.svg",
       "mime": "image/svg+xml",
       "semantic": "menu",
-      "sha256": "7f81762992554738eaca08f97c9aac410f6f2194aa56cd58d8ea32d1c6e53163",
+      "sha256": "a04f336faf49c9d8e52f0600953727b374bcfb9e79ed4064a02d6182e0848249",
       "source_name": "menu.svg",
       "usage_hint": "Меню действий строки или компактное меню дополнительных операций."
     },
@@ -312,7 +312,7 @@
       "filename": "preview_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
       "mime": "image/svg+xml",
       "semantic": "preview",
-      "sha256": "416a2240c61176be3cba9cd2c707f04eceb5725a1c9c6efa134d72cf07386a59",
+      "sha256": "304be871af91eefc187f8848526fd8c0302b02b8a484b8f8b15a5f6dcafb1411",
       "source_name": "preview_16dp_0277BD_FILL0_wght400_GRAD0_opsz20.svg",
       "usage_hint": "Просмотр записи, предпросмотр формы, просмотр результата без изменения."
     },
@@ -348,7 +348,7 @@
       "filename": "save_16dp.svg",
       "mime": "image/svg+xml",
       "semantic": "save",
-      "sha256": "607db7bc43a34cc31d154638dc6295ffc7efad847720d61aa5d3ab1b3f2b120b",
+      "sha256": "53ff0e3a8ac7690a724fe95216632b26d1c4641cb0225d254c1f324ecc1b9f0f",
       "source_name": "save_16dp.svg",
       "usage_hint": "Сохранить форму, запись, настройки."
     }
@@ -356,7 +356,9 @@
   "rules": {
     "before_write": "Inventory target project icons first, then upload only missing library icons.",
     "catalog": "docs/alterios-icons-and-actions-catalog.md",
-    "iconId": "Target project local file UUID only; never reuse source project file IDs."
+    "iconId": "Target project local file UUID only; never reuse source project file IDs.",
+    "svg_color": "All library SVG files must use fill color #4B77D1.",
+    "svg_size": "Use SVG width/height exactly as downloaded from Google Fonts Icons with UI Size=16; do not rewrite dimensions manually."
   },
   "schema_version": 1,
   "source": "sanitized Alterios project public-folder icon export"
