@@ -34,6 +34,14 @@ For view write scenarios:
 - For user-facing experimental `table`, `reference`, and `list` previews, write
   `settings.title` as one populated view-field mname. Do not write a Mustache
   template there.
+- For user-facing table/list/joined form surfaces, write human-readable
+  `viewField.alias` values and verify form-viewer headers. Do not rely only on
+  `displaying.fields.title`.
+- Do not use `reference` as a standalone embedded list in a generated user
+  form; it is a `ref source=view` selector source. A technical sample may use a
+  help cell to explain this limitation.
+- For `grid`, keep `desc` only after form-viewer UI evidence proves it renders
+  field values, not raw mnames.
 - Legacy/classic views require an explicit `allow_legacy_mode=true` argument and documented evidence that the target scenario needs that mode.
 - Known frontend formats are `table`, `grid`, `list`, `leaflet`, `gantt`, `reference`, and `calendar`; do not invent other formats without UI/API evidence.
 - `gantt` write scenarios must validate `defaultView` (`day`, `week`, `month`, `quarter`, `year`) and `date1.field`/`date2.field` before live write.
@@ -45,6 +53,9 @@ For view write scenarios:
   add/save step, rely on populated readback for the real mname.
 - For relation joins, do not declare success until populated fields and
   `get-data`/`get-data-simplified` prove the joined readable value is present.
+- For relation joins embedded into forms, explicitly hide `_id`, helper ref
+  fields, and generated related id fields such as `_id0`; include UI smoke for
+  UUID leakage before accepting the write.
 - After code or schema changes to MCP tools, restart the running MCP process before relying on live tool output or available arguments.
 - Redaction must cover nested author/user/project metadata, emails, verification codes, tokens, passwords, cookies, api keys, participant ids, and support chat ids in audit/readback data.
 

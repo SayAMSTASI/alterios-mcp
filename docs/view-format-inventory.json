@@ -58,7 +58,7 @@
         "iconWidth",
         "iconHeight"
       ],
-      "validation": "get-data returns rows, headers, and settings"
+      "validation": "get-data returns rows, headers, and settings; form-surface UI must confirm desc syntax because a raw mname can render as literal text"
     },
     "list": {
       "mode": "experimental/v2",
@@ -152,6 +152,10 @@
     "person fields store structured objects, but table populatedValue can be null; verify person display in UI/form before using it as list/report text",
     "leaflet final geoFields should be saved after view fields are attached and read back",
     "leaflet marker rendering needs GeoJSON Feature values, not bare Point geometry",
-    "calendar UI preview requires settings.title in addition to startDate"
+    "calendar UI preview requires settings.title in addition to startDate",
+    "user-facing v2 table/list/joined form headers come from viewField.alias; displaying.fields.title alone is not enough",
+    "reference view is a selector/ref source and should not be embedded as a standalone user list; use a help note or a ref field scenario instead",
+    "when embedding a relation join in a form, hide both _id and generated related id aliases such as _id0",
+    "grid desc must be UI-verified in form-viewer because an unconfirmed mname value can be displayed literally"
   ]
 }

@@ -20,6 +20,9 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 9. For views, distinguish source content fields from view fields: adding a content field is not enough until the view field, alias, order, filters, sorts, joins, and current-record behavior are verified.
 10. For views, use the Alterios experimental mode as the default required mode. Treat a non-experimental view configuration as a blocker unless the user explicitly asks for legacy behavior.
 11. After writes, verify API readback and UI-visible behavior when the result is user-facing.
+12. When the user asks for a sample form or a user-facing view format, open the
+    form-viewer UI and click every tab; `get-data` and standalone view preview
+    are not enough.
 
 ## View Types And Modes
 
@@ -36,6 +39,14 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - `gantt` requires `defaultView` (`day`, `week`, `month`, `quarter`, or `year`) plus `date1.field` and `date2.field`; optional settings include `plannedDate1`, `plannedDate2`, `title`, `resource`, `completion`, and show flags.
 - `leaflet` requires a `geo` content field attached to the view, then `settings.geoFields[]` saved by populated view-field `mname`; `markerIcons` is required and must be `default`, `img`, or `field`. For visible markers, persisted `geo` values must be GeoJSON `Feature` objects, not bare `Point` geometry.
 - `reference` is verified as a selector/ref source. Its standalone preview can save without error but does not render rows like a table/list.
+- Do not embed `reference` as a standalone user list. Demonstrate it through a
+  `ref source=view` field scenario or add a help note in a technical sample.
+- For user-facing v2 table/list/joined views, set human-readable
+  `viewField.alias` values. Form display titles alone do not reliably replace
+  the table headers.
+- For `grid`, treat `desc` as UI-sensitive: verify form-viewer output before
+  keeping it. If the UI prints the mname literally, remove `desc` or use a
+  proven syntax.
 - `get-data-simplified` returns rows only for these formats; use full `get-data` when headers/settings evidence matters.
 - For relation views, use short content field suffixes and `fieldNamePrefix` before fields are created. Long generated mnames can break joins through backend SQL alias truncation.
 - Attach source fields to the view explicitly before using them in display,
@@ -63,6 +74,9 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - Validate view filters explicitly: static filters, user filters, role-dependent filters, and `openId`/`dataId` current-record filters have different acceptance checks.
 - Always add a field-based filter for form-embedded views/lists. A `view_data` or `view_data_list` cell must be constrained by the relevant source field, relation field, or `dataId: [openId]`; unfiltered embedded lists are allowed only when the user explicitly needs a global list.
 - Hide non-informative list columns by default: technical IDs, helper relation fields, system metadata, empty service fields, and columns that do not help the user's decision.
+- In joined views embedded in forms, hide generated related-id columns such as
+  `_id0` in addition to the main `_id`; the join may need them internally but
+  users must not see UUID values.
 - For save plus script flows, preserve `submit_all -> manual_script -> routing/redirect` when the script needs fresh saved data.
 - For add/edit page actions, place `Закрыть` first and `Сохранить` second, both with project-local icons.
 - For view/detail page actions, include `Закрыть` with an icon and do not add save unless there is a real write scenario.

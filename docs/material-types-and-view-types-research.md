@@ -45,13 +45,13 @@
 | Тип материала для проверки view formats | Поля title, description, start date, end date, resource, color, geo point, две строки данных. |
 | `table` experimental/v2 | View saved, `get-data` и `get-data-simplified` вернули строки. |
 | `reference` experimental/v2 | View saved, пригоден как источник для `ref source=view`. |
-| `grid` experimental/v2 | View saved, `desc`, `iconWidth`, `iconHeight` сохранены, данные читаются. |
+| `grid` experimental/v2 | View saved, `iconWidth`, `iconHeight` сохранены, данные читаются; `desc` в пользовательской форме требует отдельной UI-проверки синтаксиса, иначе может вывести mname как текст. |
 | `list` experimental/v2 | View saved без дополнительных настроек, данные читаются. |
 | `gantt` experimental/v2 | View saved, настройки дат/ресурса/readback сохранены, данные читаются. |
 | `leaflet` experimental/v2 | View saved, `geoFields` с `markerIcons=default` сохранены, данные читаются; UI-preview показывает карту и маркеры при GeoJSON `Feature` значениях. |
 | `calendar` experimental/v2 | UI-настройка и preview подтверждены: сохраняются `title`, `startDate`, `endDate`, `bgColor`; preview показывает месячную сетку и события. |
 | Классическое `table` без `engineVersion` | Данные читаются, но режим считается исключением и требует явного `allow_legacy_mode`. |
-| UI-форма с вкладками проверки | Форма содержит вкладки v2 table, reference, relation join и classic table; analyzer вернул 0 issues. |
+| UI-форма с вкладками проверки | Эталонная пользовательская форма содержит вкладки table, grid, list, gantt, calendar, leaflet, relation join и help-вкладку по reference; analyzer вернул 0 issues, UI-smoke показал строки/виджеты без ошибок. |
 
 ## Матрица форматов представлений
 
@@ -59,7 +59,7 @@
 |---|---|---|---|---|
 | `table` | experimental/v2 | live-проверен | `engineVersion` | Использовать по умолчанию для списков, таблиц, joined views и встроенных списков. |
 | `reference` | experimental/v2 | live-проверен | `engineVersion` | Использовать как источник выбора для `ref`-полей и справочников. |
-| `grid` | experimental/v2 | live-проверен | `desc`, `iconField`, `iconWidth`, `iconHeight`, `engineVersion` | Использовать для плиточного каталога, когда нужен короткий визуальный обзор записей. |
+| `grid` | experimental/v2 | live-проверен | `iconField`, `iconWidth`, `iconHeight`, `engineVersion`; `desc` только после UI-подтверждения | Использовать для плиточного каталога, когда нужен короткий визуальный обзор записей. Не объявлять `desc` рабочим, если форма показывает mname вместо значения. |
 | `list` | experimental/v2 | live-проверен | `engineVersion` | Использовать для компактного списка с раскрытием строки; отдельной формы настроек во frontend не найдено. |
 | `gantt` | experimental/v2 | live-проверен | `defaultView`, `date1`, `date2`, `plannedDate1`, `plannedDate2`, `title`, `resource`, `completion`, `showDate`, `showDuration`, `showPlannedDate`, `showResource`, `showCompletion`, `engineVersion` | Перед сохранением требовать `defaultView`, `date1.field`, `date2.field`; после сохранения проверять `get-data`. |
 | `leaflet` | experimental/v2 | UI/live-проверен | `geoFields`, `markerIcons`, `tileLayers`, `featureLayers`, `defaultMarkerSource`, `minZoom`, `maxZoom`, `engineVersion` | Сначала создать view и поля, затем сохранить `geoFields` по view-field `mname` без `field_`; `markerIcons` обязателен; для маркеров нужны GeoJSON `Feature` значения. |
@@ -95,6 +95,9 @@
   фактический `viewField.mname`, например `title_field_mname`. Mustache-шаблон
   вида `{{field}} - {{field2}}` в этом поле дает ошибку шаблона заголовка.
 - Для joined views сначала читать реальные `viewField.mname`.
+- Для пользовательских заголовков v2 table/list/joined views задавать
+  человекочитаемый `viewField.alias`: форма берет заголовки из view field
+  alias, а не только из `displaying.fields.title`.
 - Технические `_id`, helper relation fields и пустые сервисные поля скрывать в
   пользовательском списке.
 
@@ -106,7 +109,10 @@
 
 ### Grid
 
-- `desc` указывает view-field mname для описания карточки.
+- `desc` может использоваться для описания карточки, но в form surface его
+  нужно проверять через UI: в подтвержденном проходе mname в `desc` выводился
+  как буквальный текст. Если синтаксис не подтвержден, лучше убрать `desc`,
+  чем показывать техническое имя поля пользователю.
 - `iconField` можно использовать, если иконка хранится в поле.
 - `iconWidth` и `iconHeight` задают размер иконки.
 - Данные проверяются через `get-data`; `get-data-simplified` возвращает строки без
@@ -221,6 +227,23 @@ UI-проход показал, что при заполненном `settings.t
 | `gantt` | Формат "Диаграмма Гантта", date1/date2, planned dates, title, resource, defaultView | Таблица задач и временная шкала с `Format probe 1/2`. |
 | `leaflet` | Формат "Карта", min/max zoom, layers, default marker source, geo fields | Карта отображается; при GeoJSON Feature значениях видны 2 маркера и 2 interactive layers. |
 | `calendar` | Формат "Календарь", title, start/end date, background color | Месячная сетка с событиями `Format probe 1/2`. |
+
+Дополнительно подготовлена эталонная пользовательская форма со вкладками:
+
+- `table`: таблица с русскими alias заголовков и скрытыми техническими полями;
+- `grid`: плитки без утечки mname из `desc`;
+- `list`: раскрываемый список со строками;
+- `gantt`: таблица/шкала Ганта;
+- `calendar`: месячная сетка с событиями;
+- `leaflet`: карта с контролами и маркерами;
+- `relation join`: joined table с читаемым статусом и скрытыми `_id`/`_id0`;
+- `reference`: help-вкладка, потому что `reference` подтвержден как
+  `ref source=view`, а не как самостоятельный пользовательский список.
+
+Правило для MCP: если цель - пользовательская форма, проверять именно
+form-viewer UI по каждой вкладке. Успешные `get-data`, preview или save view
+недостаточны, потому что form surface может иначе трактовать alias, `desc`,
+technical columns и reference-format.
 
 Локальные screenshots сохранены в `artifacts/ui-evidence/view-formats-2026-07-11/`
 и не коммитятся, потому что каталог `artifacts/` игнорируется.
