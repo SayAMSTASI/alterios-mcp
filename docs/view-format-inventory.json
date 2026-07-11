@@ -26,14 +26,22 @@
       "required_settings": [
         "engineVersion"
       ],
-      "optional_settings": [],
-      "validation": "read populated view fields and get-data or get-data-simplified"
+      "ui_required_settings": [
+        "title"
+      ],
+      "optional_settings": [
+        "mergeRows"
+      ],
+      "validation": "read populated view fields and get-data or get-data-simplified; UI preview requires title as one view-field mname"
     },
     "reference": {
       "mode": "experimental/v2",
       "status": "live_verified",
       "required_settings": [
         "engineVersion"
+      ],
+      "ui_required_settings": [
+        "title"
       ],
       "optional_settings": [],
       "validation": "use as ref source=view and verify selector source data"
@@ -138,6 +146,10 @@
     "cards is not present in the confirmed frontend view.format enum",
     "get-data-simplified returns rows only; full get-data returns headers and settings",
     "when fieldNamePrefix is set, pass short field suffixes to create-field to avoid double prefixing",
+    "experimental table/reference/list UI preview can require settings.title; use a single populated view-field mname, not a Mustache template",
+    "content type fields do not appear in a view until added as view fields; ordinary fields use contentTypeFieldId, system _id uses attribute",
+    "ref source=view stores the related row id; create a joined table view to show readable related attributes such as employee FIO",
+    "person fields store structured objects, but table populatedValue can be null; verify person display in UI/form before using it as list/report text",
     "leaflet final geoFields should be saved after view fields are attached and read back",
     "leaflet marker rendering needs GeoJSON Feature values, not bare Point geometry",
     "calendar UI preview requires settings.title in addition to startDate"

@@ -31,12 +31,20 @@ Existing report write coverage includes `alterios_upsert_report`, `alterios_patc
 For view write scenarios:
 
 - `alterios_upsert_view` must default to experimental/v2 by writing `settings.engineVersion = "v2"`.
+- For user-facing experimental `table`, `reference`, and `list` previews, write
+  `settings.title` as one populated view-field mname. Do not write a Mustache
+  template there.
 - Legacy/classic views require an explicit `allow_legacy_mode=true` argument and documented evidence that the target scenario needs that mode.
 - Known frontend formats are `table`, `grid`, `list`, `leaflet`, `gantt`, `reference`, and `calendar`; do not invent other formats without UI/API evidence.
 - `gantt` write scenarios must validate `defaultView` (`day`, `week`, `month`, `quarter`, `year`) and `date1.field`/`date2.field` before live write.
 - `leaflet` write scenarios must validate `geoFields` after populated view fields are available; each geo field needs `name` and `markerIcons` (`default`, `img`, or `field`). Content values must be GeoJSON `Feature` objects for marker rendering.
 - `calendar` write scenarios must set `title` and `startDate` before declaring the view complete; `endDate` and `bgColor` are optional but UI-verified.
 - For system attributes such as `_id`, add the view field with the legacy add payload but save it with normalized `contentTypeId` and `contentAttribute`; remove null selector keys before save.
+- For ordinary content source fields, call `alterios_upsert_view_field` with
+  `content_type_field_id`; for `_id`, call it with `attribute="_id"`. After the
+  add/save step, rely on populated readback for the real mname.
+- For relation joins, do not declare success until populated fields and
+  `get-data`/`get-data-simplified` prove the joined readable value is present.
 - After code or schema changes to MCP tools, restart the running MCP process before relying on live tool output or available arguments.
 - Redaction must cover nested author/user/project metadata, emails, verification codes, tokens, passwords, cookies, api keys, participant ids, and support chat ids in audit/readback data.
 

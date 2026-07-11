@@ -35,6 +35,9 @@ display cells.
   For other fields use label, tooltip, placeholder, help block, or description.
 - Use `person` when FIO needs structured surname/name/patronymic; use `text` for
   a simple free-form string.
+- Do not use `person` as a replacement for a relation to a real employee/user
+  record. If the value must point to a source record, use `ref` and show readable
+  attributes through a reference/source view or joined view.
 - Use `ref` when the record stores a link to another content row.
 - Use `comb` when the field displays a compact block of attributes from a
   selected source content type; avoid self-recursive combined fields without UI
@@ -57,7 +60,9 @@ For `ref source=view`:
 
 - create or select a `reference` view for the lookup source;
 - point settings to that view and source content type;
-- verify the selector and direct view data readback.
+- verify the selector and direct view data readback;
+- expect base table data to store and return related row ids unless readable
+  attributes are added through source fields or a joined view.
 
 For `ref source=basic`:
 
@@ -71,6 +76,8 @@ For readable relation lists and reports:
 - create a joined `table` view in experimental/v2;
 - read real view-field mnames before writing join conditions;
 - join the local ref field to the related entity `_id` view-field alias;
+- add the related readable field, for example employee FIO, as a separate view
+  field and hide technical ids/helper ref columns in user-facing forms;
 - verify both `get-data` and `get-data-simplified`.
 
 ## References
