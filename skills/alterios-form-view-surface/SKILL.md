@@ -33,6 +33,7 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - For view/detail and edit forms, set `pageTitle` to `{наименование сущности в единственном роде}`.
 - Check field order, labels, `displaying`, required status, and source field meaning before treating a field cell as finished.
 - Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip/help, placeholder, or separate help block instead of always-visible bottom text.
+- For table display cells, keep the visible cell header centered and bold. For non-table display cells, do not add a visible cell header; use `pageTitle`, tab titles, field labels, or tooltips instead.
 - Use `view_data_list` for related rows and validate the real relation field.
 - Validate view filters explicitly: static filters, user filters, role-dependent filters, and `openId`/`dataId` current-record filters have different acceptance checks.
 - Always add a field-based filter for form-embedded views/lists. A `view_data` or `view_data_list` cell must be constrained by the relevant source field, relation field, or `dataId: [openId]`; unfiltered embedded lists are allowed only when the user explicitly needs a global list.
@@ -43,6 +44,8 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - Make save behavior context-aware: terminal hierarchy forms use save-and-back; non-terminal forms save in place.
 - On view/detail forms, add an icon-only `Редактировать` action using the edit-document semantic when editing the current record is allowed. Do not add that self-edit action to edit forms.
 - Keep element actions on view/detail and edit forms semantically consistent; the edit form only omits the transition to edit itself.
+- Element actions must be icon-only: in `cellActionContainers`, set `title` to an empty string, put the visible meaning in `tooltip`, and use a project-local `iconId`. Text is allowed inside nested menu items, not on the outer element action.
+- For menus with multiple print variants, use `arrow_drop_down` on the outer menu and `print` on each nested print item.
 - For list value actions, the default row action is `Просмотр`. Use an outer `type: "menu"` value action container with nested `containers[]`, and set `default: true` on the nested `Просмотр` action container.
 - If an existing interface is intentionally unusual, ask before changing its interaction model.
 

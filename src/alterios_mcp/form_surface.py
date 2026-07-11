@@ -8,6 +8,7 @@ from typing import Any
 VIEW_CELL_TYPES = {"view_data", "view_data_list"}
 DATA_CELL_TYPES = VIEW_CELL_TYPES | {"content", "report", "comments_list", "edit_task"}
 EXPECTED_ROW_ACTION_ORDER = {"edit": 0, "view": 1, "delete": 2}
+TABLE_CELL_TYPES = {"view_data_list"}
 
 
 def analyze_form_surface(form: dict[str, Any]) -> dict[str, Any]:
@@ -195,6 +196,7 @@ def _analyze_cell(cell: dict[str, Any], path: str, issues: list[dict[str, Any]])
     if not cell_type:
         _add_issue(issues, "warning", "missing_cell_type", "Cell has no type.", path)
         return
+    _analyze_cell_header(cell, cell_type, path, issues)
     if cell_type in DATA_CELL_TYPES and not _has_flexible_width(cell):
         _add_issue(
             issues,
@@ -245,6 +247,41 @@ def _analyze_cell(cell: dict[str, Any], path: str, issues: list[dict[str, Any]])
             )
         if not params.get("entity"):
             _add_issue(issues, "info", "comments_without_entity_scope", "Comments cell has no params.entity scope.", path)
+
+
+def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues: list[dict[str, Any]]) -> None:
+    header = cell.get("header")
+    if not isinstance(header, dict):
+        return
+    title = str(header.get("title") or "").strip()
+    if not title:
+        return
+    if cell_type not in TABLE_CELL_TYPES:
+        _add_issue(
+            issues,
+            "warning",
+            "non_table_cell_header",
+            "Non-table cells should not render a visible cell header; use field labels, page titles, or help text instead.",
+            f"{path}.header",
+            {"cell_type": cell_type, "title": title},
+        )
+        return
+    styles = _dict_or_empty(header.get("styles"))
+    text_align = str(styles.get("textAlign") or styles.get("text-align") or "").lower()
+    font_weight = str(styles.get("fontWeight") or styles.get("font-weight") or "").lower()
+    if text_align != "center" or font_weight not in {"bold", "600", "700", "800", "900"}:
+        _add_issue(
+            issues,
+            "warning",
+            "table_cell_header_style",
+            "Table cell headers must be centered and bold.",
+            f"{path}.header",
+            {
+                "title": title,
+                "textAlign": styles.get("textAlign") or styles.get("text-align"),
+                "fontWeight": styles.get("fontWeight") or styles.get("font-weight"),
+            },
+        )
 
 
 def _has_flexible_width(cell: dict[str, Any]) -> bool:
@@ -333,7 +370,17 @@ def _analyze_action_containers(
         is_nested_menu_item = row_actions and ".containers" in path
         if container_icon:
             action_icons.append(container_icon)
-        if container_icon and container_title and not is_nested_menu_item:
+        is_element_action = ".cellActionContainers" in path
+        if container_icon and container_title and is_element_action and not is_nested_menu_item:
+            _add_issue(
+                issues,
+                "warning",
+                "element_action_title_must_be_tooltip",
+                "Element actions must render as icon-only; move visible text to tooltip and clear the outer title.",
+                container_path,
+                {"title": container_title, "icon": container_icon},
+            )
+        elif container_icon and container_title and not is_nested_menu_item:
             _add_issue(
                 issues,
                 "info",
@@ -359,7 +406,16 @@ def _analyze_action_containers(
                     action_path,
                 )
             title = str(action.get("title") or "").strip()
-            if icon and title:
+            if icon and title and is_element_action and not is_nested_menu_item:
+                _add_issue(
+                    issues,
+                    "warning",
+                    "element_action_title_must_be_tooltip",
+                    "Element actions must render as icon-only; move visible text to tooltip and clear the action title.",
+                    action_path,
+                    {"title": title, "icon": icon},
+                )
+            elif icon and title:
                 _add_issue(
                     issues,
                     "info",

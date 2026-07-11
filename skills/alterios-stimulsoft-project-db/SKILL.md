@@ -16,6 +16,7 @@ Use this skill when report output depends on Alterios project-base data or when 
 5. Validate `report/full` readback after template changes.
 6. Run static layout checks for overlap, page overflow, and dynamic-height risk.
 7. If the user needs UI/render proof, verify in browser or exported/rendered output; do not stop at JSON readback.
+8. For Project Database dashboard tables, prefer templates saved through the Stimulsoft runtime/native builder so the saved JSON contains `ConnectionStringEncrypted`, `StiCustomDatabase`, `StiCustomSource`, and explicit table columns. Manually assembled JSON can render headers while returning blank rows in the Alterios viewer.
 
 Prefer existing typed tools before adding anything new: `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`.
 Current known risk: embedded report viewer visual proof can remain open even when API/template/readback checks pass; keep that risk visible until UI/render/export proof exists.
@@ -26,6 +27,7 @@ Current known risk: embedded report viewer visual proof can remain open even whe
 - Avoid overlapping visible components unless the template intentionally layers them.
 - Reserve dynamic-height components enough room or place them in bands that can grow.
 - Refresh Stimulsoft datasources after view field changes; stale datasources can hide fields.
+- For table reports, validate both headers and row values in the UI. Source-view rows plus JSON readback are not enough when the embedded viewer is the acceptance target.
 
 ## References
 

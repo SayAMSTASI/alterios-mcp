@@ -295,3 +295,137 @@ def test_form_surface_collects_roles_styles_and_report_source() -> None:
     assert result["inventory"]["style_keys"]["fontWeight"] == 1
     assert result["inventory"]["data_sources"][0]["reportId"] == "report-1"
     assert result["inventory"]["role_keys"][0]["key"] == "roles"
+
+
+def test_form_surface_flags_visible_title_on_element_action() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {}}},
+                                "cellActionContainers": [
+                                    {
+                                        "title": "Files",
+                                        "iconId": "attach_file_add",
+                                        "actions": [{"type": "forms"}],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["issues_by_code"]["element_action_title_must_be_tooltip"] == 1
+
+
+def test_form_surface_allows_titles_inside_nested_cell_menu_items() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {}}},
+                                "cellActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "title": "",
+                                        "tooltip": "Print",
+                                        "iconId": "arrow_drop_down",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Question and parameters",
+                                                "iconId": "print",
+                                                "actions": [{"type": "forms"}],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert "element_action_title_must_be_tooltip" not in result["issues_by_code"]
+
+
+def test_form_surface_checks_table_cell_header_style() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "header": {"title": "Parameters", "styles": {"textAlign": "left", "fontWeight": "400"}},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {}}},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["issues_by_code"]["table_cell_header_style"] == 1
+
+
+def test_form_surface_flags_non_table_cell_header() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "header": {"title": "Question", "styles": {"textAlign": "center", "fontWeight": "bold"}},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {}}},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["issues_by_code"]["non_table_cell_header"] == 1

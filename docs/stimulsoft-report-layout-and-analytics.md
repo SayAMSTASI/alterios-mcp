@@ -41,7 +41,12 @@ POST /api/views/v2/get-data-simplified
    - `Dictionary.Databases[*].ServiceName = "Project Database"`;
    - connection string с `{"type":"view-data-v2","filter":{"viewId":"..."}}`;
    - data-source columns, соответствующие текущим view fields.
-5. Если view fields или joins изменились, refresh или rebuild Stimulsoft
+5. Для dashboard/table reports Project Database template лучше создавать через
+   Stimulsoft runtime/native builder. Сохраненный JSON должен содержать
+   `ConnectionStringEncrypted`, `StiCustomDatabase`, `StiCustomSource` и явные
+   table columns. Ручной JSON с обычным connection string может показать
+   заголовки таблицы, но не вывести строки в embedded viewer.
+6. Если view fields или joins изменились, refresh или rebuild Stimulsoft
    dictionary data source. Не доверять старым cached columns.
 
 ## Выбор типа отчета

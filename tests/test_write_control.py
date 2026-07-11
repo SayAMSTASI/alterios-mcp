@@ -1117,8 +1117,23 @@ def test_report_project_base_validation_checks_template_and_view_without_real_ne
 
     template = {
         "CodexMarker": "Codex-managed: alterios-mcp report sandbox.",
-        "Pages": {"0": {"Ident": "StiDashboard"}},
-        "Dictionary": {"Databases": {"0": {"ServiceName": "Project Database"}}, "DataSources": {"0": {"Name": "MCP Practice. Список"}}},
+        "Pages": {
+            "0": {
+                "Ident": "StiDashboard",
+                "Components": {
+                    "0": {
+                        "Ident": "StiTableElement",
+                        "Columns": {
+                            "0": {"Ident": "DimensionColumn", "Expression": "data.name", "Label": "Наименование"}
+                        },
+                    }
+                },
+            }
+        },
+        "Dictionary": {
+            "Databases": {"0": {"ServiceName": "Project Database", "ConnectionStringEncrypted": "encrypted"}},
+            "DataSources": {"0": {"Name": "data", "NameInSource": "MCP Practice. Список"}},
+        },
     }
 
     class FakeClient:
@@ -1140,6 +1155,9 @@ def test_report_project_base_validation_checks_template_and_view_without_real_ne
 
     assert result["validation"]["has_dashboard_page"] is True
     assert result["validation"]["has_project_database"] is True
+    assert result["validation"]["has_encrypted_project_database_connection"] is True
+    assert result["validation"]["table_has_columns"] is True
+    assert result["validation"]["table_columns"][0]["expressions"] == ["data.name"]
     assert result["validation"]["view_name_matches"] is True
     assert result["validation"]["view_row_count"] == 1
 
@@ -2133,6 +2151,9 @@ def test_create_report_tab_dry_run_stores_plan_without_real_network(tmp_path) ->
     assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
     database = result["response"]["planned"]["report"]["template"]["Dictionary"]["Databases"]["0"]
     assert database["ServiceName"] == "Project Database"
+    table = result["response"]["planned"]["report"]["template"]["Pages"]["0"]["Components"]["1"]
+    assert table["Columns"]["0"]["Expression"] == "data.name"
+    assert table["Columns"]["0"]["Label"] == "Наименование"
     assert result["response"]["context_readback"]["validation"]["data_id_matches_expected"] is True
     assert result["response"]["planned"]["form_tabs"][0]["rows"][0]["cells"][0]["params"]["openId"] is True
     assert result["plan"]["plan_id"].startswith("wp_")
@@ -2305,6 +2326,8 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
     assert result["response"]["ids"] == {"report_id": "report-1", "form_id": "form-1", "source_view_id": "view-1"}
     assert apply_client.reports["report-1"]["template"]["Dictionary"]["DataSources"]["0"]["NameInSource"] == "Материалы. Список"
+    table = apply_client.reports["report-1"]["template"]["Pages"]["0"]["Components"]["1"]
+    assert [item["Expression"] for item in table["Columns"].values()] == ["data.name", "data.count"]
     tab = apply_client.forms["form-1"]["tabs"][1]
     assert tab["name"] == "Отчет"
     cell = tab["rows"][0]["cells"][0]

@@ -7,11 +7,14 @@ import json
 import mimetypes
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from xml.sax.saxutils import escape as _xml_escape
 
 from mcp.server.fastmcp import FastMCP
@@ -1578,6 +1581,49 @@ def _has_project_database(template: dict[str, Any] | None) -> bool:
     return False
 
 
+def _has_encrypted_project_database_connection(template: dict[str, Any] | None) -> bool:
+    if not isinstance(template, dict):
+        return False
+    for value in _walk_values(template):
+        if (
+            isinstance(value, dict)
+            and value.get("ServiceName") == "Project Database"
+            and bool(value.get("ConnectionStringEncrypted"))
+        ):
+            return True
+    return False
+
+
+def _dashboard_table_summaries(template: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(template, dict):
+        return []
+    tables: list[dict[str, Any]] = []
+    for value in _walk_values(template):
+        if not isinstance(value, dict) or value.get("Ident") != "StiTableElement":
+            continue
+        columns = value.get("Columns")
+        column_items = list(columns.values()) if isinstance(columns, dict) else []
+        expressions = [
+            str(column.get("Expression") or "")
+            for column in column_items
+            if isinstance(column, dict) and column.get("Expression")
+        ]
+        labels = [
+            str(column.get("Label") or "")
+            for column in column_items
+            if isinstance(column, dict) and column.get("Label")
+        ]
+        tables.append(
+            {
+                "name": value.get("Name"),
+                "column_count": len(column_items),
+                "expressions": expressions,
+                "labels": labels,
+            }
+        )
+    return tables
+
+
 def _report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
     if MANAGED_MARKER in str(existing.get("description") or ""):
         return True
@@ -1595,10 +1641,15 @@ def _report_project_base_validation(
 ) -> dict[str, Any]:
     template = _report_template_payload(report)
     marker = template.get("CodexMarker") if isinstance(template, dict) else None
+    table_summaries = _dashboard_table_summaries(template)
     return {
         "has_template": isinstance(template, dict),
         "has_dashboard_page": _report_has_dashboard_page(report),
         "has_project_database": _has_project_database(template),
+        "has_encrypted_project_database_connection": _has_encrypted_project_database_connection(template),
+        "table_component_count": len(table_summaries),
+        "table_has_columns": any(item["column_count"] > 0 for item in table_summaries),
+        "table_columns": table_summaries,
         "marker": marker,
         "marker_matches": expected_marker is None or marker == expected_marker,
         "view_name_matches": expected_view_name is None or _contains_text(template, expected_view_name),
@@ -2243,9 +2294,15 @@ def _project_database_dashboard_template(
     columns: list[dict[str, str]],
 ) -> dict[str, Any]:
     column_items = {
-        str(index): {"Name": column["name"], "Alias": column["alias"], "Type": column["type"]}
+        str(index): {
+            "Name": column["name"],
+            "NameInSource": column["name"],
+            "Alias": column["alias"],
+            "Type": column["type"],
+        }
         for index, column in enumerate(columns)
     }
+    table_columns = _dashboard_table_columns(columns)
     connection = json.dumps(
         {"type": "view-data-v2", "filter": {"viewId": source_view_id}},
         ensure_ascii=False,
@@ -2262,20 +2319,22 @@ def _project_database_dashboard_template(
         "Dictionary": {
             "Databases": {
                 "0": {
-                    "Ident": "StiDatabase",
-                    "Name": "Project Database",
+                    "Ident": "StiCustomDatabase",
+                    "Name": source_view_name,
                     "Alias": "Project Database",
+                    "CastToColumnType": "CastToColumnType",
                     "ServiceName": "Project Database",
                     "ConnectionString": connection,
                 }
             },
             "DataSources": {
                 "0": {
-                    "Ident": "StiDataTableSource",
-                    "Name": source_view_name,
+                    "Ident": "StiCustomSource",
+                    "Name": "data",
                     "Alias": source_view_name,
                     "NameInSource": source_view_name,
                     "ServiceName": "Project Database",
+                    "SqlCommand": "data",
                     "Columns": column_items,
                 }
             },
@@ -2297,12 +2356,224 @@ def _project_database_dashboard_template(
                         "Ident": "StiTableElement",
                         "Name": "SourceRows",
                         "ClientRectangle": "0.2,0.9,9.4,5.8",
-                        "DataSourceName": source_view_name,
+                        "Columns": table_columns,
+                        "HeaderFont": ";10;Bold;",
+                        "FooterFont": ";10;;",
+                        "Title": {"Text": "", "Visible": False},
+                        "DashboardInteraction": {
+                            "Ident": "Table",
+                            "OnHover": "ShowToolTip",
+                            "OnClick": "ApplyFilter",
+                            "HyperlinkDestination": "NewTab",
+                        },
+                        "SizeMode": "Fit",
+                        "CornerRadius": "0, 0, 0, 0",
+                        "Shadow": ";;;",
                     },
                 },
             }
         },
     }
+
+
+def _project_database_native_dashboard_template(
+    *,
+    report_name: str,
+    marker: str,
+    source_view_id: str,
+    source_view_name: str,
+    columns: list[dict[str, str]],
+    base_url: str,
+) -> dict[str, Any]:
+    template = _project_database_dashboard_template(
+        report_name=report_name,
+        marker=marker,
+        source_view_id=source_view_id,
+        source_view_name=source_view_name,
+        columns=columns,
+    )
+    try:
+        return _stimulsoft_native_project_database_template(
+            template=template,
+            report_name=report_name,
+            marker=marker,
+            source_view_id=source_view_id,
+            source_view_name=source_view_name,
+            columns=columns,
+            base_url=base_url,
+        )
+    except Exception as exc:
+        alterios = template.setdefault("Alterios", {})
+        if isinstance(alterios, dict):
+            alterios["nativeTemplateBuildError"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+        return template
+
+
+def _stimulsoft_native_project_database_template(
+    *,
+    template: dict[str, Any],
+    report_name: str,
+    marker: str,
+    source_view_id: str,
+    source_view_name: str,
+    columns: list[dict[str, str]],
+    base_url: str,
+) -> dict[str, Any]:
+    node_path = _find_node()
+    scripts_dir = _ensure_stimulsoft_assets(base_url)
+    helper_path = Path(tempfile.gettempdir()) / "alterios-mcp-stimulsoft" / "build_project_database_dashboard.js"
+    helper_path.parent.mkdir(parents=True, exist_ok=True)
+    helper_path.write_text(_STIMULSOFT_PROJECT_DATABASE_DASHBOARD_HELPER, encoding="utf-8")
+    completed = subprocess.run(
+        [str(node_path), str(helper_path)],
+        input=json.dumps(
+            {
+                "scriptsDir": str(scripts_dir),
+                "template": template,
+                "reportName": report_name,
+                "marker": marker,
+                "viewId": source_view_id,
+                "viewName": source_view_name,
+                "columns": columns,
+            },
+            ensure_ascii=False,
+        ),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip()[:1000] or "Stimulsoft helper failed.")
+    payload = json.loads(completed.stdout)
+    if not isinstance(payload, dict):
+        raise RuntimeError("Stimulsoft helper returned unexpected payload.")
+    return payload
+
+
+def _find_node() -> Path:
+    node = shutil.which("node")
+    if node:
+        return Path(node)
+    runtime_node = (
+        Path.home()
+        / ".cache"
+        / "codex-runtimes"
+        / "codex-primary-runtime"
+        / "dependencies"
+        / "node"
+        / "bin"
+        / "node.exe"
+    )
+    if runtime_node.exists():
+        return runtime_node
+    raise RuntimeError("Node.js was not found for native Stimulsoft template generation.")
+
+
+def _ensure_stimulsoft_assets(base_url: str) -> Path:
+    if not base_url:
+        raise RuntimeError("base_url is required for native Stimulsoft template generation.")
+    target = Path(tempfile.gettempdir()) / "alterios-mcp-stimulsoft"
+    target.mkdir(parents=True, exist_ok=True)
+    for filename in ("stimulsoft.reports.pack.js", "stimulsoft.dashboards.pack.js"):
+        path = target / filename
+        if path.exists() and path.stat().st_size > 1000:
+            continue
+        request = Request(
+            base_url.rstrip("/") + f"/assets/stimulsoft/{filename}",
+            headers={"User-Agent": "alterios-mcp/1.0"},
+        )
+        with urlopen(request, timeout=45) as response:
+            path.write_bytes(response.read())
+    return target
+
+
+_STIMULSOFT_PROJECT_DATABASE_DASHBOARD_HELPER = r"""
+const fs = require("fs");
+const path = require("path");
+
+const input = JSON.parse(fs.readFileSync(0, "utf8"));
+const reports = require(path.join(input.scriptsDir, "stimulsoft.reports.pack.js"));
+const dashboards = require(path.join(input.scriptsDir, "stimulsoft.dashboards.pack.js"));
+const Stimulsoft = dashboards.Stimulsoft || reports.Stimulsoft;
+const S = Stimulsoft;
+
+const report = new S.Report.StiReport();
+const base = JSON.parse(JSON.stringify(input.template));
+delete base.Dictionary;
+report.load(JSON.stringify(base));
+report.reportName = input.reportName;
+report.reportAlias = input.reportName;
+
+const connection = JSON.stringify({ type: "view-data-v2", filter: { viewId: input.viewId } });
+const database = new S.Report.Dictionary.StiCustomDatabase(input.viewName, "Project Database", connection);
+database.serviceName = "Project Database";
+database.castToColumnType = "CastToColumnType";
+report.dictionary.databases.add(database);
+
+const dataSource = new S.Report.Dictionary.StiCustomSource(input.viewName, "data", input.viewName);
+dataSource.serviceName = "Project Database";
+dataSource.sqlCommand = "data";
+for (const column of input.columns) {
+  let type = S.System.String;
+  if (column.type === "System.DateTime") type = S.System.DateTime;
+  if (column.type === "System.Decimal") type = S.System.Decimal;
+  if (column.type === "System.Boolean") type = S.System.Boolean;
+  dataSource.columns.add(new S.Report.Dictionary.StiDataColumn(column.name, column.name, column.alias, type));
+}
+report.dictionary.dataSources.add(dataSource);
+
+const saved = JSON.parse(report.saveToJsonString());
+saved.CodexMarker = input.marker;
+saved.Alterios = {
+  ...(input.template.Alterios || {}),
+  sourceViewId: input.viewId,
+  sourceViewName: input.viewName,
+  templateKind: "report_tab_project_database_native_dashboard",
+};
+process.stdout.write(JSON.stringify(saved));
+"""
+
+
+def _dashboard_table_columns(columns: list[dict[str, str]]) -> dict[str, dict[str, Any]]:
+    visible_columns = _visible_report_columns(columns)
+    return {
+        str(index): {
+            "Ident": "DimensionColumn",
+            "Key": _stable_dashboard_key("table", column["name"]),
+            "Expression": f"data.{column['name']}",
+            "Label": column["alias"],
+            "DashboardInteraction": {
+                "Ident": "TableColumn",
+                "OnHover": "None",
+                "OnClick": "None",
+                "HyperlinkDestination": "NewTab",
+            },
+            "Size": {"MinWidth": 30, "MaxWidth": 300},
+        }
+        for index, column in enumerate(visible_columns)
+    }
+
+
+def _visible_report_columns(columns: list[dict[str, str]]) -> list[dict[str, str]]:
+    visible = [
+        column
+        for column in columns
+        if not _is_technical_report_column(column.get("name") or "", column.get("alias") or "")
+    ]
+    return visible or [column for column in columns if column.get("name") != "_id"] or columns
+
+
+def _is_technical_report_column(name: str, alias: str) -> bool:
+    lowered = f"{name} {alias}".lower()
+    if name == "_id":
+        return True
+    return name.startswith("test__field_") or "bulk_select" in lowered
+
+
+def _stable_dashboard_key(prefix: str, value: str) -> str:
+    return hashlib.md5(f"{prefix}:{value}".encode("utf-8")).hexdigest()
 
 
 def _report_tab_row(*, report_id: str, cell_name: str, open_id: bool, fullscreen_mode: bool) -> dict[str, Any]:
@@ -6558,12 +6829,16 @@ def alterios_create_report_tab(
 
     view_fields = _view_fields_body(client, normalized_view_id)
     resolved_marker = marker or f"{MANAGED_MARKER}: alterios-mcp report tab {normalized_report_name}."
-    template_payload: str | dict[str, Any] = template if template is not None else _project_database_dashboard_template(
+    report_columns = _project_database_columns(view_fields)
+    client_config = getattr(client, "config", None)
+    base_url = str(getattr(client_config, "base_url", "") or "")
+    template_payload: str | dict[str, Any] = template if template is not None else _project_database_native_dashboard_template(
         report_name=normalized_report_name,
         marker=resolved_marker,
         source_view_id=normalized_view_id,
         source_view_name=source_view_name,
-        columns=_project_database_columns(view_fields),
+        columns=report_columns,
+        base_url=base_url,
     )
 
     operation = _report_tab_operation(
