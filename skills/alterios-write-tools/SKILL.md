@@ -17,6 +17,15 @@ Use this skill when a repeated Alterios operation should become a typed MCP tool
 6. Return redacted audit details and perform readback.
 7. Add tests for happy path, blocked write, validation errors, target mismatch, and redaction.
 
+For material-module write scenarios, enforce the configured UX contract:
+
+- content type/material type must include a meaningful description and user hint/tooltip;
+- views must use Alterios experimental mode unless the user explicitly asks for legacy behavior;
+- forms must include list, add, edit, and read-only view/detail surfaces;
+- form-embedded views/lists must have a relevant field-based filter or `dataId: [openId]`;
+- list views must hide non-informative technical/service columns;
+- forms must use human-readable user-facing titles, tab names, and page names.
+
 Existing report write coverage includes `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`; use these before adding another report write tool.
 
 ## Boundaries
