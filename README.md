@@ -93,7 +93,7 @@ MCP умеет собирать состав проекта:
 - точечная замена `tabs` и `formActionContainers`;
 - точечная настройка `emitting.listeners` у ячейки формы;
 - массовое обновление выбранных content rows по `selected_content_ids`;
-- создание и обновление manual/event/diagram scripts;
+- создание и обновление web/cron/manual/event/library/diagram scripts;
 - запуск manual script;
 - создание и обновление BPMN-диаграмм;
 - запуск процесса, чтение задач, завершение задачи, проверка side effects;

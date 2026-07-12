@@ -28,6 +28,14 @@ For material-module write scenarios, enforce the configured UX contract:
 
 Existing report write coverage includes `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`; use these before adding another report write tool.
 
+For script write scenarios:
+
+- `alterios_upsert_script` must accept the UI-observed script types: `web`, `cron`, `manual`, `event`, `library`, and `diagram`;
+- `cron` scripts require `config.cron` as a six-part string: `second minute hour day month week`;
+- keep new `web` and `cron` research scripts inactive until endpoint/schedule behavior is explicitly approved and verified;
+- `library` scripts are linked from consumer scripts through `librariesIds`; use global functions/constants for shared helpers unless live runtime evidence proves a different module format;
+- manual execution uses `/api/scripts/execute-manual` with a saved script UUID, not runtime service names.
+
 For view write scenarios:
 
 - `alterios_upsert_view` must default to experimental/v2 by writing `settings.engineVersion = "v2"`.

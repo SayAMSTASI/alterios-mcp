@@ -68,7 +68,7 @@
 | `alterios_upsert_form` | Typed form write | Добавлено после реинвентаризации; create/update form с tabs/action containers |
 | `alterios_patch_form_actions` | Typed form actions patch | Добавлено после реинвентаризации; узкая замена `formActionContainers` |
 | `alterios_patch_form_tabs` | Typed form tabs patch | Добавлено после реинвентаризации; узкая замена `tabs` |
-| `alterios_upsert_script` | Typed script write | Добавлено после реинвентаризации; create/update manual/event/diagram script |
+| `alterios_upsert_script` | Typed script write | Добавлено после реинвентаризации; create/update web/cron/manual/event/library/diagram script |
 | `alterios_execute_manual_script` | Typed manual script execution | Усилено после реинвентаризации; preflight, active/name checks, readback |
 | `alterios_upsert_bpmn_diagram` | Typed BPMN write | Добавлено после реинвентаризации; diagram create/update |
 | `alterios_start_process` | Typed workflow side effect | Добавлено после реинвентаризации; process start + process/task readback |
@@ -162,7 +162,7 @@ sandbox manual script.
 
 | Tool | Назначение |
 |---|---|
-| `alterios_upsert_script` | Создать/обновить manual/event/diagram script |
+| `alterios_upsert_script` | Создать/обновить web/cron/manual/event/library/diagram script |
 | `alterios_validate_script` | Проверить type, active, librariesIds, config, managed marker |
 | `alterios_execute_manual_script` | Запустить manual script UUID с preflight, active/name checks и readback |
 
@@ -236,7 +236,7 @@ Full readback подтвержден. Сохраненный Stimulsoft template
 1. content/content fields/file-field;
 2. views/view entities/view fields;
 3. forms/form actions/form components;
-4. scripts/manual/event/diagram scripts;
+4. scripts/web/cron/manual/event/library/diagram scripts;
 5. BPMN/process/task side effects;
 6. reports/Stimulsoft Project Database;
 7. groups/help/comments.

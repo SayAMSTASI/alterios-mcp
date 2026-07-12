@@ -1223,6 +1223,64 @@ def test_upsert_script_dry_run_uses_put_route_and_redacts_secret_without_real_ne
     assert "secret-token" not in str(result)
 
 
+def test_upsert_script_accepts_all_observed_ui_script_types_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    script_types = {
+        "web": {"cron": None, "arguments": [{"key": "payload"}]},
+        "cron": {"cron": "0 0 3 * * *", "arguments": []},
+        "manual": {"cron": None, "arguments": [{"key": "contentId"}]},
+        "event": {"cron": None, "arguments": [{"key": "contentId"}]},
+        "library": {"cron": None, "arguments": []},
+        "diagram": {"cron": None, "arguments": []},
+    }
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        for script_type, config in script_types.items():
+            result = server.alterios_upsert_script(
+                f"Script {script_type}",
+                script_type=script_type,
+                body="new Handler();",
+                config=config,
+                profile="vniimt",
+                project_id="project-1",
+            )
+            assert result["dry_run"] is True
+            assert {"field": "type", "before": None, "after": script_type, "changed": True} in result["response"]["diff"]
+
+
+def test_upsert_cron_script_requires_six_part_cron_config_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        with pytest.raises(ValueError, match="six parts"):
+            server.alterios_upsert_script(
+                "Cron Script",
+                script_type="cron",
+                body="new Handler();",
+                config={"cron": "0 3 * * *", "arguments": []},
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+
 def test_execute_manual_script_dry_run_prefights_script_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:

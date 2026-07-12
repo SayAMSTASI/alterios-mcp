@@ -51,6 +51,8 @@ from .write_plan import artifact_root, assert_plan_matches_audit, list_write_jou
 
 mcp = FastMCP("alterios")
 
+ALTERIOS_SCRIPT_TYPES = {"web", "cron", "manual", "event", "library", "diagram"}
+
 
 def _client(profile: str | None = None, project_id: str | None = None) -> AlteriosClient:
     return AlteriosClient(AlteriosConfig.from_env(profile=profile).with_project_id(project_id))
@@ -106,6 +108,19 @@ def _rest_write_operation(method: str, path: str, params: dict[str, Any], body: 
         target_ids=collect_target_ids({"params": params, "body": body}),
         request={"params": params, "body": body},
     )
+
+
+def _validate_script_type_config(script_type: str, config: dict[str, Any]) -> None:
+    if script_type not in ALTERIOS_SCRIPT_TYPES:
+        allowed = ", ".join(sorted(ALTERIOS_SCRIPT_TYPES))
+        raise ValueError(f"script_type must be one of: {allowed}.")
+    if script_type != "cron":
+        return
+    cron = config.get("cron")
+    if not isinstance(cron, str) or not cron.strip():
+        raise ValueError("cron script requires config.cron as a six-part string: second minute hour day month week.")
+    if len(cron.split()) != 6:
+        raise ValueError("cron script config.cron must contain six parts: second minute hour day month week.")
 
 
 def _add_comment_operation(entity_id: str, body: str, entity: str, parent_id: str | None) -> WriteOperation:
@@ -6161,7 +6176,7 @@ def alterios_upsert_script(
     profile: str | None = None,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Plan or create/update an Alterios manual/event/diagram script."""
+    """Plan or create/update an Alterios web/cron/manual/event/library/diagram script."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
@@ -6172,8 +6187,6 @@ def alterios_upsert_script(
         raise ValueError("body is required when creating a new script.")
 
     effective_type = script_type or (existing or {}).get("type") or "manual"
-    if effective_type not in {"manual", "event", "diagram"}:
-        raise ValueError("script_type must be one of: manual, event, diagram.")
     payload = {
         **(existing or {}),
         "name": name,
@@ -6185,6 +6198,8 @@ def alterios_upsert_script(
         "config": config if config is not None else (existing or {}).get("config") or {},
         "librariesIds": libraries_ids if libraries_ids is not None else (existing or {}).get("librariesIds") or [],
     }
+    effective_config = payload["config"] if isinstance(payload["config"], dict) else {}
+    _validate_script_type_config(effective_type, effective_config)
     operation = _resource_operation(
         name=("PUT /api/scripts" if existing else "POST /api/scripts"),
         kind="script",
