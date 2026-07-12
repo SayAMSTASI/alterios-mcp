@@ -71,6 +71,8 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip, placeholder, or separate help block instead of always-visible bottom text. Treat analyzer issue `field_footnote_requires_date` as a tester failure before accepting a form.
 - For table display cells, keep the visible cell header centered and bold. For non-table display cells, do not add a visible cell header; use `pageTitle`, tab titles, field labels, or tooltips instead.
 - Use `view_data_list` for related rows and validate the real relation field.
+- Treat the user-approved master-detail reference pattern as: top context row, compact action hub, grouped menus, second-row detail blocks, related list with centered bold table header, and nested downstream form section.
+- In master-detail action hubs that follow this reference, short visible group labels on `top_center` action containers are allowed. Do not rewrite them to icon-only without a user request.
 - Validate view filters explicitly: static filters, user filters, role-dependent filters, and `openId`/`dataId` current-record filters have different acceptance checks.
 - Always add a field-based filter for form-embedded views/lists. A `view_data` or `view_data_list` cell must be constrained by the relevant source field, relation field, or `dataId: [openId]`; unfiltered embedded lists are allowed only when the user explicitly needs a global list.
 - Hide non-informative list columns by default: technical IDs, helper relation fields, system metadata, empty service fields, and columns that do not help the user's decision.
@@ -84,7 +86,9 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - On view/detail forms, add an icon-only `Редактировать` action using the edit-document semantic when editing the current record is allowed. Do not add that self-edit action to edit forms.
 - Keep element actions on view/detail and edit forms semantically consistent; the edit form only omits the transition to edit itself.
 - Element actions must be icon-only: in `cellActionContainers`, set `title` to an empty string, put the visible meaning in `tooltip`, and use a project-local `iconId`. Text is allowed inside nested menu items, not on the outer element action.
+- Exception: approved master-detail action hubs may use short visible labels on `position: "top_center"` action containers, such as `Отбор`, `Журналы`, `Отчеты`, `Вложения`.
 - For menus with multiple print variants, use `arrow_drop_down` on the outer menu and `print` on each nested print item.
+- Analytical and printable forms are opened as separate forms in a new browser tab: `type: "forms"`, `openInNewTab: true`, `openInDialog: false`. The target analytical/print form must include a page action `Закрыть`.
 - For list value actions, the default row action is `Просмотр`. Use an outer `type: "menu"` value action container with nested `containers[]`, and set `default: true` on the nested `Просмотр` action container.
 - If an existing interface is intentionally unusual, ask before changing its interaction model.
 

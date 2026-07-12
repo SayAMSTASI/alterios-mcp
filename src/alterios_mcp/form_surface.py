@@ -9,6 +9,16 @@ VIEW_CELL_TYPES = {"view_data", "view_data_list"}
 DATA_CELL_TYPES = VIEW_CELL_TYPES | {"content", "report", "comments_list", "edit_task"}
 EXPECTED_ROW_ACTION_ORDER = {"edit": 0, "view": 1, "delete": 2}
 TABLE_CELL_TYPES = {"view_data_list"}
+REPORT_OR_ANALYTICS_TOKENS = (
+    "отчет",
+    "отчёт",
+    "печать",
+    "печатн",
+    "аналит",
+    "report",
+    "print",
+    "dashboard",
+)
 FOOTNOTE_KEYS = {
     "bottomText",
     "bottom_text",
@@ -457,21 +467,21 @@ def _analyze_action_containers(
             _add_issue(issues, "warning", "invalid_action_container", "Action container is not an object.", container_path)
             continue
         container_type = str(container.get("type") or "").lower()
-        if row_actions and container_type == "menu":
+        if container_type == "menu":
             container_icon = _action_icon(container)
             if container_icon:
                 action_icons.append(container_icon)
             nested = container.get("containers")
             if not isinstance(nested, list) or not nested:
-                _add_issue(
-                    issues,
-                    "warning",
-                    "row_menu_missing_containers",
-                    "Row menu must contain nested action containers in containers[].",
-                    container_path,
-                )
-                continue
-            if not _row_menu_has_default_view(nested):
+                if row_actions:
+                    _add_issue(
+                        issues,
+                        "warning",
+                        "row_menu_missing_containers",
+                        "Row menu must contain nested action containers in containers[].",
+                        container_path,
+                    )
+            elif row_actions and not _row_menu_has_default_view(nested):
                 _add_issue(
                     issues,
                     "warning",
@@ -479,8 +489,8 @@ def _analyze_action_containers(
                     "Row menu should mark the view action container as default.",
                     container_path,
                 )
-            _analyze_action_containers(nested, f"{container_path}.containers", issues, action_icons, row_actions=True)
-            continue
+            if isinstance(nested, list):
+                _analyze_action_containers(nested, f"{container_path}.containers", issues, action_icons, row_actions=row_actions)
         actions = container.get("actions")
         if actions is None:
             actions = [container] if _looks_like_action(container) else []
@@ -505,11 +515,12 @@ def _analyze_action_containers(
             )
         container_icon = _action_icon(container)
         container_title = str(container.get("title") or container.get("name") or "").strip()
-        is_nested_menu_item = row_actions and ".containers" in path
+        is_nested_menu_item = ".containers" in path
         if container_icon:
             action_icons.append(container_icon)
         is_element_action = ".cellActionContainers" in path
-        if container_icon and container_title and is_element_action and not is_nested_menu_item:
+        is_action_hub_item = is_element_action and str(container.get("position") or "").lower() == "top_center"
+        if container_icon and container_title and is_element_action and not is_nested_menu_item and not is_action_hub_item:
             _add_issue(
                 issues,
                 "warning",
@@ -563,6 +574,7 @@ def _analyze_action_containers(
                     {"title": title, "icon": icon},
                 )
             category = _action_category(action, container)
+            _analyze_report_or_analytics_opening(action, container, action_path, issues)
             if row_actions and category:
                 known_order.append((category, action_path))
             if category == "delete" and row_actions:
@@ -630,6 +642,42 @@ def _action_category(action: dict[str, Any], container: dict[str, Any] | None = 
     if any(token in haystack for token in ("view", "open", "show", "просмотр", "открыт")):
         return "view"
     return ""
+
+
+def _analyze_report_or_analytics_opening(
+    action: dict[str, Any],
+    container: dict[str, Any],
+    action_path: str,
+    issues: list[dict[str, Any]],
+) -> None:
+    if str(action.get("type") or "").lower() != "forms":
+        return
+    haystack = " ".join(
+        str(value or "")
+        for value in (
+            action.get("name"),
+            action.get("title"),
+            container.get("name"),
+            container.get("title"),
+            container.get("tooltip"),
+        )
+    ).lower()
+    if not any(token in haystack for token in REPORT_OR_ANALYTICS_TOKENS):
+        return
+    if action.get("openInNewTab") is True and action.get("openInDialog") is not True:
+        return
+    _add_issue(
+        issues,
+        "warning",
+        "report_or_analytics_form_should_open_new_tab",
+        "Analytical and printable forms must open in a new tab, not in a dialog.",
+        action_path,
+        {
+            "name": action.get("name"),
+            "openInNewTab": action.get("openInNewTab"),
+            "openInDialog": action.get("openInDialog"),
+        },
+    )
 
 
 def _collect_style_keys(styles: Any, counter: Counter[str]) -> None:

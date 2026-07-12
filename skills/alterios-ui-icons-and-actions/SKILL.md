@@ -13,6 +13,7 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - Use base icon size `16`.
 - Use base color `#4B77D1`.
 - Element actions must be icon-only. For `cellActionContainers`, store `title: ""`, put the user-facing meaning in `tooltip`, and use a project-local `iconId`. Do not render element actions as icon plus visible text.
+- Exception: approved master-detail action hubs may show short visible group labels on `position: "top_center"` action containers. Keep ordinary row/edit/view/delete element actions icon-only.
 - Use a three-dot menu for secondary row actions.
 - Keep the standard row action order: edit, visibility/view, delete.
 - Before writing forms, groups, or actions, ensure required Google icons are uploaded into the target project through `alterios_ensure_project_icons`.
@@ -30,6 +31,7 @@ Use this skill before finalizing any Alterios UI action surface. It is a reviewe
 - For script or processing actions, use `forms_apps_script`.
 - If an element has more than three actions, group them behind `menu`.
 - If an element action opens several print variants, use an outer `type: "menu"` container with `arrow_drop_down`, `title: ""`, and `tooltip: "Печать"`. Each nested print item keeps a readable `title` and uses `print`.
+- Print and analytics form actions must open in a new tab: nested action `type: "forms"`, `openInNewTab: true`, `openInDialog: false`; the target form must provide `Закрыть` with `keyboard_return`.
 - In list value actions, use a `menu` action and include `Редактировать`, `Просмотр`, and `Удалить` with icons.
 - For list row menus, use the verified Alterios JSON contract: the outer value action container has `type: "menu"`, a project-local `more_vert`/`menu` icon, empty `actions: []`, and nested `containers[]`; each menu item is its own `type: "action"` container with `title`, `iconId`, and `actions[]`. Mark the nested `Просмотр` container as `default: true`.
 - Do not model row menus as one `type: "action"` container with several `actions[]`; that shape may save but does not create the expected nested menu UI.

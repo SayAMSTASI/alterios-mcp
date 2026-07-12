@@ -375,6 +375,60 @@ def test_form_surface_allows_titles_inside_nested_cell_menu_items() -> None:
     assert "element_action_title_must_be_tooltip" not in result["issues_by_code"]
 
 
+def test_form_surface_allows_master_detail_action_hub_labels() -> None:
+    form = {
+        "name": "Direction panel",
+        "pageTitle": "Direction panel",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "help",
+                                "styles": {"width": "100%"},
+                                "params": {"helpId": "help-1"},
+                                "displaying": {"fields": {}},
+                                "cellActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "title": "Отчеты",
+                                        "tooltip": "Печатные формы",
+                                        "iconId": "arrow_drop_down",
+                                        "position": "top_center",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "План верификации",
+                                                "iconId": "print",
+                                                "actions": [
+                                                    {
+                                                        "_id": "report-form-1",
+                                                        "name": "План верификации. Отчет",
+                                                        "type": "forms",
+                                                        "openInDialog": False,
+                                                        "openInNewTab": True,
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert "element_action_title_must_be_tooltip" not in result["issues_by_code"]
+    assert "report_or_analytics_form_should_open_new_tab" not in result["issues_by_code"]
+
+
 def test_form_surface_checks_table_cell_header_style() -> None:
     form = {
         "name": "Question",
@@ -544,3 +598,107 @@ def test_form_surface_does_not_treat_tooltip_as_bottom_footnote() -> None:
 
     assert "field_footnote_requires_date" not in result["issues_by_code"]
     assert result["inventory"]["field_footnotes"] == []
+
+
+def test_form_surface_flags_print_or_analytics_form_opened_in_dialog() -> None:
+    form = {
+        "name": "Direction panel",
+        "pageTitle": "Direction panel",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "cellActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "title": "Отчеты",
+                                        "iconId": "arrow_drop_down",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "План верификации",
+                                                "iconId": "print",
+                                                "actions": [
+                                                    {
+                                                        "_id": "report-form-1",
+                                                        "name": "План верификации. Отчет",
+                                                        "type": "forms",
+                                                        "openInDialog": True,
+                                                        "openInNewTab": False,
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert result["issues_by_code"]["report_or_analytics_form_should_open_new_tab"] == 1
+    issue = next(issue for issue in result["issues"] if issue["code"] == "report_or_analytics_form_should_open_new_tab")
+    assert issue["details"]["name"] == "План верификации. Отчет"
+
+
+def test_form_surface_accepts_print_or_analytics_form_opened_in_new_tab() -> None:
+    form = {
+        "name": "Direction panel",
+        "pageTitle": "Direction panel",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "cellActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "title": "Отчеты",
+                                        "iconId": "arrow_drop_down",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Акт верификации",
+                                                "iconId": "print",
+                                                "actions": [
+                                                    {
+                                                        "_id": "report-form-2",
+                                                        "name": "Акт верификации. Отчет",
+                                                        "type": "forms",
+                                                        "openInDialog": False,
+                                                        "openInNewTab": True,
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form)
+
+    assert "report_or_analytics_form_should_open_new_tab" not in result["issues_by_code"]
