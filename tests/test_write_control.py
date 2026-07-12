@@ -1257,6 +1257,50 @@ def test_upsert_script_accepts_all_observed_ui_script_types_without_real_network
             assert {"field": "type", "before": None, "after": script_type, "changed": True} in result["response"]["diff"]
 
 
+def test_upsert_web_and_cron_scripts_default_to_inactive_without_real_network() -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        web_result = server.alterios_upsert_script(
+            "Web Script",
+            script_type="web",
+            body="new Handler();",
+            config={"arguments": []},
+            profile="vniimt",
+            project_id="project-1",
+        )
+        cron_result = server.alterios_upsert_script(
+            "Cron Script",
+            script_type="cron",
+            body="new Handler();",
+            config={"cron": "0 0 3 * * *", "arguments": []},
+            profile="vniimt",
+            project_id="project-1",
+        )
+        active_web_result = server.alterios_upsert_script(
+            "Active Web Script",
+            script_type="web",
+            body="new Handler();",
+            active=True,
+            config={"arguments": []},
+            profile="vniimt",
+            project_id="project-1",
+        )
+
+    assert web_result["response"]["planned_payload"]["active"] is False
+    assert cron_result["response"]["planned_payload"]["active"] is False
+    assert active_web_result["response"]["planned_payload"]["active"] is True
+
+
 def test_upsert_cron_script_requires_six_part_cron_config_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:
@@ -1276,6 +1320,39 @@ def test_upsert_cron_script_requires_six_part_cron_config_without_real_network()
                 script_type="cron",
                 body="new Handler();",
                 config={"cron": "0 3 * * *", "arguments": []},
+                profile="vniimt",
+                project_id="project-1",
+            )
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"cron": "", "arguments": []},
+        {"cron": None, "arguments": []},
+        {"cron": ["0", "0"], "arguments": []},
+    ],
+)
+def test_upsert_cron_script_requires_cron_string_without_real_network(config: dict[str, object]) -> None:
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+    class FakeClient:
+        def list_scripts(self, *, limit: int = 1000, offset: int = 0) -> FakeResponse:
+            return FakeResponse([[], 0])
+
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch.object(server, "_client", return_value=FakeClient()),
+    ):
+        with pytest.raises(ValueError, match="config.cron"):
+            server.alterios_upsert_script(
+                "Cron Script",
+                script_type="cron",
+                body="new Handler();",
+                config=config,
                 profile="vniimt",
                 project_id="project-1",
             )

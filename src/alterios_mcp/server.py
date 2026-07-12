@@ -123,6 +123,14 @@ def _validate_script_type_config(script_type: str, config: dict[str, Any]) -> No
         raise ValueError("cron script config.cron must contain six parts: second minute hour day month week.")
 
 
+def _script_active_default(script_type: str, existing: dict[str, Any] | None, active: bool | None) -> bool:
+    if active is not None:
+        return active
+    if existing and "active" in existing:
+        return bool(existing["active"])
+    return script_type not in {"web", "cron"}
+
+
 def _add_comment_operation(entity_id: str, body: str, entity: str, parent_id: str | None) -> WriteOperation:
     request: dict[str, Any] = {"entity": entity, "entityId": entity_id, "body": body}
     if parent_id:
@@ -6192,7 +6200,7 @@ def alterios_upsert_script(
         "name": name,
         "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp script.",
         "type": effective_type,
-        "active": active if active is not None else (existing or {}).get("active", True),
+        "active": _script_active_default(effective_type, existing, active),
         "body": body if body is not None else (existing or {}).get("body") or "",
         "share": share if share is not None else (existing or {}).get("share", False),
         "config": config if config is not None else (existing or {}).get("config") or {},
