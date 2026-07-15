@@ -3127,6 +3127,7 @@ def gitea_workboard_probe(dotenv_path: str | None = None, include_repo: bool = T
 def gitea_list_work_items(
     state: str = "open",
     labels: list[str] | None = None,
+    milestones: list[str] | None = None,
     query: str | None = None,
     limit: int = 20,
     dotenv_path: str | None = None,
@@ -3140,6 +3141,7 @@ def gitea_list_work_items(
     response = GiteaClient(config).list_issues(
         state=state,
         labels=labels or [],
+        milestones=milestones or [],
         query=query,
         limit=limit,
     )
@@ -3147,6 +3149,7 @@ def gitea_list_work_items(
         "target": config.target(),
         "state": state,
         "labels": labels or [],
+        "milestones": milestones or [],
         "query": query,
         "response": response.as_dict(),
     }
@@ -3259,6 +3262,88 @@ def gitea_create_work_item(
         response=response,
         dotenv_path=env_path,
     )
+
+
+@mcp.tool()
+def gitea_create_sprint(
+    title: str | None = None,
+    description: str = "",
+    due_on: str | None = None,
+    state: str = "open",
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create a Gitea milestone used as a sprint for the private workboard."""
+    if state not in {"open", "closed"}:
+        raise ValueError("state must be one of: open, closed.")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
+    sprint_title = (title or config.default_milestone).strip()
+    if not sprint_title:
+        raise ValueError("title must not be empty and GITEA_DEFAULT_MILESTONE is not configured.")
+    payload = {
+        "title": sprint_title,
+        "description": description,
+        "due_on": due_on,
+        "state": state,
+    }
+    if dry_run:
+        return planned_gitea_result(
+            operation="gitea_create_sprint",
+            config=config,
+            dry_run=True,
+            payload=payload,
+            response={"will_create_only_if_missing": True},
+            dotenv_path=env_path,
+        )
+
+    assert_gitea_write_allowed(config, dry_run=False, dotenv_path=env_path)
+    response = GiteaClient(config).ensure_milestone(
+        title=sprint_title,
+        description=description,
+        due_on=due_on,
+        state=state,
+    )
+    return planned_gitea_result(
+        operation="gitea_create_sprint",
+        config=config,
+        dry_run=False,
+        payload=payload,
+        response=response,
+        dotenv_path=env_path,
+    )
+
+
+@mcp.tool()
+def gitea_list_sprint_tasks(
+    milestone: str | None = None,
+    state: str = "open",
+    labels: list[str] | None = None,
+    limit: int = 50,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """List Gitea issue work items for one sprint/milestone."""
+    if state not in {"open", "closed", "all"}:
+        raise ValueError("state must be one of: open, closed, all.")
+    if limit < 1 or limit > 100:
+        raise ValueError("limit must be between 1 and 100.")
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    sprint = (milestone or config.default_milestone).strip()
+    if not sprint:
+        raise ValueError("milestone must not be empty and GITEA_DEFAULT_MILESTONE is not configured.")
+    response = GiteaClient(config).list_issues(
+        state=state,
+        labels=labels or [],
+        milestones=[sprint],
+        limit=limit,
+    )
+    return {
+        "target": config.target(),
+        "milestone": sprint,
+        "state": state,
+        "labels": labels or [],
+        "response": response.as_dict(),
+    }
 
 
 @mcp.tool()

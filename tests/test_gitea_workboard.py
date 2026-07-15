@@ -36,6 +36,41 @@ class FakeGiteaClient:
         return FakeGiteaResponse({"number": 5, "title": payload["title"]}, status_code=201)
 
 
+class FakeSprintClient:
+    ensured: dict[str, object] | None = None
+    listed: dict[str, object] | None = None
+
+    def __init__(self, _config: object) -> None:
+        pass
+
+    def ensure_milestone(self, *, title: str, description: str = "", due_on: str | None = None, state: str = "open") -> dict[str, object]:
+        FakeSprintClient.ensured = {
+            "title": title,
+            "description": description,
+            "due_on": due_on,
+            "state": state,
+        }
+        return {"created": True, "milestone": {"id": 7, "title": title}}
+
+    def list_issues(
+        self,
+        *,
+        state: str = "open",
+        labels: list[str] | None = None,
+        milestones: list[str] | None = None,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> FakeGiteaResponse:
+        FakeSprintClient.listed = {
+            "state": state,
+            "labels": labels,
+            "milestones": milestones,
+            "query": query,
+            "limit": limit,
+        }
+        return FakeGiteaResponse([{"number": 3, "title": "Sprint task"}])
+
+
 def test_gitea_config_redacts_token_and_sensitive_url_query() -> None:
     env = {
         "GITEA_BASE_URL": "https://user:password@gitea.example.local?token=secret-value",
@@ -143,6 +178,56 @@ def test_gitea_create_work_item_execution_resolves_labels_and_milestone_without_
         "labels": [11, 12],
         "assignees": ["lead"],
         "milestone": 21,
+    }
+
+
+def test_gitea_create_sprint_execution_uses_default_milestone_without_real_network() -> None:
+    env = {
+        "GITEA_BASE_URL": "https://gitea.example.local",
+        "GITEA_TOKEN": "private-gitea-token",
+        "GITEA_OWNER": "team",
+        "GITEA_REPO": "workboard",
+        "GITEA_DEFAULT_MILESTONE": "2026-07-S1",
+        "GITEA_MCP_ALLOW_WRITE": "1",
+    }
+    FakeSprintClient.ensured = None
+
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "GiteaClient", FakeSprintClient):
+        result = server.gitea_create_sprint(
+            description="Sprint description",
+            dry_run=False,
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["created"] is True
+    assert FakeSprintClient.ensured == {
+        "title": "2026-07-S1",
+        "description": "Sprint description",
+        "due_on": None,
+        "state": "open",
+    }
+
+
+def test_gitea_list_sprint_tasks_filters_by_milestone_without_real_network() -> None:
+    env = {
+        "GITEA_BASE_URL": "https://gitea.example.local",
+        "GITEA_TOKEN": "private-gitea-token",
+        "GITEA_OWNER": "team",
+        "GITEA_REPO": "workboard",
+        "GITEA_DEFAULT_MILESTONE": "2026-07-S1",
+    }
+    FakeSprintClient.listed = None
+
+    with patch.dict("os.environ", env, clear=True), patch.object(server, "GiteaClient", FakeSprintClient):
+        result = server.gitea_list_sprint_tasks(labels=["type:feature"], state="all")
+
+    assert result["response"]["body"][0]["number"] == 3
+    assert FakeSprintClient.listed == {
+        "state": "all",
+        "labels": ["type:feature"],
+        "milestones": ["2026-07-S1"],
+        "query": None,
+        "limit": 50,
     }
 
 

@@ -116,6 +116,7 @@ class GiteaClient:
         *,
         state: str = "open",
         labels: list[str] | None = None,
+        milestones: list[str] | None = None,
         query: str | None = None,
         limit: int = 20,
     ) -> GiteaResponse:
@@ -123,6 +124,8 @@ class GiteaClient:
         params: dict[str, Any] = {"state": state, "type": "issues", "limit": limit}
         if labels:
             params["labels"] = ",".join(labels)
+        if milestones:
+            params["milestones"] = ",".join(milestones)
         if query:
             params["q"] = query
         return self._request("GET", f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues", params=params)
@@ -150,6 +153,38 @@ class GiteaClient:
             f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/milestones",
             params={"state": state, "limit": limit},
         )
+
+    def create_milestone(self, payload: dict[str, Any]) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "POST",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/milestones",
+            body=payload,
+        )
+
+    def ensure_milestone(
+        self,
+        *,
+        title: str,
+        description: str = "",
+        due_on: str | None = None,
+        state: str = "open",
+    ) -> dict[str, Any]:
+        normalized_title = title.strip()
+        if not normalized_title:
+            raise ValueError("milestone title must not be empty.")
+        response = self.list_milestones(state="all")
+        milestones = response.body if isinstance(response.body, list) else []
+        for item in milestones:
+            if isinstance(item, dict) and item.get("title") == normalized_title:
+                return {"created": False, "milestone": item}
+        payload: dict[str, Any] = {"title": normalized_title, "state": state}
+        if description:
+            payload["description"] = description
+        if due_on:
+            payload["due_on"] = due_on
+        created = self.create_milestone(payload)
+        return {"created": True, "milestone": created.body, "response": created.as_dict()}
 
     def create_issue(self, payload: dict[str, Any]) -> GiteaResponse:
         self._require_repo_config()

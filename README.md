@@ -201,6 +201,8 @@ playbook: [docs/gost-documentation-scribe-agent.md](docs/gost-documentation-scri
 - `gitea_workboard_config` и `gitea_workboard_probe` проверяют конфиг и доступ;
 - `gitea_list_work_items` читает задачи;
 - `gitea_sync_standard_labels` синхронизирует стандартные labels;
+- `gitea_create_sprint` создает milestone как sprint;
+- `gitea_list_sprint_tasks` читает задачи sprint/milestone;
 - `gitea_create_work_item` создает private issue;
 - `gitea_add_agent_report` добавляет отчет агента в issue.
 
