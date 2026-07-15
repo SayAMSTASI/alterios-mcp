@@ -33,6 +33,16 @@ from .client import (
 )
 from .discovery import discover_readonly, list_objects, list_projects
 from .form_surface import analyze_form_surface
+from .gitea_workboard import (
+    GiteaClient,
+    GiteaConfig,
+    agent_report_body,
+    assert_gitea_write_allowed,
+    build_issue_payload,
+    gitea_write_enabled,
+    load_standard_labels,
+    planned_gitea_result,
+)
 from .profile_smoke import run_profile_smoke
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
@@ -3070,6 +3080,224 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
 def alterios_list_profiles(profile: str | None = None) -> dict[str, Any]:
     """Return configured Alterios instance profiles with redacted settings and missing values."""
     return configured_profiles(selected_profile=profile)
+
+
+@mcp.tool()
+def gitea_workboard_config(dotenv_path: str | None = None) -> dict[str, Any]:
+    """Return redacted private Gitea workboard configuration and missing values."""
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    return {
+        "config": config.redacted(),
+        "missing_for_base_call": config.missing_for_base_call(),
+        "missing_for_repo_call": config.missing_for_repo_call(),
+        "write_enabled": gitea_write_enabled(),
+        "write_gate": "GITEA_MCP_ALLOW_WRITE=1",
+    }
+
+
+@mcp.tool()
+def gitea_workboard_probe(dotenv_path: str | None = None, include_repo: bool = True) -> dict[str, Any]:
+    """Probe the configured private Gitea API and repository without changing state."""
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    result: dict[str, Any] = {
+        "config": config.redacted(),
+        "missing_for_base_call": config.missing_for_base_call(),
+        "missing_for_repo_call": config.missing_for_repo_call(),
+        "write_enabled": gitea_write_enabled(),
+    }
+    if config.missing_for_base_call():
+        result["api_version"] = {"skipped": True, "reason": "missing GITEA_BASE_URL"}
+        result["repository"] = {"skipped": True, "reason": "missing GITEA_BASE_URL"}
+        return result
+
+    client = GiteaClient(config)
+    result["api_version"] = client.api_version().as_dict()
+    if not include_repo:
+        result["repository"] = {"skipped": True, "reason": "include_repo=false"}
+    elif config.missing_for_repo_call():
+        result["repository"] = {"skipped": True, "missing": config.missing_for_repo_call()}
+    else:
+        result["repository"] = client.repository().as_dict()
+    return result
+
+
+@mcp.tool()
+def gitea_list_work_items(
+    state: str = "open",
+    labels: list[str] | None = None,
+    query: str | None = None,
+    limit: int = 20,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """List private Gitea issue work items from the configured workboard repository."""
+    if state not in {"open", "closed", "all"}:
+        raise ValueError("state must be one of: open, closed, all.")
+    if limit < 1 or limit > 100:
+        raise ValueError("limit must be between 1 and 100.")
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    response = GiteaClient(config).list_issues(
+        state=state,
+        labels=labels or [],
+        query=query,
+        limit=limit,
+    )
+    return {
+        "target": config.target(),
+        "state": state,
+        "labels": labels or [],
+        "query": query,
+        "response": response.as_dict(),
+    }
+
+
+@mcp.tool()
+def gitea_sync_standard_labels(
+    template_path: str = "templates/gitea/labels.yaml",
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create the standard private-workboard labels in Gitea."""
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    labels = load_standard_labels(template_path)
+    planned_payload = {"template_path": template_path, "label_count": len(labels), "labels": labels}
+    if dry_run:
+        return planned_gitea_result(
+            operation="gitea_sync_standard_labels",
+            config=config,
+            dry_run=True,
+            payload=planned_payload,
+            response={"will_check_existing_labels_on_apply": True},
+        )
+
+    assert_gitea_write_allowed(config, dry_run=False)
+    client = GiteaClient(config)
+    existing_response = client.list_labels()
+    existing_labels = existing_response.body if isinstance(existing_response.body, list) else []
+    existing_names = {str(label.get("name")) for label in existing_labels if isinstance(label, dict)}
+    created = []
+    skipped = []
+    for label in labels:
+        if label["name"] in existing_names:
+            skipped.append(label["name"])
+            continue
+        created_response = client.create_label(label).as_dict()
+        created.append({"name": label["name"], "response": created_response})
+    return planned_gitea_result(
+        operation="gitea_sync_standard_labels",
+        config=config,
+        dry_run=False,
+        payload=planned_payload,
+        response={
+            "created_count": len(created),
+            "skipped_count": len(skipped),
+            "created": created,
+            "skipped": skipped,
+        },
+    )
+
+
+@mcp.tool()
+def gitea_create_work_item(
+    title: str,
+    body: str,
+    labels: list[str] | None = None,
+    assignees: list[str] | None = None,
+    milestone_id: int | None = None,
+    milestone_name: str | None = None,
+    due_date: str | None = None,
+    ref: str | None = None,
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Plan or create a private Gitea issue work item for real project work."""
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    effective_milestone = milestone_id if milestone_id is not None else (milestone_name or config.default_milestone)
+    planned_payload = {
+        "title": title.strip(),
+        "body": body,
+        "label_names": labels or [],
+        "assignees": assignees or [],
+        "milestone": effective_milestone,
+        "due_date": due_date,
+        "ref": ref,
+    }
+    if dry_run:
+        return planned_gitea_result(
+            operation="gitea_create_work_item",
+            config=config,
+            dry_run=True,
+            payload=planned_payload,
+            response={"will_resolve_label_and_milestone_ids_on_apply": True},
+        )
+
+    assert_gitea_write_allowed(config, dry_run=False)
+    client = GiteaClient(config)
+    label_ids = client.resolve_label_ids(labels or [])
+    resolved_milestone_id = client.resolve_milestone_id(effective_milestone)
+    issue_payload = build_issue_payload(
+        title=title,
+        body=body,
+        label_ids=label_ids,
+        assignees=assignees or [],
+        milestone_id=resolved_milestone_id,
+        due_date=due_date,
+        ref=ref,
+    )
+    response = client.create_issue(issue_payload).as_dict()
+    return planned_gitea_result(
+        operation="gitea_create_work_item",
+        config=config,
+        dry_run=False,
+        payload={**planned_payload, "resolved_label_ids": label_ids, "resolved_milestone_id": resolved_milestone_id},
+        response=response,
+    )
+
+
+@mcp.tool()
+def gitea_add_agent_report(
+    issue_number: int,
+    role: str,
+    scope: str,
+    findings: str,
+    artifacts: str = "",
+    verification: str = "",
+    risks: str = "",
+    next_step: str = "",
+    body: str | None = None,
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Plan or add a structured agent report comment to a private Gitea work item."""
+    if issue_number < 1:
+        raise ValueError("issue_number must be positive.")
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    comment_body = body or agent_report_body(
+        role=role,
+        scope=scope,
+        findings=findings,
+        artifacts=artifacts,
+        verification=verification,
+        risks=risks,
+        next_step=next_step,
+    )
+    payload = {"issue_number": issue_number, "body": comment_body}
+    if dry_run:
+        return planned_gitea_result(
+            operation="gitea_add_agent_report",
+            config=config,
+            dry_run=True,
+            payload=payload,
+        )
+
+    assert_gitea_write_allowed(config, dry_run=False)
+    response = GiteaClient(config).create_issue_comment(issue_number, comment_body).as_dict()
+    return planned_gitea_result(
+        operation="gitea_add_agent_report",
+        config=config,
+        dry_run=False,
+        payload=payload,
+        response=response,
+    )
 
 
 @mcp.tool()

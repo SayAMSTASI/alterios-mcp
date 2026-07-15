@@ -172,24 +172,33 @@ GITEA_OWNER=alterios-team
 GITEA_REPO=alterios-workboard
 GITEA_DEFAULT_PROJECT=Alterios Delivery
 GITEA_DEFAULT_MILESTONE=2026-07-S1
+GITEA_TIMEOUT_SECONDS=20
+GITEA_MCP_ALLOW_WRITE=0
 ```
 
 В публичном `.env.example` допускаются только placeholders.
 
-## 12. Будущие MCP tools
+## 12. MCP tools
 
-Когда Gitea workflow стабилизируется, можно добавить typed tools:
+Первый рабочий слой typed tools уже добавлен:
 
-- `gitea_create_work_item`;
+- `gitea_workboard_config` - показывает redacted-конфиг, missing keys и состояние `GITEA_MCP_ALLOW_WRITE`;
+- `gitea_workboard_probe` - проверяет API `/api/v1/version` и, если настроены token/owner/repo, доступ к repository;
+- `gitea_list_work_items` - читает private issues по state, labels и query;
+- `gitea_sync_standard_labels` - dry-run и apply стандартных labels из `templates/gitea/labels.yaml`;
+- `gitea_create_work_item` - dry-run и apply private issue; labels на apply разрешаются в id;
+- `gitea_add_agent_report` - dry-run и apply структурированного комментария агента в issue.
+
+Write calls в Gitea не используют `ALTERIOS_MCP_ALLOW_WRITE`. Для private workboard есть отдельный gate
+`GITEA_MCP_ALLOW_WRITE=1`, чтобы не смешивать live-запись в Alterios и публикацию задач в Gitea.
+
+Следующий слой после проверки в реальном private repo:
+
 - `gitea_update_work_item_status`;
-- `gitea_add_agent_report`;
 - `gitea_create_sprint`;
 - `gitea_list_sprint_tasks`;
 - `gitea_link_commit`;
 - `gitea_close_work_item`.
-
-Каждый write-tool должен иметь dry-run, redaction, explicit repo target и
-проверку, что он пишет в private Gitea, а не в публичный `alterios-mcp`.
 
 ## 13. Definition of Done для Gitea-задачи
 

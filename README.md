@@ -193,6 +193,21 @@ playbook: [docs/gost-documentation-scribe-agent.md](docs/gost-documentation-scri
 
 Матрица агентов и ролей: [docs/agents-and-skills.md](docs/agents-and-skills.md).
 
+### Приватное рабочее поле Gitea
+
+Для реальных бизнес-задач, которые нельзя светить в публичном `alterios-mcp`,
+поддержан private Gitea workboard:
+
+- `gitea_workboard_config` и `gitea_workboard_probe` проверяют конфиг и доступ;
+- `gitea_list_work_items` читает задачи;
+- `gitea_sync_standard_labels` синхронизирует стандартные labels;
+- `gitea_create_work_item` создает private issue;
+- `gitea_add_agent_report` добавляет отчет агента в issue.
+
+Запись в Gitea имеет отдельный gate `GITEA_MCP_ALLOW_WRITE=1`; он не связан с
+`ALTERIOS_MCP_ALLOW_WRITE`, чтобы не смешивать Alterios live-write и публикацию
+задач в private workboard.
+
 ## Безопасность записи
 
 Запись выключена по умолчанию.
