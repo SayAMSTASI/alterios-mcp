@@ -54,6 +54,27 @@ def test_gitea_config_redacts_token_and_sensitive_url_query() -> None:
     assert result["write_enabled"] is False
 
 
+def test_gitea_config_reads_write_gate_from_private_dotenv(tmp_path) -> None:
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "\n".join(
+            [
+                "GITEA_BASE_URL=https://gitea.example.local",
+                "GITEA_OWNER=team",
+                "GITEA_REPO=workboard",
+                "GITEA_MCP_ALLOW_WRITE=1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with patch.dict("os.environ", {}, clear=True):
+        result = server.gitea_workboard_config(dotenv_path=str(dotenv))
+
+    assert result["write_enabled"] is True
+    assert result["missing_for_repo_call"] == ["GITEA_TOKEN"]
+
+
 def test_gitea_create_work_item_dry_run_does_not_require_token_or_network() -> None:
     env = {
         "GITEA_BASE_URL": "https://gitea.example.local",

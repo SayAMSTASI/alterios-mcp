@@ -3085,12 +3085,13 @@ def alterios_list_profiles(profile: str | None = None) -> dict[str, Any]:
 @mcp.tool()
 def gitea_workboard_config(dotenv_path: str | None = None) -> dict[str, Any]:
     """Return redacted private Gitea workboard configuration and missing values."""
-    config = GiteaConfig.from_env(dotenv_path or ".env")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
     return {
         "config": config.redacted(),
         "missing_for_base_call": config.missing_for_base_call(),
         "missing_for_repo_call": config.missing_for_repo_call(),
-        "write_enabled": gitea_write_enabled(),
+        "write_enabled": gitea_write_enabled(env_path),
         "write_gate": "GITEA_MCP_ALLOW_WRITE=1",
     }
 
@@ -3098,12 +3099,13 @@ def gitea_workboard_config(dotenv_path: str | None = None) -> dict[str, Any]:
 @mcp.tool()
 def gitea_workboard_probe(dotenv_path: str | None = None, include_repo: bool = True) -> dict[str, Any]:
     """Probe the configured private Gitea API and repository without changing state."""
-    config = GiteaConfig.from_env(dotenv_path or ".env")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
     result: dict[str, Any] = {
         "config": config.redacted(),
         "missing_for_base_call": config.missing_for_base_call(),
         "missing_for_repo_call": config.missing_for_repo_call(),
-        "write_enabled": gitea_write_enabled(),
+        "write_enabled": gitea_write_enabled(env_path),
     }
     if config.missing_for_base_call():
         result["api_version"] = {"skipped": True, "reason": "missing GITEA_BASE_URL"}
@@ -3157,7 +3159,8 @@ def gitea_sync_standard_labels(
     dotenv_path: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create the standard private-workboard labels in Gitea."""
-    config = GiteaConfig.from_env(dotenv_path or ".env")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
     labels = load_standard_labels(template_path)
     planned_payload = {"template_path": template_path, "label_count": len(labels), "labels": labels}
     if dry_run:
@@ -3167,9 +3170,10 @@ def gitea_sync_standard_labels(
             dry_run=True,
             payload=planned_payload,
             response={"will_check_existing_labels_on_apply": True},
+            dotenv_path=env_path,
         )
 
-    assert_gitea_write_allowed(config, dry_run=False)
+    assert_gitea_write_allowed(config, dry_run=False, dotenv_path=env_path)
     client = GiteaClient(config)
     existing_response = client.list_labels()
     existing_labels = existing_response.body if isinstance(existing_response.body, list) else []
@@ -3193,6 +3197,7 @@ def gitea_sync_standard_labels(
             "created": created,
             "skipped": skipped,
         },
+        dotenv_path=env_path,
     )
 
 
@@ -3210,7 +3215,8 @@ def gitea_create_work_item(
     dotenv_path: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create a private Gitea issue work item for real project work."""
-    config = GiteaConfig.from_env(dotenv_path or ".env")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
     effective_milestone = milestone_id if milestone_id is not None else (milestone_name or config.default_milestone)
     planned_payload = {
         "title": title.strip(),
@@ -3228,9 +3234,10 @@ def gitea_create_work_item(
             dry_run=True,
             payload=planned_payload,
             response={"will_resolve_label_and_milestone_ids_on_apply": True},
+            dotenv_path=env_path,
         )
 
-    assert_gitea_write_allowed(config, dry_run=False)
+    assert_gitea_write_allowed(config, dry_run=False, dotenv_path=env_path)
     client = GiteaClient(config)
     label_ids = client.resolve_label_ids(labels or [])
     resolved_milestone_id = client.resolve_milestone_id(effective_milestone)
@@ -3250,6 +3257,7 @@ def gitea_create_work_item(
         dry_run=False,
         payload={**planned_payload, "resolved_label_ids": label_ids, "resolved_milestone_id": resolved_milestone_id},
         response=response,
+        dotenv_path=env_path,
     )
 
 
@@ -3270,7 +3278,8 @@ def gitea_add_agent_report(
     """Plan or add a structured agent report comment to a private Gitea work item."""
     if issue_number < 1:
         raise ValueError("issue_number must be positive.")
-    config = GiteaConfig.from_env(dotenv_path or ".env")
+    env_path = dotenv_path or ".env"
+    config = GiteaConfig.from_env(env_path)
     comment_body = body or agent_report_body(
         role=role,
         scope=scope,
@@ -3287,9 +3296,10 @@ def gitea_add_agent_report(
             config=config,
             dry_run=True,
             payload=payload,
+            dotenv_path=env_path,
         )
 
-    assert_gitea_write_allowed(config, dry_run=False)
+    assert_gitea_write_allowed(config, dry_run=False, dotenv_path=env_path)
     response = GiteaClient(config).create_issue_comment(issue_number, comment_body).as_dict()
     return planned_gitea_result(
         operation="gitea_add_agent_report",
@@ -3297,6 +3307,7 @@ def gitea_add_agent_report(
         dry_run=False,
         payload=payload,
         response=response,
+        dotenv_path=env_path,
     )
 
 

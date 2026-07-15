@@ -333,34 +333,48 @@ def planned_gitea_result(
     dry_run: bool,
     payload: dict[str, Any],
     response: dict[str, Any] | None = None,
+    dotenv_path: str | Path | None = ".env",
 ) -> dict[str, Any]:
     required_execution_gates = ["dry_run=false", "GITEA_MCP_ALLOW_WRITE=1"]
     if config.missing_for_repo_call():
         required_execution_gates.extend(config.missing_for_repo_call())
+    write_enabled = gitea_write_enabled(dotenv_path)
     return {
         "dry_run": dry_run,
-        "write_enabled": gitea_write_enabled(),
+        "write_enabled": write_enabled,
         "target": config.target(),
         "operation": operation,
         "payload": redact_sensitive(payload),
         "response": redact_sensitive(response),
         "required_execution_gates": required_execution_gates,
-        "will_execute": bool(not dry_run and gitea_write_enabled()),
+        "will_execute": bool(not dry_run and write_enabled),
     }
 
 
-def assert_gitea_write_allowed(config: GiteaConfig, *, dry_run: bool) -> None:
+def assert_gitea_write_allowed(
+    config: GiteaConfig,
+    *,
+    dry_run: bool,
+    dotenv_path: str | Path | None = ".env",
+) -> None:
     if dry_run:
         return
-    if not gitea_write_enabled():
+    if not gitea_write_enabled(dotenv_path):
         raise GiteaConfigError("Gitea writes are disabled. Set GITEA_MCP_ALLOW_WRITE=1 explicitly.")
     missing = config.missing_for_repo_call()
     if missing:
         raise GiteaConfigError("Missing required configuration: " + ", ".join(missing))
 
 
-def gitea_write_enabled() -> bool:
-    return os.environ.get("GITEA_MCP_ALLOW_WRITE") == "1"
+def gitea_write_enabled(dotenv_path: str | Path | None = ".env") -> bool:
+    effective_dotenv_path = dotenv_path
+    if dotenv_path == ".env":
+        effective_dotenv_path = (
+            os.environ.get("GITEA_DOTENV_PATH")
+            or os.environ.get("ALTERIOS_DOTENV_PATH")
+            or ".env"
+        )
+    return load_config_values(effective_dotenv_path).get("GITEA_MCP_ALLOW_WRITE") == "1"
 
 
 def _create_label_payload(label: dict[str, Any]) -> dict[str, Any]:
