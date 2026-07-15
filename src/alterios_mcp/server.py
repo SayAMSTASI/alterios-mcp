@@ -43,6 +43,13 @@ from .gitea_workboard import (
     load_standard_labels,
     planned_gitea_result,
 )
+from .local_workboard import (
+    LocalWorkboardConfig,
+    add_local_agent_report,
+    create_local_work_item,
+    ensure_local_workboard,
+    list_local_work_items,
+)
 from .profile_smoke import run_profile_smoke
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
@@ -3121,6 +3128,101 @@ def gitea_workboard_probe(dotenv_path: str | None = None, include_repo: bool = T
     else:
         result["repository"] = client.repository().as_dict()
     return result
+
+
+@mcp.tool()
+def local_workboard_config(base_dir: str | None = None, dotenv_path: str | None = None) -> dict[str, Any]:
+    """Return the local private workboard target used when Gitea is unavailable."""
+    config = LocalWorkboardConfig.from_env(dotenv_path=dotenv_path or ".env", base_dir=base_dir)
+    return {
+        "config": config.redacted(),
+        "exists": config.base_dir.exists(),
+        "required_execution_gates": ["dry_run=false"],
+    }
+
+
+@mcp.tool()
+def local_workboard_init(base_dir: str | None = None, dotenv_path: str | None = None) -> dict[str, Any]:
+    """Create the local private workboard folder structure."""
+    return ensure_local_workboard(base_dir=base_dir, dotenv_path=dotenv_path or ".env")
+
+
+@mcp.tool()
+def local_workboard_create_item(
+    title: str,
+    body: str,
+    status: str = "backlog",
+    kind: str = "task",
+    sprint: str | None = None,
+    labels: list[str] | None = None,
+    assignee: str | None = None,
+    base_dir: str | None = None,
+    dotenv_path: str | None = None,
+    dry_run: bool = True,
+) -> dict[str, Any]:
+    """Plan or create a local private work item when Gitea is unavailable."""
+    return create_local_work_item(
+        title=title,
+        body=body,
+        status=status,
+        kind=kind,
+        sprint=sprint,
+        labels=labels or [],
+        assignee=assignee,
+        base_dir=base_dir,
+        dotenv_path=dotenv_path or ".env",
+        dry_run=dry_run,
+    )
+
+
+@mcp.tool()
+def local_workboard_list_items(
+    status: str | None = None,
+    sprint: str | None = None,
+    base_dir: str | None = None,
+    dotenv_path: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """List local private work items from the fallback file workboard."""
+    return list_local_work_items(
+        status=status,
+        sprint=sprint,
+        base_dir=base_dir,
+        dotenv_path=dotenv_path or ".env",
+        limit=limit,
+    )
+
+
+@mcp.tool()
+def local_workboard_add_agent_report(
+    item_id: str,
+    role: str,
+    scope: str,
+    findings: str,
+    artifacts: str = "",
+    verification: str = "",
+    risks: str = "",
+    next_step: str = "",
+    body: str | None = None,
+    base_dir: str | None = None,
+    dotenv_path: str | None = None,
+    dry_run: bool = True,
+) -> dict[str, Any]:
+    """Plan or append a structured agent report to a local private work item."""
+    return add_local_agent_report(
+        item_id=item_id,
+        role=role,
+        scope=scope,
+        findings=findings,
+        artifacts=artifacts,
+        verification=verification,
+        risks=risks,
+        next_step=next_step,
+        body=body,
+        base_dir=base_dir,
+        dotenv_path=dotenv_path or ".env",
+        dry_run=dry_run,
+    )
 
 
 @mcp.tool()

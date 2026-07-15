@@ -210,6 +210,18 @@ playbook: [docs/gost-documentation-scribe-agent.md](docs/gost-documentation-scri
 `ALTERIOS_MCP_ALLOW_WRITE`, чтобы не смешивать Alterios live-write и публикацию
 задач в private workboard.
 
+Если Gitea недоступна, используется локальный private workboard в файлах
+пользователя:
+
+- `local_workboard_config` показывает путь локальной доски;
+- `local_workboard_init` создает структуру каталогов;
+- `local_workboard_create_item` создает локальную задачу с dry-run по умолчанию;
+- `local_workboard_list_items` читает локальный backlog/sprint;
+- `local_workboard_add_agent_report` дописывает отчет агента.
+
+Локальный workboard хранится вне public Git. Если каталог случайно создан внутри
+repo, путь `workboard/` игнорируется Git.
+
 ## Безопасность записи
 
 Запись выключена по умолчанию.

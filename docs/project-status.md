@@ -1,6 +1,6 @@
 # Статус проекта Alterios MCP
 
-Обновлено: 2026-07-11
+Обновлено: 2026-07-15
 
 ## Текущая сводка
 
@@ -15,12 +15,14 @@ workflow, files, comments, users и reports. Sandbox practice script
 а также comments, file-field upload, saved manual script, BPMN process/task и
 dashboard report create/update/full-readback.
 
-Покрытие методов ведется явно: 88 MCP tools, 14 runtime services, 15 live
+Покрытие методов ведется явно: 93 MCP tools, 14 runtime services, 15 live
 read-only route probes, 78 REST route/method patterns и 13 классов операций.
 После typed-write, metadata/data, dangerous-write и security/form/bulk этапов
 текущая write-поверхность Alterios составляет 35 write-like tools; private
 Gitea workboard добавляет отдельный слой issue/comment/label/sprint tools с gate
-`GITEA_MCP_ALLOW_WRITE`. Последний stage-17 pass добавил `alterios_replay_smoke`. Этап оптимизации
+`GITEA_MCP_ALLOW_WRITE`; локальный private workboard добавляет fallback tools для
+ведения задач в файлах пользователя, если Gitea недоступна или Projects board
+требует browser-session. Последний stage-17 pass добавил `alterios_replay_smoke`. Этап оптимизации
 добавил read-only tools для write plans, write journal и replay smoke, а сценарные
 material-module/report-tab/process-flow apply теперь требуют проверенный `plan_id`.
 
@@ -142,6 +144,7 @@ API cleanup readback. Cross-project content-type transfer имеет route evide
 | 2 | Expand user/configurator scenarios. | Done | Published `docs/expanded-user-scenarios.md`. Follow-up implementation added typed users/user-groups/roles/delete wrappers, form-listener patching, bulk selected-row update, and native publish planning. |
 | 2 | Add profile-level live smoke matrix across multiple Alterios instances. | Done | `alterios-profile-smoke` and `alterios_profile_smoke_matrix` record sanitized profile/project coverage; live 2026-07-10 run covered `artx` and `vniimt` with 15/15 default-project route smoke each. |
 | 2 | Add private Gitea workboard MCP tools. | Done | Added `gitea_workboard_config`, `gitea_workboard_probe`, `gitea_list_work_items`, `gitea_sync_standard_labels`, `gitea_create_sprint`, `gitea_list_sprint_tasks`, `gitea_create_work_item`, and `gitea_add_agent_report` with dry-run defaults, separate `GITEA_MCP_ALLOW_WRITE` gate, label/milestone resolution on apply, docs, and no-network tests. Live Gitea writes are limited to private workboard setup. |
+| 2 | Add local private workboard fallback and Gitea Projects board evidence. | Done | Added `local_workboard_config`, `local_workboard_init`, `local_workboard_create_item`, `local_workboard_list_items`, and `local_workboard_add_agent_report` for file-based private task tracking when Gitea is unavailable. Documented that Gitea Projects board is not exposed in swagger/API on the checked instance and requires browser-session/CSRF, while issues/milestones/labels remain token-automatable. |
 | 2 | Add plan binding or expected target IDs for execution after dry-run review. | Deferred | Useful before production typed write execution. |
 | 2 | Improve static scanner context classification (`matched_by`, confidence, callee kind). | Deferred | Stage 3 keeps false positives unknown; deeper classification is separate scanner work. |
 | 3 | Release packaging and changelog process. | Deferred | Start after controlled writes are stable. |

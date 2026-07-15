@@ -10,13 +10,13 @@
 - профиль: `artx`;
 - проект: `<sandbox-project-id>`;
 - основной sandbox: `MCP Practice`;
-- дата ревизии: 2026-07-10.
+- дата ревизии: 2026-07-15.
 
 ## Сводка По Количеству
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 75 | Публичные callable tools в `src/alterios_mcp/server.py`. |
+| MCP tools | 93 | Публичные callable tools в `src/alterios_mcp/server.py`, включая Alterios tools и private workboard helpers. |
 | Write-like MCP tools | 35 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_create_material_module`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_create_process_flow`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_create_report_tab`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |

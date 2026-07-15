@@ -14,5 +14,6 @@ artifacts/
 local-artifacts/
 private-artifacts/
 work-notes/
+workboard/
 *.har
 *.har.json

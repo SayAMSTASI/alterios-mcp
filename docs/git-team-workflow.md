@@ -100,6 +100,7 @@ Skill/agent должен ссылаться на обезличенные пра
 - inventories и write journals;
 - временные постановки;
 - протоколы работы агентов;
+- local private workboard: `index.md`, `issues/*`, `sprints/*`, `evidence/*`;
 - выгрузки из Alterios;
 - evidence с реальными данными.
 
