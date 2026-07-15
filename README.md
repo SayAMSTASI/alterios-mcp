@@ -492,6 +492,8 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   проверки, риски и ближайшие действия.
 - [docs/git-team-workflow.md](docs/git-team-workflow.md) - правила командной
   работы, push и разграничения business task artifacts от reusable MCP/skills.
+- [docs/development-cycle-and-agent-workflow.md](docs/development-cycle-and-agent-workflow.md) -
+  положение о цикле разработки, stage gates, Definition of Done и работе агентов.
 - [docs/controlled-writes.md](docs/controlled-writes.md) - правила безопасной
   записи.
 - [docs/administrator-guide.md](docs/administrator-guide.md) - инструкция
