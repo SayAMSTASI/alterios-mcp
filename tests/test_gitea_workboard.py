@@ -12,6 +12,7 @@ from alterios_mcp.gitea_workboard import (
     cookie_header_from_file,
     parse_project_board_html,
     sync_board_by_labels,
+    transition_issue_stage,
 )
 
 
@@ -107,6 +108,32 @@ class FakeBoardSyncClient:
 class FailingWebBoardClient:
     def read_project_board(self, project_id: int | str) -> dict[str, object]:
         raise AssertionError(f"web board should not be used for project {project_id}")
+
+
+class FakeStageTransitionClient:
+    def __init__(self, labels: list[str]) -> None:
+        self.labels = labels
+        self.replaced_with: list[str | int] | None = None
+        self.comments: list[str] = []
+
+    def list_issue_labels(self, issue_number: int) -> FakeGiteaResponse:
+        assert issue_number == 1
+        return FakeGiteaResponse([{"name": label, "id": index + 1} for index, label in enumerate(self.labels)])
+
+    def resolve_label_ids(self, label_names: list[str]) -> list[int]:
+        assert label_names == ["stage:verify"]
+        return [101]
+
+    def replace_issue_labels(self, issue_number: int, labels: list[str | int]) -> FakeGiteaResponse:
+        assert issue_number == 1
+        self.replaced_with = labels
+        self.labels = [str(label) for label in labels]
+        return FakeGiteaResponse([{"name": label} for label in self.labels])
+
+    def create_issue_comment(self, issue_number: int, body: str) -> FakeGiteaResponse:
+        assert issue_number == 1
+        self.comments.append(body)
+        return FakeGiteaResponse({"id": 9, "body": body}, status_code=201)
 
 
 def _board_config() -> GiteaConfig:
@@ -397,3 +424,70 @@ def test_gitea_board_html_and_cookie_parsers(tmp_path) -> None:
     assert board["columns"][0]["title"] == "Done"
     assert board["current_cards"][46]["column_id"] == "20"
     assert cookie_header_from_file(cookie_file) == "test_cookie=abc"
+
+
+def test_gitea_transition_issue_stage_dry_run_preserves_non_stage_labels() -> None:
+    client = FakeStageTransitionClient(["type:chore", "area:mcp", "stage:done"])
+
+    result = transition_issue_stage(
+        config=_board_config(),
+        issue_number=1,
+        target_stage="verify",
+        dry_run=True,
+        dotenv_path=None,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    assert result["dry_run"] is True
+    assert result["payload"]["current_stage_labels"] == ["stage:done"]
+    assert result["payload"]["next_labels"] == ["type:chore", "area:mcp", "stage:verify"]
+    assert client.replaced_with is None
+
+
+def test_gitea_transition_issue_stage_apply_replaces_only_stage_label() -> None:
+    client = FakeStageTransitionClient(["type:chore", "area:mcp", "stage:done"])
+
+    with patch.dict("os.environ", {"GITEA_MCP_ALLOW_WRITE": "1"}, clear=True):
+        result = transition_issue_stage(
+            config=_board_config(),
+            issue_number=1,
+            target_stage="stage:verify",
+            comment="Moved to verify",
+            dry_run=False,
+            dotenv_path=None,
+            client=client,  # type: ignore[arg-type]
+        )
+
+    assert result["dry_run"] is False
+    assert client.replaced_with == ["type:chore", "area:mcp", "stage:verify"]
+    assert client.comments == ["Moved to verify"]
+    assert result["response"]["readback"]["stage_labels"] == ["stage:verify"]
+    assert result["response"]["readback"]["target_stage_set"] is True
+
+
+def test_gitea_transition_issue_stage_apply_requires_write_gate() -> None:
+    client = FakeStageTransitionClient(["type:chore", "stage:done"])
+
+    with patch.dict("os.environ", {}, clear=True), pytest.raises(GiteaConfigError, match="GITEA_MCP_ALLOW_WRITE"):
+        transition_issue_stage(
+            config=_board_config(),
+            issue_number=1,
+            target_stage="verify",
+            dry_run=False,
+            dotenv_path=None,
+            client=client,  # type: ignore[arg-type]
+        )
+
+
+def test_gitea_transition_issue_stage_rejects_unknown_stage() -> None:
+    client = FakeStageTransitionClient(["type:chore", "stage:done"])
+
+    with pytest.raises(ValueError, match="known stage"):
+        transition_issue_stage(
+            config=_board_config(),
+            issue_number=1,
+            target_stage="stage:qa",
+            dry_run=True,
+            dotenv_path=None,
+            client=client,  # type: ignore[arg-type]
+        )

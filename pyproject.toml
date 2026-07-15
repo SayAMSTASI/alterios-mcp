@@ -31,6 +31,8 @@ alterios-replay-smoke = "alterios_mcp.replay_smoke:main"
 alterios-project-health = "alterios_mcp.project_health:main"
 gitea_sync_board_by_labels = "alterios_mcp.gitea_board_sync:main"
 gitea-sync-board-by-labels = "alterios_mcp.gitea_board_sync:main"
+gitea_transition_issue_stage = "alterios_mcp.gitea_stage_transition:main"
+gitea-transition-issue-stage = "alterios_mcp.gitea_stage_transition:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

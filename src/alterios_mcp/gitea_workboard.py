@@ -228,6 +228,21 @@ class GiteaClient:
             body={"body": body},
         )
 
+    def list_issue_labels(self, issue_number: int) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "GET",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues/{issue_number}/labels",
+        )
+
+    def replace_issue_labels(self, issue_number: int, labels: list[str | int]) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "PUT",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues/{issue_number}/labels",
+            body={"labels": labels},
+        )
+
     def list_repo_projects(self, *, state: str = "open", limit: int = 100) -> GiteaResponse:
         self._require_repo_config()
         return self._request(
@@ -540,6 +555,116 @@ def sync_board_by_labels(
             "board_errors": board_state.get("errors", []),
             "plan": plan,
         },
+        response=response,
+        dotenv_path=dotenv_path,
+    )
+
+
+def transition_issue_stage(
+    *,
+    config: GiteaConfig,
+    issue_number: int,
+    target_stage: str,
+    comment: str | None = None,
+    sync_board: bool = False,
+    project_id: str | int | None = None,
+    apply_mode: str = "auto",
+    dry_run: bool = True,
+    dotenv_path: str | Path | None = ".env",
+    client: GiteaClient | None = None,
+    web_client: GiteaBoardWebClient | None = None,
+) -> dict[str, Any]:
+    if issue_number < 1:
+        raise ValueError("issue_number must be positive.")
+    normalized_stage = target_stage.strip()
+    if not normalized_stage.startswith("stage:"):
+        normalized_stage = f"stage:{normalized_stage}"
+    if normalized_stage not in normalize_stage_column_map({}):
+        raise ValueError(
+            "target_stage must be a known stage label: "
+            + ", ".join(sorted(normalize_stage_column_map({}).keys()))
+        )
+    if apply_mode not in {"auto", "api", "web"}:
+        raise ValueError("apply_mode must be one of: auto, api, web.")
+
+    api_client = client or GiteaClient(config)
+    labels_response = api_client.list_issue_labels(issue_number)
+    current_labels = labels_response.body if isinstance(labels_response.body, list) else []
+    current_label_names = [
+        str(label.get("name"))
+        for label in current_labels
+        if isinstance(label, dict) and str(label.get("name") or "").strip()
+    ]
+    current_stage_labels = [label for label in current_label_names if label.startswith("stage:")]
+    next_label_names = [label for label in current_label_names if not label.startswith("stage:")]
+    next_label_names.append(normalized_stage)
+    label_changed = sorted(current_label_names) != sorted(next_label_names)
+
+    payload = {
+        "issue_number": issue_number,
+        "target_stage": normalized_stage,
+        "current_stage_labels": current_stage_labels,
+        "current_labels": current_label_names,
+        "next_labels": next_label_names,
+        "label_changed": label_changed,
+        "comment": comment,
+        "sync_board": sync_board,
+        "project_id": str(project_id or config.default_project).strip() if sync_board else None,
+        "apply_mode": apply_mode,
+    }
+    if dry_run:
+        return planned_gitea_result(
+            operation="gitea_transition_issue_stage",
+            config=config,
+            dry_run=True,
+            payload=payload,
+            response={"will_replace_issue_labels_on_apply": label_changed},
+            dotenv_path=dotenv_path,
+        )
+
+    assert_gitea_write_allowed(config, dry_run=False, dotenv_path=dotenv_path)
+    api_client.resolve_label_ids([normalized_stage])
+    response: dict[str, Any] = {
+        "labels_replace": None,
+        "comment": None,
+        "sync_board": None,
+        "readback": None,
+    }
+    if label_changed:
+        response["labels_replace"] = api_client.replace_issue_labels(issue_number, next_label_names).as_dict()
+    else:
+        response["labels_replace"] = {"skipped": True, "reason": "target stage already set"}
+    if comment:
+        response["comment"] = api_client.create_issue_comment(issue_number, comment).as_dict()
+    readback_labels = api_client.list_issue_labels(issue_number).as_dict()
+    readback_names = [
+        str(label.get("name"))
+        for label in readback_labels.get("body", [])
+        if isinstance(label, dict) and str(label.get("name") or "").strip()
+    ] if isinstance(readback_labels.get("body"), list) else []
+    response["readback"] = {
+        "labels": readback_labels,
+        "stage_labels": [label for label in readback_names if label.startswith("stage:")],
+        "target_stage_set": normalized_stage in readback_names,
+    }
+    if not response["readback"]["target_stage_set"]:
+        raise GiteaConfigError(f"Target stage {normalized_stage!r} was not visible after label replacement.")
+    if sync_board:
+        response["sync_board"] = sync_board_by_labels(
+            config=config,
+            project_id=project_id,
+            state="open",
+            apply_mode=apply_mode,
+            dry_run=False,
+            dotenv_path=dotenv_path,
+            client=api_client,
+            web_client=web_client,
+        )
+    return planned_gitea_result(
+        operation="gitea_transition_issue_stage",
+        config=config,
+        dry_run=False,
+        payload=payload,
         response=response,
         dotenv_path=dotenv_path,
     )

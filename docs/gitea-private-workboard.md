@@ -193,14 +193,23 @@ GITEA_MCP_ALLOW_WRITE=0
 - `gitea_list_sprint_tasks` - читает issues выбранного sprint/milestone;
 - `gitea_create_work_item` - dry-run и apply private issue; labels на apply разрешаются в id;
 - `gitea_add_agent_report` - dry-run и apply структурированного комментария агента в issue;
+- `gitea_transition_issue_stage` - dry-run и apply перехода статуса через замену `stage:*`
+  label с сохранением остальных labels и API-readback;
 - `gitea_sync_board_by_labels` - dry-run и apply синхронизации Projects board по labels `stage:*`.
 
 Для ручного запуска и запуска по расписанию добавлена CLI-команда:
 
 ```powershell
+gitea_transition_issue_stage 1 verify --dotenv C:\path\to\private\.env --pretty
+gitea_transition_issue_stage 1 verify --dotenv C:\path\to\private\.env --apply --pretty
 gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --pretty
 gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --apply --pretty
 ```
+
+Статус задачи считается надежно измененным, когда `gitea_transition_issue_stage`
+возвращает `target_stage_set=true` и readback показывает ровно один актуальный
+`stage:*` label. Board-колонка не является источником истины, потому в текущей
+проверенной сборке Gitea board API не опубликован.
 
 Если имена колонок отличаются от стандартных `Backlog`, `Ready`, `In Progress`,
 `Review`, `Verify`, `Done`, `Blocked`, передайте JSON-карту:

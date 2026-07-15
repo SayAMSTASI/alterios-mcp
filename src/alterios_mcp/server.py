@@ -43,6 +43,7 @@ from .gitea_workboard import (
     load_standard_labels,
     planned_gitea_result,
     sync_board_by_labels,
+    transition_issue_stage,
 )
 from .local_workboard import (
     LocalWorkboardConfig,
@@ -3517,6 +3518,32 @@ def gitea_sync_board_by_labels(
         stage_column_map=stage_column_map,
         state=state,
         limit=limit,
+        apply_mode=apply_mode,
+        dry_run=dry_run,
+        dotenv_path=env_path,
+    )
+
+
+@mcp.tool()
+def gitea_transition_issue_stage(
+    issue_number: int,
+    target_stage: str,
+    comment: str | None = None,
+    sync_board: bool = False,
+    project_id: str | None = None,
+    apply_mode: str = "auto",
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Replace an issue stage:* label and optionally sync the Projects board."""
+    env_path = dotenv_path or ".env"
+    return transition_issue_stage(
+        config=GiteaConfig.from_env(env_path),
+        issue_number=issue_number,
+        target_stage=target_stage,
+        comment=comment,
+        sync_board=sync_board,
+        project_id=project_id,
         apply_mode=apply_mode,
         dry_run=dry_run,
         dotenv_path=env_path,
