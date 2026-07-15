@@ -204,7 +204,21 @@ playbook: [docs/gost-documentation-scribe-agent.md](docs/gost-documentation-scri
 - `gitea_create_sprint` создает milestone как sprint;
 - `gitea_list_sprint_tasks` читает задачи sprint/milestone;
 - `gitea_create_work_item` создает private issue;
-- `gitea_add_agent_report` добавляет отчет агента в issue.
+- `gitea_add_agent_report` добавляет отчет агента в issue;
+- `gitea_sync_board_by_labels` строит dry-run план и, при включенном gate,
+  переносит карточки Projects board по labels `stage:*`.
+
+Для ручного запуска и запуска по расписанию есть CLI:
+
+```powershell
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --pretty
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --apply --pretty
+```
+
+По умолчанию это dry-run. При `--apply` нужен `GITEA_MCP_ALLOW_WRITE=1`.
+Если Gitea не публикует board API, для web-переноса нужны
+`GITEA_BOARD_COOKIE_FILE` или `GITEA_BOARD_COOKIE_HEADER`; эти значения хранятся
+только в private `.env`.
 
 Запись в Gitea имеет отдельный gate `GITEA_MCP_ALLOW_WRITE=1`; он не связан с
 `ALTERIOS_MCP_ALLOW_WRITE`, чтобы не смешивать Alterios live-write и публикацию

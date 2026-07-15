@@ -42,6 +42,7 @@ from .gitea_workboard import (
     gitea_write_enabled,
     load_standard_labels,
     planned_gitea_result,
+    sync_board_by_labels,
 )
 from .local_workboard import (
     LocalWorkboardConfig,
@@ -3494,6 +3495,30 @@ def gitea_add_agent_report(
         dry_run=False,
         payload=payload,
         response=response,
+        dotenv_path=env_path,
+    )
+
+
+@mcp.tool()
+def gitea_sync_board_by_labels(
+    project_id: str | None = None,
+    stage_column_map: dict[str, str] | None = None,
+    state: str = "open",
+    limit: int = 100,
+    apply_mode: str = "auto",
+    dry_run: bool = True,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Move Gitea project-board cards into columns based on issue stage:* labels."""
+    env_path = dotenv_path or ".env"
+    return sync_board_by_labels(
+        config=GiteaConfig.from_env(env_path),
+        project_id=project_id,
+        stage_column_map=stage_column_map,
+        state=state,
+        limit=limit,
+        apply_mode=apply_mode,
+        dry_run=dry_run,
         dotenv_path=env_path,
     )
 

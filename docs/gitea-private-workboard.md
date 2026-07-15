@@ -170,9 +170,12 @@ GITEA_BASE_URL=https://gitea.example.local
 GITEA_TOKEN=put-token-here
 GITEA_OWNER=alterios-team
 GITEA_REPO=alterios-workboard
-GITEA_DEFAULT_PROJECT=Alterios Delivery
+GITEA_DEFAULT_PROJECT=put-project-board-id-here
 GITEA_DEFAULT_MILESTONE=2026-07-S1
 GITEA_TIMEOUT_SECONDS=20
+GITEA_BOARD_COOKIE_FILE=
+GITEA_BOARD_COOKIE_HEADER=
+GITEA_BOARD_CSRF_TOKEN=
 GITEA_MCP_ALLOW_WRITE=0
 ```
 
@@ -189,7 +192,22 @@ GITEA_MCP_ALLOW_WRITE=0
 - `gitea_create_sprint` - dry-run и apply Gitea milestone, который используется как sprint;
 - `gitea_list_sprint_tasks` - читает issues выбранного sprint/milestone;
 - `gitea_create_work_item` - dry-run и apply private issue; labels на apply разрешаются в id;
-- `gitea_add_agent_report` - dry-run и apply структурированного комментария агента в issue.
+- `gitea_add_agent_report` - dry-run и apply структурированного комментария агента в issue;
+- `gitea_sync_board_by_labels` - dry-run и apply синхронизации Projects board по labels `stage:*`.
+
+Для ручного запуска и запуска по расписанию добавлена CLI-команда:
+
+```powershell
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --pretty
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --apply --pretty
+```
+
+Если имена колонок отличаются от стандартных `Backlog`, `Ready`, `In Progress`,
+`Review`, `Verify`, `Done`, `Blocked`, передайте JSON-карту:
+
+```powershell
+gitea_sync_board_by_labels --project-id 3 --stage-column-map-json '{"stage:done":"Готово","stage:build":"В работе"}'
+```
 
 Write calls в Gitea не используют `ALTERIOS_MCP_ALLOW_WRITE`. Для private workboard есть отдельный gate
 `GITEA_MCP_ALLOW_WRITE=1`, чтобы не смешивать live-запись в Alterios и публикацию задач в Gitea.
@@ -220,8 +238,13 @@ Web UI доски использует browser-session и CSRF, а не API toke
 Вывод: обычный MCP с `GITEA_TOKEN` может надежно автоматизировать задачи,
 sprints, labels и agent reports. Управление колонками и карточками Projects
 board требует отдельного browser-backed workflow или настройки web-session/CSRF.
-До появления такого слоя статус задачи для автоматизации ведется через labels
-`stage:*` и milestones, а Projects board используется как визуальная UI-доска.
+Для этого в MCP есть режим `gitea_sync_board_by_labels`: сначала он пробует будущие
+API routes, затем при `apply_mode=auto` может использовать web bridge через
+`GITEA_BOARD_COOKIE_FILE` или `GITEA_BOARD_COOKIE_HEADER`. Реальные cookie и CSRF
+нельзя коммитить в Git; они должны храниться только во внешнем private `.env`.
+
+До появления официального board API источником истины для автоматизации остаются
+labels `stage:*` и milestones, а Projects board синхронизируется из labels.
 
 ## 14. Локальный private workboard, если Gitea недоступна
 

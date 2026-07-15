@@ -29,6 +29,8 @@ alterios-ui-flow = "alterios_mcp.ui_flow:main"
 alterios-profile-smoke = "alterios_mcp.profile_smoke:main"
 alterios-replay-smoke = "alterios_mcp.replay_smoke:main"
 alterios-project-health = "alterios_mcp.project_health:main"
+gitea_sync_board_by_labels = "alterios_mcp.gitea_board_sync:main"
+gitea-sync-board-by-labels = "alterios_mcp.gitea_board_sync:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

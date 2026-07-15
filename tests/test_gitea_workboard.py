@@ -6,6 +6,13 @@ import pytest
 
 from alterios_mcp import server
 from alterios_mcp.gitea_workboard import GiteaConfigError, load_standard_labels
+from alterios_mcp.gitea_workboard import (
+    GiteaConfig,
+    build_board_sync_plan,
+    cookie_header_from_file,
+    parse_project_board_html,
+    sync_board_by_labels,
+)
 
 
 class FakeGiteaResponse:
@@ -69,6 +76,47 @@ class FakeSprintClient:
             "limit": limit,
         }
         return FakeGiteaResponse([{"number": 3, "title": "Sprint task"}])
+
+
+class FakeBoardSyncClient:
+    def __init__(self, issues: list[dict[str, object]], columns: list[dict[str, object]]) -> None:
+        self.issues = issues
+        self.columns = columns
+        self.moved: list[dict[str, object]] = []
+
+    def list_issues(
+        self,
+        *,
+        state: str = "open",
+        labels: list[str] | None = None,
+        milestones: list[str] | None = None,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> FakeGiteaResponse:
+        return FakeGiteaResponse(self.issues[:limit])
+
+    def list_project_columns(self, project_id: int | str) -> FakeGiteaResponse:
+        assert str(project_id) == "3"
+        return FakeGiteaResponse(self.columns)
+
+    def add_issue_to_project_column(self, column_id: int | str, issue_id: int) -> FakeGiteaResponse:
+        self.moved.append({"column_id": str(column_id), "issue_id": issue_id})
+        return FakeGiteaResponse({"column_id": str(column_id), "issue_id": issue_id})
+
+
+class FailingWebBoardClient:
+    def read_project_board(self, project_id: int | str) -> dict[str, object]:
+        raise AssertionError(f"web board should not be used for project {project_id}")
+
+
+def _board_config() -> GiteaConfig:
+    return GiteaConfig(
+        base_url="https://gitea.example.local",
+        token="test-token",
+        owner="team",
+        repo="workboard",
+        default_project="3",
+    )
 
 
 def test_gitea_config_redacts_token_and_sensitive_url_query() -> None:
@@ -238,3 +286,114 @@ def test_gitea_standard_labels_template_parses_without_pyyaml_dependency() -> No
     assert labels[1]["name"] == "type:feature"
     assert labels[1]["color"] == "#1D76DB"
     assert all(label["color"].startswith("#") for label in labels)
+
+
+def test_gitea_board_sync_plan_maps_stage_labels_to_columns() -> None:
+    issues = [
+        {"id": 46, "number": 1, "title": "Done task", "labels": [{"name": "stage:done"}]},
+        {"id": 47, "number": 2, "title": "Build task", "labels": [{"name": "stage:build"}]},
+        {"id": 48, "number": 3, "title": "No stage", "labels": []},
+        {"id": 49, "number": 4, "title": "Conflict", "labels": [{"name": "stage:done"}, {"name": "stage:build"}]},
+    ]
+    columns = [
+        {"id": "10", "title": "In Progress"},
+        {"id": "20", "title": "Done"},
+    ]
+
+    plan = build_board_sync_plan(
+        issues=issues,
+        columns=columns,
+        stage_column_map={"stage:build": "In Progress", "stage:done": "Done"},
+        current_cards={47: {"issue_id": 47, "column_id": "10", "column_title": "In Progress"}},
+    )
+
+    assert plan["move_count"] == 1
+    assert plan["moves"][0]["issue_id"] == 46
+    assert plan["moves"][0]["target_column_id"] == "20"
+    assert plan["skipped_count"] == 1
+    assert plan["missing_stage_count"] == 1
+    assert plan["conflict_count"] == 1
+
+
+def test_gitea_sync_board_by_labels_dry_run_reads_api_columns_without_real_network() -> None:
+    client = FakeBoardSyncClient(
+        issues=[
+            {"id": 46, "number": 1, "title": "Done task", "labels": [{"name": "stage:done"}]},
+            {"id": 47, "number": 2, "title": "Build task", "labels": [{"name": "stage:build"}]},
+        ],
+        columns=[
+            {"id": "10", "title": "In Progress", "issues": [{"id": 47}]},
+            {"id": "20", "title": "Done", "issues": []},
+        ],
+    )
+
+    result = sync_board_by_labels(
+        config=_board_config(),
+        dry_run=True,
+        dotenv_path=None,
+        client=client,  # type: ignore[arg-type]
+        web_client=FailingWebBoardClient(),  # type: ignore[arg-type]
+    )
+
+    assert result["dry_run"] is True
+    assert result["payload"]["board_source"] == "api"
+    assert result["payload"]["plan"]["move_count"] == 1
+    assert result["payload"]["plan"]["moves"][0]["target_column"] == "Done"
+
+
+def test_gitea_sync_board_by_labels_apply_requires_write_gate() -> None:
+    client = FakeBoardSyncClient(
+        issues=[{"id": 46, "number": 1, "title": "Done task", "labels": [{"name": "stage:done"}]}],
+        columns=[{"id": "20", "title": "Done", "issues": []}],
+    )
+
+    with patch.dict("os.environ", {}, clear=True), pytest.raises(GiteaConfigError, match="GITEA_MCP_ALLOW_WRITE"):
+        sync_board_by_labels(
+            config=_board_config(),
+            dry_run=False,
+            dotenv_path=None,
+            client=client,  # type: ignore[arg-type]
+            web_client=FailingWebBoardClient(),  # type: ignore[arg-type]
+        )
+
+
+def test_gitea_sync_board_by_labels_apply_moves_cards_through_api() -> None:
+    client = FakeBoardSyncClient(
+        issues=[{"id": 46, "number": 1, "title": "Done task", "labels": [{"name": "stage:done"}]}],
+        columns=[{"id": "20", "title": "Done", "issues": []}],
+    )
+
+    with patch.dict("os.environ", {"GITEA_MCP_ALLOW_WRITE": "1"}, clear=True):
+        result = sync_board_by_labels(
+            config=_board_config(),
+            dry_run=False,
+            dotenv_path=None,
+            client=client,  # type: ignore[arg-type]
+            web_client=FailingWebBoardClient(),  # type: ignore[arg-type]
+        )
+
+    assert result["dry_run"] is False
+    assert result["response"]["apply_mode_used"] == "api"
+    assert client.moved == [{"column_id": "20", "issue_id": 46}]
+
+
+def test_gitea_board_html_and_cookie_parsers(tmp_path) -> None:
+    html = """
+    <script>window.config = {csrfToken: "csrf-123"};</script>
+    <div class="project-column" data-id="20">
+      <div class="project-column-title-text">Done</div>
+      <div class="issue-card" data-issue="46"></div>
+    </div>
+    """
+    board = parse_project_board_html(html)
+    cookie_file = tmp_path / "cookies.txt"
+    cookie_file.write_text(
+        "# Netscape HTTP Cookie File\n"
+        "gitea.example.local\tFALSE\t/\tTRUE\t0\ttest_cookie\tabc\n",
+        encoding="utf-8",
+    )
+
+    assert board["csrf_token"] == "csrf-123"
+    assert board["columns"][0]["title"] == "Done"
+    assert board["current_cards"][46]["column_id"] == "20"
+    assert cookie_header_from_file(cookie_file) == "test_cookie=abc"

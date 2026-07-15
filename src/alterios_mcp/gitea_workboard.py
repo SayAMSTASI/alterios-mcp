@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
+from html import unescape
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -23,6 +25,21 @@ class GiteaRequestError(RuntimeError):
         self.body = body
 
 
+DEFAULT_STAGE_COLUMN_MAP: dict[str, str] = {
+    "stage:intake": "Backlog",
+    "stage:backlog": "Backlog",
+    "stage:ready": "Ready",
+    "stage:discovery": "Ready",
+    "stage:design": "In Progress",
+    "stage:build": "In Progress",
+    "stage:in-progress": "In Progress",
+    "stage:review": "Review",
+    "stage:verify": "Verify",
+    "stage:done": "Done",
+    "stage:blocked": "Blocked",
+}
+
+
 @dataclass(frozen=True)
 class GiteaConfig:
     base_url: str = ""
@@ -32,6 +49,9 @@ class GiteaConfig:
     default_project: str = ""
     default_milestone: str = ""
     timeout_seconds: float = 20.0
+    board_cookie_header: str = ""
+    board_cookie_file: str = ""
+    board_csrf_token: str = ""
 
     @classmethod
     def from_env(cls, dotenv_path: str | Path | None = ".env") -> "GiteaConfig":
@@ -56,6 +76,9 @@ class GiteaConfig:
             default_project=values.get("GITEA_DEFAULT_PROJECT", "").strip(),
             default_milestone=values.get("GITEA_DEFAULT_MILESTONE", "").strip(),
             timeout_seconds=timeout_seconds,
+            board_cookie_header=values.get("GITEA_BOARD_COOKIE_HEADER", "").strip(),
+            board_cookie_file=values.get("GITEA_BOARD_COOKIE_FILE", "").strip(),
+            board_csrf_token=values.get("GITEA_BOARD_CSRF_TOKEN", "").strip(),
         )
 
     def redacted(self) -> dict[str, Any]:
@@ -67,6 +90,9 @@ class GiteaConfig:
             "default_project": self.default_project,
             "default_milestone": self.default_milestone,
             "timeout_seconds": self.timeout_seconds,
+            "board_cookie_header": "<set>" if self.board_cookie_header else "<missing>",
+            "board_cookie_file": "<set>" if self.board_cookie_file else "<missing>",
+            "board_csrf_token": "<set>" if self.board_csrf_token else "<missing>",
         }
 
     def missing_for_base_call(self) -> list[str]:
@@ -202,6 +228,29 @@ class GiteaClient:
             body={"body": body},
         )
 
+    def list_repo_projects(self, *, state: str = "open", limit: int = 100) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "GET",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/projects",
+            params={"state": state, "limit": limit},
+        )
+
+    def list_project_columns(self, project_id: int | str) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "GET",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/projects/{project_id}/columns",
+        )
+
+    def add_issue_to_project_column(self, column_id: int | str, issue_id: int) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "POST",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/projects/columns/{column_id}/issues",
+            body={"issue_id": issue_id},
+        )
+
     def resolve_label_ids(self, label_names: list[str]) -> list[int]:
         if not label_names:
             return []
@@ -312,6 +361,552 @@ def build_issue_payload(
     if ref:
         payload["ref"] = ref
     return payload
+
+
+class GiteaBoardWebClient:
+    def __init__(self, config: GiteaConfig):
+        self.config = config
+
+    def read_project_board(self, project_id: int | str) -> dict[str, Any]:
+        html = self._request_text("GET", f"/{_path(self.config.owner)}/-/projects/{project_id}")
+        board = parse_project_board_html(html)
+        if not board["columns"]:
+            raise GiteaConfigError(
+                "Project board was not found in web response. Check GITEA_BOARD_COOKIE_HEADER or GITEA_BOARD_COOKIE_FILE."
+            )
+        return {
+            "project_id": str(project_id),
+            "csrf_token_found": bool(board.get("csrf_token")),
+            "columns": board["columns"],
+            "current_cards": board["current_cards"],
+        }
+
+    def move_issue_to_column(
+        self,
+        *,
+        project_id: int | str,
+        column_id: int | str,
+        issue_id: int,
+        existing_target_issue_ids: list[int] | None = None,
+    ) -> GiteaResponse:
+        issue_ids = [item for item in (existing_target_issue_ids or []) if item != issue_id]
+        issue_ids.append(issue_id)
+        payload = {
+            "issues": [
+                {"issueID": item, "sorting": index}
+                for index, item in enumerate(issue_ids)
+            ]
+        }
+        body = self._request_text(
+            "POST",
+            f"/{_path(self.config.owner)}/-/projects/{project_id}/{column_id}/move",
+            json_body=payload,
+            csrf_project_id=project_id,
+        )
+        return GiteaResponse(status_code=200, content_type="text/plain", body=body)
+
+    def _request_text(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        csrf_project_id: int | str | None = None,
+    ) -> str:
+        if not self.config.base_url:
+            raise GiteaConfigError("Missing required configuration: GITEA_BASE_URL")
+        cookie_header = self._cookie_header()
+        if not cookie_header:
+            raise GiteaConfigError("Missing Gitea web session. Set GITEA_BOARD_COOKIE_HEADER or GITEA_BOARD_COOKIE_FILE.")
+
+        data = None
+        headers = {
+            "Accept": "text/html,application/json,text/plain",
+            "Cookie": cookie_header,
+        }
+        if json_body is not None:
+            data = json.dumps(json_body, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+            headers["x-csrf-token"] = self._csrf_token(csrf_project_id)
+
+        request = Request(self.config.base_url + path, data=data, headers=headers, method=method.upper())
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            decoded = exc.read().decode("utf-8", errors="replace")
+            raise GiteaRequestError(
+                f"Gitea web HTTP {exc.code}: {decoded[:300]}",
+                status_code=exc.code,
+                body=decoded,
+            ) from exc
+        except URLError as exc:
+            raise GiteaRequestError(f"Gitea web request failed: {exc.reason}") from exc
+
+    def _cookie_header(self) -> str:
+        if self.config.board_cookie_header:
+            return self.config.board_cookie_header
+        if not self.config.board_cookie_file:
+            return ""
+        return cookie_header_from_file(self.config.board_cookie_file)
+
+    def _csrf_token(self, project_id: int | str | None = None) -> str:
+        if self.config.board_csrf_token:
+            return self.config.board_csrf_token
+        effective_project_id = str(project_id or self.config.default_project).strip()
+        if not effective_project_id:
+            raise GiteaConfigError("GITEA_DEFAULT_PROJECT or explicit project_id is required to fetch csrfToken.")
+        html = self._request_text("GET", f"/{_path(self.config.owner)}/-/projects/{effective_project_id}")
+        token = parse_csrf_token(html)
+        if not token:
+            raise GiteaConfigError("Could not extract csrfToken from Gitea project page.")
+        return token
+
+
+def sync_board_by_labels(
+    *,
+    config: GiteaConfig,
+    project_id: str | int | None = None,
+    stage_column_map: dict[str, str] | None = None,
+    state: str = "open",
+    limit: int = 100,
+    apply_mode: str = "auto",
+    dry_run: bool = True,
+    dotenv_path: str | Path | None = ".env",
+    client: GiteaClient | None = None,
+    web_client: GiteaBoardWebClient | None = None,
+) -> dict[str, Any]:
+    if state not in {"open", "closed", "all"}:
+        raise ValueError("state must be one of: open, closed, all.")
+    if limit < 1 or limit > 100:
+        raise ValueError("limit must be between 1 and 100.")
+    if apply_mode not in {"auto", "api", "web"}:
+        raise ValueError("apply_mode must be one of: auto, api, web.")
+
+    effective_project_id = str(project_id or config.default_project).strip()
+    if not effective_project_id:
+        raise ValueError("project_id must not be empty and GITEA_DEFAULT_PROJECT is not configured.")
+
+    stage_map = normalize_stage_column_map(stage_column_map)
+    api_client = client or GiteaClient(config)
+    issues_response = api_client.list_issues(state=state, limit=limit)
+    issues = issues_response.body if isinstance(issues_response.body, list) else []
+
+    board_state = _load_board_state(
+        api_client=api_client,
+        web_client=web_client or GiteaBoardWebClient(config),
+        project_id=effective_project_id,
+        apply_mode=apply_mode,
+    )
+    plan = build_board_sync_plan(
+        issues=issues,
+        columns=board_state["columns"],
+        stage_column_map=stage_map,
+        current_cards=board_state.get("current_cards", {}),
+    )
+    response: dict[str, Any] = {
+        "moved": [],
+        "skipped_apply": dry_run,
+        "apply_mode_used": None,
+    }
+
+    if not dry_run:
+        assert_gitea_write_allowed(config, dry_run=False, dotenv_path=dotenv_path)
+        response = _apply_board_sync_plan(
+            config=config,
+            plan=plan,
+            board_state=board_state,
+            project_id=effective_project_id,
+            apply_mode=apply_mode,
+            api_client=api_client,
+            web_client=web_client or GiteaBoardWebClient(config),
+        )
+
+    return planned_gitea_result(
+        operation="gitea_sync_board_by_labels",
+        config=config,
+        dry_run=dry_run,
+        payload={
+            "project_id": effective_project_id,
+            "state": state,
+            "limit": limit,
+            "apply_mode": apply_mode,
+            "stage_column_map": stage_map,
+            "board_source": board_state["source"],
+            "columns": [
+                {"id": column.get("id"), "title": column.get("title")}
+                for column in board_state["columns"]
+            ],
+            "board_errors": board_state.get("errors", []),
+            "plan": plan,
+        },
+        response=response,
+        dotenv_path=dotenv_path,
+    )
+
+
+def build_board_sync_plan(
+    *,
+    issues: list[Any],
+    columns: list[dict[str, Any]],
+    stage_column_map: dict[str, str],
+    current_cards: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    current_cards = current_cards or {}
+    columns_by_title = {str(column.get("title")): column for column in columns}
+    moves: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    conflicts: list[dict[str, Any]] = []
+    missing_stage: list[dict[str, Any]] = []
+    missing_column: list[dict[str, Any]] = []
+
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        issue_ref = _issue_ref(issue)
+        issue_id = _coerce_int(issue.get("id"))
+        if issue_id is None:
+            conflicts.append({**issue_ref, "reason": "missing_issue_id"})
+            continue
+        stage_labels = _issue_stage_labels(issue)
+        if not stage_labels:
+            missing_stage.append(issue_ref)
+            continue
+        mapped_labels = [label for label in stage_labels if label in stage_column_map]
+        unknown_labels = [label for label in stage_labels if label not in stage_column_map]
+        if len(mapped_labels) != 1 or unknown_labels:
+            conflicts.append({**issue_ref, "stage_labels": stage_labels, "unknown_stage_labels": unknown_labels})
+            continue
+        stage_label = mapped_labels[0]
+        target_column_title = stage_column_map[stage_label]
+        target_column = columns_by_title.get(target_column_title)
+        if not target_column:
+            missing_column.append({**issue_ref, "stage_label": stage_label, "target_column": target_column_title})
+            continue
+        current = current_cards.get(issue_id)
+        current_column_title = current.get("column_title") if current else None
+        if current_column_title == target_column_title:
+            skipped.append({**issue_ref, "stage_label": stage_label, "current_column": current_column_title})
+            continue
+        moves.append(
+            {
+                **issue_ref,
+                "stage_label": stage_label,
+                "current_column": current_column_title,
+                "target_column": target_column_title,
+                "target_column_id": target_column.get("id"),
+            }
+        )
+
+    return {
+        "move_count": len(moves),
+        "moves": moves,
+        "skipped_count": len(skipped),
+        "skipped": skipped,
+        "conflict_count": len(conflicts),
+        "conflicts": conflicts,
+        "missing_stage_count": len(missing_stage),
+        "missing_stage": missing_stage,
+        "missing_column_count": len(missing_column),
+        "missing_column": missing_column,
+    }
+
+
+def _load_board_state(
+    *,
+    api_client: GiteaClient,
+    web_client: GiteaBoardWebClient,
+    project_id: str,
+    apply_mode: str,
+) -> dict[str, Any]:
+    errors: list[dict[str, Any]] = []
+
+    if apply_mode in {"auto", "api"}:
+        try:
+            response = api_client.list_project_columns(project_id)
+            columns, current_cards = _normalize_api_columns(response.body)
+            if columns:
+                return {
+                    "source": "api",
+                    "columns": columns,
+                    "current_cards": current_cards,
+                    "errors": errors,
+                }
+            errors.append({"source": "api", "message": "Project columns API returned no columns."})
+        except (GiteaConfigError, GiteaRequestError) as exc:
+            errors.append(_board_error("api", exc))
+        if apply_mode == "api":
+            return {"source": "unavailable", "columns": [], "current_cards": {}, "errors": errors}
+
+    if apply_mode in {"auto", "web"}:
+        try:
+            board = web_client.read_project_board(project_id)
+            return {
+                "source": "web",
+                "columns": board.get("columns", []),
+                "current_cards": board.get("current_cards", {}),
+                "errors": errors,
+            }
+        except (GiteaConfigError, GiteaRequestError, OSError) as exc:
+            errors.append(_board_error("web", exc))
+
+    return {"source": "unavailable", "columns": [], "current_cards": {}, "errors": errors}
+
+
+def _apply_board_sync_plan(
+    *,
+    config: GiteaConfig,
+    plan: dict[str, Any],
+    board_state: dict[str, Any],
+    project_id: str,
+    apply_mode: str,
+    api_client: GiteaClient,
+    web_client: GiteaBoardWebClient,
+) -> dict[str, Any]:
+    if board_state.get("source") == "unavailable":
+        raise GiteaConfigError("Project board state is unavailable; run dry-run and fix board_errors first.")
+    if plan.get("conflict_count"):
+        raise GiteaConfigError("Project board sync has stage label conflicts; fix labels before apply.")
+    if plan.get("missing_column_count"):
+        raise GiteaConfigError("Project board sync has missing target columns; create/map columns before apply.")
+
+    source = str(board_state.get("source") or "")
+    if apply_mode == "api" and source != "api":
+        raise GiteaConfigError("apply_mode=api requires API board state.")
+    if apply_mode == "web" and source != "web":
+        raise GiteaConfigError("apply_mode=web requires web board state.")
+    if source not in {"api", "web"}:
+        raise GiteaConfigError(f"Unsupported board sync source: {source!r}.")
+
+    moved = []
+    if source == "api":
+        for move in plan.get("moves", []):
+            issue_id = _coerce_int(move.get("issue_id"))
+            column_id = move.get("target_column_id")
+            if issue_id is None or column_id in (None, ""):
+                raise GiteaConfigError(f"Invalid move payload: {move!r}.")
+            response = api_client.add_issue_to_project_column(column_id, issue_id).as_dict()
+            moved.append({**move, "response": response})
+        return {"moved": moved, "skipped_apply": False, "apply_mode_used": "api"}
+
+    target_issue_ids = _target_issue_ids_by_column(board_state.get("columns", []))
+    for move in plan.get("moves", []):
+        issue_id = _coerce_int(move.get("issue_id"))
+        column_id = str(move.get("target_column_id") or "")
+        if issue_id is None or not column_id:
+            raise GiteaConfigError(f"Invalid move payload: {move!r}.")
+        response = web_client.move_issue_to_column(
+            project_id=project_id,
+            column_id=column_id,
+            issue_id=issue_id,
+            existing_target_issue_ids=target_issue_ids.get(column_id, []),
+        ).as_dict()
+        for issue_ids in target_issue_ids.values():
+            while issue_id in issue_ids:
+                issue_ids.remove(issue_id)
+        target_issue_ids.setdefault(column_id, []).append(issue_id)
+        moved.append({**move, "response": response})
+    return {"moved": moved, "skipped_apply": False, "apply_mode_used": "web"}
+
+
+def _normalize_api_columns(payload: Any) -> tuple[list[dict[str, Any]], dict[int, dict[str, Any]]]:
+    columns_payload = payload if isinstance(payload, list) else []
+    columns: list[dict[str, Any]] = []
+    current_cards: dict[int, dict[str, Any]] = {}
+    for column in columns_payload:
+        if not isinstance(column, dict):
+            continue
+        column_id = column.get("id") or column.get("ID")
+        title = str(column.get("title") or column.get("name") or "").strip()
+        if column_id in (None, "") or not title:
+            continue
+        cards = []
+        for raw_card in _api_column_cards(column):
+            issue_id = _api_card_issue_id(raw_card)
+            if issue_id is None:
+                continue
+            card = {
+                "issue_id": issue_id,
+                "column_id": str(column_id),
+                "column_title": title,
+            }
+            current_cards[issue_id] = card
+            cards.append(card)
+        columns.append({"id": str(column_id), "title": title, "cards": cards})
+    return columns, current_cards
+
+
+def _api_column_cards(column: dict[str, Any]) -> list[Any]:
+    for key in ("issues", "cards", "items"):
+        value = column.get(key)
+        if isinstance(value, list):
+            return value
+    return []
+
+
+def _api_card_issue_id(card: Any) -> int | None:
+    if not isinstance(card, dict):
+        return _coerce_int(card)
+    for key in ("issue_id", "issueID", "issueId"):
+        issue_id = _coerce_int(card.get(key))
+        if issue_id is not None:
+            return issue_id
+    nested = card.get("issue")
+    if isinstance(nested, dict):
+        return _coerce_int(nested.get("id"))
+    return _coerce_int(card.get("id"))
+
+
+def _target_issue_ids_by_column(columns: list[dict[str, Any]]) -> dict[str, list[int]]:
+    result: dict[str, list[int]] = {}
+    for column in columns:
+        column_id = str(column.get("id") or "")
+        if not column_id:
+            continue
+        result[column_id] = [
+            issue_id
+            for issue_id in (_coerce_int(card.get("issue_id")) for card in column.get("cards", []))
+            if issue_id is not None
+        ]
+    return result
+
+
+def _board_error(source: str, exc: BaseException) -> dict[str, Any]:
+    status_code = getattr(exc, "status_code", None)
+    result: dict[str, Any] = {"source": source, "message": str(exc)}
+    if status_code is not None:
+        result["status_code"] = status_code
+    return result
+
+
+def normalize_stage_column_map(stage_column_map: dict[str, str] | None = None) -> dict[str, str]:
+    result = dict(DEFAULT_STAGE_COLUMN_MAP)
+    for key, value in (stage_column_map or {}).items():
+        normalized_key = str(key).strip()
+        normalized_value = str(value).strip()
+        if normalized_key and normalized_value:
+            result[normalized_key] = normalized_value
+    return result
+
+
+def parse_project_board_html(html: str) -> dict[str, Any]:
+    columns: list[dict[str, Any]] = []
+    current_cards: dict[int, dict[str, Any]] = {}
+    fragments = re.split(r'(?=<div[^>]*class="(?:[^"]*\s)?project-column(?:\s[^"]*)?")', html)
+    for fragment in fragments[1:]:
+        tag_match = re.match(r"<div(?P<attrs>[^>]*)>", fragment, re.DOTALL)
+        if not tag_match:
+            continue
+        attrs = tag_match.group("attrs")
+        body = fragment
+        column_id = _html_attr(attrs, "data-id") or _html_attr(attrs, "data-column-id")
+        title_match = re.search(
+            r'<div[^>]*class="[^"]*\bproject-column-title-text\b[^"]*"[^>]*>(?P<title>.*?)</div>',
+            body,
+            re.DOTALL,
+        )
+        title = _clean_html(title_match.group("title")) if title_match else ""
+        if not column_id or not title:
+            continue
+        cards = []
+        for card_match in re.finditer(
+            r'<div[^>]*class="[^"]*\bissue-card\b[^"]*"[^>]*(?:data-issue|data-issue-id)="(?P<issue>\d+)"',
+            body,
+            re.DOTALL,
+        ):
+            issue_id = int(card_match.group("issue"))
+            card = {
+                "issue_id": issue_id,
+                "column_id": column_id,
+                "column_title": title,
+            }
+            current_cards[issue_id] = card
+            cards.append(card)
+        columns.append({"id": column_id, "title": title, "cards": cards})
+    return {
+        "csrf_token": parse_csrf_token(html),
+        "columns": columns,
+        "current_cards": current_cards,
+    }
+
+
+def _issue_ref(issue: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "issue_id": _coerce_int(issue.get("id")),
+        "number": _coerce_int(issue.get("number")),
+        "title": str(issue.get("title") or ""),
+        "url": issue.get("html_url") or issue.get("url"),
+    }
+
+
+def _issue_stage_labels(issue: dict[str, Any]) -> list[str]:
+    labels = issue.get("labels") or []
+    result: list[str] = []
+    if not isinstance(labels, list):
+        return result
+    for label in labels:
+        if isinstance(label, dict):
+            name = str(label.get("name") or "").strip()
+        else:
+            name = str(label).strip()
+        if name.startswith("stage:"):
+            result.append(name)
+    return result
+
+
+def _html_attr(attrs: str, name: str) -> str:
+    pattern = rf'\b{re.escape(name)}=(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))'
+    match = re.search(pattern, attrs)
+    if not match:
+        return ""
+    return unescape(next(group for group in match.groups() if group is not None))
+
+
+def _clean_html(value: str) -> str:
+    text = re.sub(r"<[^>]+>", "", value)
+    return unescape(text).strip()
+
+
+def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def parse_csrf_token(html: str) -> str:
+    patterns = [
+        r"csrfToken:\s*'([^']+)'",
+        r'csrfToken:\s*"([^"]+)"',
+        r'<meta name="_csrf" content="([^"]+)"',
+        r'<meta name="csrf-token" content="([^"]+)"',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html)
+        if match:
+            return unescape(match.group(1))
+    return ""
+
+
+def cookie_header_from_file(path: str | Path) -> str:
+    cookie_path = Path(path).expanduser()
+    text = cookie_path.read_text(encoding="utf-8")
+    raw = text.strip()
+    if not raw:
+        return ""
+    if "\t" not in raw and "=" in raw and "\n" not in raw:
+        return raw
+    pairs: list[str] = []
+    for line in raw.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 7:
+            pairs.append(f"{parts[5]}={parts[6]}")
+    return "; ".join(pairs)
 
 
 def load_standard_labels(path: str | Path = "templates/gitea/labels.yaml") -> list[dict[str, Any]]:
