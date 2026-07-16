@@ -62,6 +62,10 @@ OS-процессами: `alterios-mcp.exe` launcher и дочерний `python
 
 ## Быстрый live-preflight
 
+Для обычной бизнесовой разработки запускайте MCP с
+`ALTERIOS_MCP_TOOL_PROFILE=live`. Активный реестр проверяйте через
+`alterios_tool_profile`; смена профиля требует перезапуска процесса.
+
 Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
 дубликаты MCP instances, project health, replay smoke и наличие приватной
 delivery evidence в единый результат `ready/blocked`:
@@ -85,9 +89,11 @@ delivery evidence в единый результат `ready/blocked`:
 - `stale=false`;
 - `matches_expected=true`, если передан expected fingerprint;
 - `duplicate_instance_count=0`;
-- `ux_contract_version` соответствует активному `alterios_ux_contract`.
+- `ux_contract_version` соответствует активному `alterios_ux_contract`;
 - `project_health` не содержит blockers;
-- `delivery_evidence` содержит ссылку на приватную задачу и handoff агентов.
+- private Gitea issue существует и открыт;
+- handoff-комментарии аналитика, исполнителя и тестировщика прошли
+  `alterios_verify_delivery_evidence`.
 
 Если эти условия не выполнены, сначала очистите runtime и только потом
 повторяйте dry-run/apply.

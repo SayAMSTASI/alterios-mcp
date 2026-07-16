@@ -5,7 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from alterios_mcp import server
-from alterios_mcp.gitea_workboard import GiteaConfigError, load_standard_labels
+from alterios_mcp.delivery_evidence import parse_handoff_comment
+from alterios_mcp.gitea_workboard import GiteaConfigError, agent_report_body, load_standard_labels
 from alterios_mcp.gitea_workboard import (
     GiteaConfig,
     build_board_sync_plan,
@@ -23,6 +24,30 @@ class FakeGiteaResponse:
 
     def as_dict(self) -> dict[str, object]:
         return {"status_code": self.status_code, "content_type": "application/json", "body": self.body}
+
+
+def test_agent_report_body_matches_delivery_evidence_contract() -> None:
+    body = agent_report_body(
+        role="implementer",
+        scope="Implement tool profiles",
+        inputs="Issue and repository",
+        findings="Profiles implemented",
+        artifacts="source and tests",
+        verification="pytest passed",
+        risks="none",
+        next_step="hand off to verifier",
+    )
+
+    assert set(parse_handoff_comment(body)) == {
+        "role",
+        "scope",
+        "inputs",
+        "findings",
+        "artifacts",
+        "verification",
+        "risks",
+        "next",
+    }
 
 
 class FakeGiteaClient:

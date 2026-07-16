@@ -21,11 +21,16 @@ For scenario apply, do not let code, skills, and the running MCP drift apart:
 
 - read `alterios_runtime_info` and block writes when `stale=true`;
 - preserve the reviewed runtime fingerprint between dry-run and apply;
-- require `delivery_evidence.work_item_ref`, at least one
-  `agent_handoff_refs` entry, and the current `ux_contract_version`;
+- verify `delivery_evidence.work_item_ref` and every `agent_handoff_refs` entry
+  against private Gitea; require structured analyst, implementer, and verifier
+  comments plus the current `ux_contract_version`;
+- reject closed/missing work items, mismatched issue references, incomplete
+  handoff sections, and missing required roles;
 - use `alterios_ux_contract` as the machine-readable source of blocking form
   issue codes;
 - require the same evidence in the saved dry-run plan and apply request.
+- use `ALTERIOS_MCP_TOOL_PROFILE=live` for normal scenario work; restricted
+  profiles must not expose generic REST/script write escape hatches.
 
 For material-module write scenarios, enforce the configured UX contract:
 

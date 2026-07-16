@@ -12,7 +12,7 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 99 | Публичные callable tools в `src/alterios_mcp/server.py`, включая Alterios tools и private workboard helpers. |
+| MCP tools | 101 | Полный callable registry в `src/alterios_mcp/server.py`; профиль `live` публикует 75 tools. |
 | Write-like MCP tools | 35 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_create_material_module`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_create_process_flow`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_create_report_tab`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
@@ -43,7 +43,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Sandbox create/update/delete and cleanup are verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 99
+## MCP Tools: 101
 
 | Tool | Вид |
 |---|---|
@@ -119,6 +119,8 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_replay_smoke` | Local/read-only MCP replay smoke after updates |
 | `alterios_project_health` | Read-only cached project health/diff preflight before writes |
 | `alterios_live_task_preflight` | Fast read-only go/no-go preflight before live write tasks |
+| `alterios_tool_profile` | Active `full/live/discovery/admin` registry profile and removed-tool summary |
+| `alterios_verify_delivery_evidence` | Read-only private Gitea issue and structured agent handoff verification |
 | `alterios_write_safety_preflight` | Write safety classification read |
 | `alterios_call_write_service` | Controlled runtime write/service call |
 | `alterios_execute_manual_script` | Controlled manual script execution |

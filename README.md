@@ -22,7 +22,8 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **99 инструментов**, из них **35 write-like инструментов**.
+Полная поверхность MCP: **101 инструмент**, из них **35 write-like инструментов**.
+Рекомендуемый профиль `live` публикует клиенту 75 инструментов.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -319,6 +320,8 @@ ALTERIOS_SECONDARY_AUTH_SCHEME=Bearer
 ALTERIOS_SECONDARY_TIMEOUT_SECONDS=20
 
 ALTERIOS_MCP_ALLOW_WRITE=0
+ALTERIOS_MCP_TOOL_PROFILE=live
+ALTERIOS_MCP_REQUIRED_AGENT_ROLES=analyst,implementer,verifier
 ```
 
 Подключить файл в текущей PowerShell-сессии:
@@ -370,6 +373,7 @@ tool_timeout_sec = 120
 
 [mcp_servers.alterios.env]
 ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
+ALTERIOS_MCP_TOOL_PROFILE = "live"
 ```
 
 Fallback через Python:
@@ -383,6 +387,7 @@ tool_timeout_sec = 120
 
 [mcp_servers.alterios.env]
 ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
+ALTERIOS_MCP_TOOL_PROFILE = "live"
 ```
 
 ## Как выполнять запись
@@ -582,6 +587,8 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   использование приватного Gitea как Jira-подобного рабочего поля для реальных задач.
 - [docs/runtime-hygiene.md](docs/runtime-hygiene.md) -
   проверка и очистка локальных `alterios-mcp` процессов перед live-записью.
+- [docs/mcp-tool-profiles.md](docs/mcp-tool-profiles.md) - профили `live`,
+  `discovery`, `admin`, `full` и проверка private Gitea agent evidence.
 - [docs/controlled-writes.md](docs/controlled-writes.md) - правила безопасной
   записи.
 - [docs/administrator-guide.md](docs/administrator-guide.md) - инструкция

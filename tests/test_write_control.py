@@ -24,6 +24,38 @@ DELIVERY_EVIDENCE = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _verified_delivery_evidence(monkeypatch):
+    monkeypatch.setattr(
+        server,
+        "_verify_delivery_evidence",
+        lambda **kwargs: {
+            "ok": True,
+            "fingerprint": "test-delivery-evidence",
+            "verified_roles": ["analyst", "implementer", "verifier"],
+            "verified_comment_ids": [1, 2, 3],
+            "blockers": [],
+        },
+    )
+
+
+def test_scenario_apply_evidence_requires_verified_gitea_receipt(monkeypatch) -> None:
+    monkeypatch.setattr(
+        server,
+        "_verify_delivery_evidence",
+        lambda **kwargs: {
+            "ok": False,
+            "fingerprint": "failed-receipt",
+            "verified_roles": ["analyst"],
+            "verified_comment_ids": [1],
+            "blockers": [{"code": "missing_required_roles", "roles": ["implementer", "verifier"]}],
+        },
+    )
+
+    with pytest.raises(ValueError, match="Gitea delivery evidence verification failed"):
+        server._assert_delivery_evidence(DELIVERY_EVIDENCE)
+
+
 def test_write_audit_requires_explicit_profile_and_project() -> None:
     operation = WriteOperation(
         name="PUT /api/reports",
@@ -2538,6 +2570,11 @@ def test_material_module_fields_keep_persistent_help_only_for_dates() -> None:
                 "description": "Формат даты",
                 "help": "Укажите дату",
             },
+            {
+                "name": "Количество",
+                "mname": "mat_count",
+                "field_type": "number",
+            },
         ],
         field_name_prefix="field_test",
     )
@@ -2547,6 +2584,8 @@ def test_material_module_fields_keep_persistent_help_only_for_dates() -> None:
     assert fields[0]["tooltip"] == "Подсказка"
     assert fields[1]["description"] == "Формат даты"
     assert fields[1]["help"] == "Укажите дату"
+    assert fields[1]["tooltip"] == "Укажите дату для поля «Дата»."
+    assert fields[2]["tooltip"] == "Укажите значение поля «Количество»."
 
 
 def test_create_report_tab_dry_run_stores_plan_without_real_network(tmp_path) -> None:

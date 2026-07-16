@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
 from typing import Any
 
@@ -20,6 +21,27 @@ REPORT_OR_ANALYTICS_TOKENS = (
     "report",
     "print",
     "dashboard",
+)
+ADD_FORM_STEMS = ("добав",)
+ADD_FORM_WORDS = {"add", "create", "new"}
+EDIT_FORM_STEMS = ("редакт", "измен")
+EDIT_FORM_WORDS = {"edit", "update"}
+VIEW_DETAIL_FORM_STEMS = ("просмотр", "карточк")
+VIEW_DETAIL_FORM_WORDS = {"detail", "view"}
+TECHNICAL_LIST_FIELD_PATTERN = re.compile(r"^_id\d*$", re.IGNORECASE)
+SERVICE_ID_FIELD_NAMES = frozenset(
+    {
+        "id",
+        "contentid",
+        "contenttypeid",
+        "entityid",
+        "formid",
+        "projectid",
+        "reportid",
+        "scriptid",
+        "viewentityid",
+        "viewid",
+    }
 )
 FOOTNOTE_KEYS = {
     "bottomText",
@@ -51,6 +73,8 @@ FIELD_TYPE_KEYS = {
     "inputType",
     "input_type",
 }
+
+
 def analyze_form_surface(
     form: dict[str, Any],
     field_type_map: dict[str, str] | None = None,
@@ -78,8 +102,8 @@ def analyze_form_surface(
         "field_footnotes": [],
     }
 
-    if not str(form.get("pageTitle") or form.get("name") or "").strip():
-        _add_issue(issues, "warning", "missing_page_title", "Form has no user-facing pageTitle or name.", "form")
+    if not str(form.get("pageTitle") or "").strip():
+        _add_issue(issues, "warning", "missing_page_title", "Form has no user-facing pageTitle.", "pageTitle")
 
     tabs = form.get("tabs")
     if not isinstance(tabs, list) or not tabs:
@@ -96,6 +120,7 @@ def analyze_form_surface(
     headers: list[str] = []
     field_footnotes: list[dict[str, Any]] = []
     view_data_cells: list[tuple[dict[str, Any], str]] = []
+    report_cells: list[tuple[dict[str, Any], str]] = []
 
     _collect_role_keys(form, role_keys)
     _collect_titles(form, page_titles, headers)
@@ -127,6 +152,8 @@ def analyze_form_surface(
                 cell_types[cell_type] += 1
                 if cell_type == "view_data":
                     view_data_cells.append((cell, cell_path))
+                elif cell_type == "report":
+                    report_cells.append((cell, cell_path))
                 _collect_style_keys(cell.get("styles"), style_keys)
                 _collect_data_source(cell, cell_path, data_sources)
                 _analyze_cell(cell, cell_path, issues, field_type_map or {}, field_footnotes)
@@ -138,11 +165,18 @@ def analyze_form_surface(
                     action_icons,
                     row_actions=True,
                 )
+                if cell_type == "view_data_list":
+                    _analyze_list_row_action_contract(
+                        cell.get("valueActionContainers"),
+                        f"{cell_path}.valueActionContainers",
+                        issues,
+                    )
 
     top_actions = form.get("formActionContainers")
     _analyze_action_containers(top_actions, "formActionContainers", issues, action_icons)
     _analyze_close_action_routing(top_actions, "formActionContainers", issues)
     _analyze_view_detail_editing(form, view_data_cells, issues)
+    _analyze_page_action_contract(form, view_data_cells, report_cells, issues)
 
     inventory["cell_types"] = dict(sorted(cell_types.items()))
     inventory["style_keys"] = dict(sorted(style_keys.items()))
@@ -276,6 +310,15 @@ def _analyze_cell(
         params = _dict_or_empty(cell.get("params"))
         if not params.get("viewId"):
             _add_issue(issues, "error", "missing_view_source", "View cell has no params.viewId.", path)
+        if not _embedded_view_has_filter_or_context(cell):
+            _add_issue(
+                issues,
+                "warning",
+                "embedded_view_missing_filter_or_context",
+                "Embedded view_data/view_data_list must have a field-based filter or dataId/openId context.",
+                path,
+                {"cell_type": cell_type, "view_id": params.get("viewId")},
+            )
         displaying = _dict_or_empty(cell.get("displaying"))
         if not isinstance(displaying.get("fields"), dict) or not displaying.get("fields"):
             _add_issue(
@@ -285,6 +328,8 @@ def _analyze_cell(
                 "View cell has no displaying.fields map, so user-facing columns may be incomplete.",
                 path,
             )
+        if cell_type == "view_data_list":
+            _analyze_technical_list_fields(displaying, path, issues)
     elif cell_type == "content":
         params = _dict_or_empty(cell.get("params"))
         if not params.get("contentTypeId"):
@@ -413,6 +458,83 @@ def _is_date_type(field_type: str) -> bool:
     return normalized in {"date", "datetime", "date_time", "date-time"} or normalized.startswith("date:")
 
 
+def _embedded_view_has_filter_or_context(cell: dict[str, Any]) -> bool:
+    params = _dict_or_empty(cell.get("params"))
+    open_id = params.get("openId")
+    if open_id is True or _references_open_id(open_id):
+        return True
+    for owner in (cell, params):
+        data_id = owner.get("dataId")
+        if data_id not in (None, "", False, [], {}):
+            return True
+    displaying = _dict_or_empty(cell.get("displaying"))
+    fields = displaying.get("fields")
+    if isinstance(fields, dict):
+        for field_config in fields.values():
+            if not isinstance(field_config, dict):
+                continue
+            field_filter = field_config.get("filter")
+            if isinstance(field_filter, dict) and field_filter and field_filter.get("enabled") is not False:
+                return True
+            if field_filter is True:
+                return True
+    for owner in (cell, params, displaying):
+        for key in ("userFilters", "fieldFilters"):
+            configured = owner.get(key)
+            if not isinstance(configured, dict):
+                continue
+            configured_fields = configured.get("fields")
+            if isinstance(configured_fields, dict) and configured_fields:
+                return True
+    return False
+
+
+def _references_open_id(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().casefold() in {"openid", "[openid]", "{{openid}}"}
+    if isinstance(value, dict):
+        return any(_references_open_id(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_references_open_id(child) for child in value)
+    return False
+
+
+def _analyze_technical_list_fields(
+    displaying: dict[str, Any],
+    path: str,
+    issues: list[dict[str, Any]],
+) -> None:
+    fields = displaying.get("fields")
+    if not isinstance(fields, dict):
+        return
+    for field_name, field_config in fields.items():
+        if not _is_technical_list_field(str(field_name)) or _field_is_hidden(field_config):
+            continue
+        _add_issue(
+            issues,
+            "warning",
+            "technical_list_field_must_be_hidden",
+            "Technical and service ID fields must be hidden in list displaying.",
+            f"{path}.displaying.fields.{field_name}",
+            {"field": str(field_name)},
+        )
+
+
+def _is_technical_list_field(field_name: str) -> bool:
+    normalized = field_name.strip().casefold()
+    if TECHNICAL_LIST_FIELD_PATTERN.fullmatch(normalized):
+        return True
+    compact = re.sub(r"[_-]", "", normalized)
+    return compact in SERVICE_ID_FIELD_NAMES
+
+
+def _field_is_hidden(field_config: Any) -> bool:
+    if not isinstance(field_config, dict):
+        return False
+    hidden = field_config.get("hidden")
+    return hidden is True or (isinstance(hidden, str) and hidden.strip().casefold() == "true")
+
+
 def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues: list[dict[str, Any]]) -> None:
     header = cell.get("header")
     if not isinstance(header, dict):
@@ -488,6 +610,90 @@ def _contains_redirect_back(value: Any) -> bool:
     if isinstance(value, list):
         return any(_contains_redirect_back(child) for child in value)
     return False
+
+
+def _analyze_page_action_contract(
+    form: dict[str, Any],
+    view_data_cells: list[tuple[dict[str, Any], str]],
+    report_cells: list[tuple[dict[str, Any], str]],
+    issues: list[dict[str, Any]],
+) -> None:
+    top_actions = form.get("formActionContainers")
+    form_kind = _explicit_form_kind(form)
+    if form_kind in {"add", "edit"}:
+        observed = _page_action_categories(top_actions)
+        if observed[:2] != ["close", "save"]:
+            _add_issue(
+                issues,
+                "warning",
+                "add_edit_page_action_order",
+                "Add/edit page actions must start with Close and then Save.",
+                "formActionContainers",
+                {"form_kind": form_kind, "observed": observed},
+            )
+
+    has_close = _contains_close_action(top_actions)
+    if form_kind == "view_detail" and view_data_cells and not _form_has_submit_action(top_actions) and not has_close:
+        _add_issue(
+            issues,
+            "warning",
+            "view_detail_close_action_missing",
+            "A view/detail form must have a Close page action.",
+            "formActionContainers",
+        )
+    if report_cells and not has_close:
+        _add_issue(
+            issues,
+            "warning",
+            "report_or_analytics_target_missing_close",
+            "A printable or analytical target form with a report cell must have a Close page action.",
+            "formActionContainers",
+            {"report_cell_paths": [path for _, path in report_cells]},
+        )
+
+
+def _explicit_form_kind(form: dict[str, Any]) -> str:
+    text = f"{form.get('name') or ''} {form.get('pageTitle') or ''}".casefold()
+    english_words = set(re.findall(r"[a-z]+", text))
+    if any(stem in text for stem in ADD_FORM_STEMS) or english_words & ADD_FORM_WORDS:
+        return "add"
+    if any(stem in text for stem in EDIT_FORM_STEMS) or english_words & EDIT_FORM_WORDS:
+        return "edit"
+    if any(stem in text for stem in VIEW_DETAIL_FORM_STEMS) or english_words & VIEW_DETAIL_FORM_WORDS:
+        return "view_detail"
+    return ""
+
+
+def _page_action_categories(containers: Any) -> list[str]:
+    if not isinstance(containers, list):
+        return []
+    categories: list[str] = []
+    for container in containers:
+        if not isinstance(container, dict):
+            continue
+        if _contains_close_action(container):
+            categories.append("close")
+        elif _is_save_action(container):
+            categories.append("save")
+        else:
+            categories.append("other")
+    return categories
+
+
+def _contains_close_action(value: Any) -> bool:
+    if isinstance(value, dict):
+        return _is_close_action(value) or any(_contains_close_action(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_close_action(child) for child in value)
+    return False
+
+
+def _is_save_action(value: dict[str, Any]) -> bool:
+    for key in ("title", "name", "tooltip"):
+        label = str(value.get(key) or "").strip().casefold().rstrip(".:")
+        if label.startswith("сохран") or label.startswith("save"):
+            return True
+    return _form_has_submit_action(value)
 
 
 def _analyze_view_detail_editing(
@@ -573,7 +779,7 @@ def _analyze_action_containers(
                         "Row menu must contain nested action containers in containers[].",
                         container_path,
                     )
-            elif row_actions and not _row_menu_has_default_view(nested):
+            elif row_actions and _row_menu_has_view(nested) and not _row_menu_has_default_view(nested):
                 _add_issue(
                     issues,
                     "warning",
@@ -690,6 +896,104 @@ def _analyze_action_containers(
                 path,
                 {"observed": [category for category, _ in known_order]},
             )
+
+
+def _analyze_list_row_action_contract(
+    containers: Any,
+    path: str,
+    issues: list[dict[str, Any]],
+) -> None:
+    if not isinstance(containers, list) or not containers:
+        return
+    menus: list[tuple[int, dict[str, Any]]] = []
+    non_menu_paths: list[str] = []
+    for index, container in enumerate(containers):
+        if not isinstance(container, dict):
+            continue
+        if str(container.get("type") or "").strip().casefold() == "menu":
+            menus.append((index, container))
+        else:
+            non_menu_paths.append(f"{path}[{index}]")
+    if non_menu_paths:
+        _add_issue(
+            issues,
+            "warning",
+            "list_row_actions_must_be_menu",
+            "Configured list row actions must use outer type=menu containers.",
+            path,
+            {"non_menu_paths": non_menu_paths},
+        )
+    if not menus:
+        return
+
+    menu_summaries: list[tuple[int, dict[str, Any], set[str]]] = []
+    missing_icon_paths: list[str] = []
+    for index, menu in menus:
+        menu_path = f"{path}[{index}]"
+        if not _action_icon(menu):
+            missing_icon_paths.append(menu_path)
+        nested = menu.get("containers")
+        nested_items = nested if isinstance(nested, list) else []
+        categories: set[str] = set()
+        for nested_index, nested_container in enumerate(nested_items):
+            if not isinstance(nested_container, dict):
+                continue
+            nested_path = f"{menu_path}.containers[{nested_index}]"
+            nested_categories = _row_action_container_categories(nested_container)
+            categories.update(nested_categories)
+            actions = nested_container.get("actions")
+            action_items = actions if isinstance(actions, list) else []
+            has_icon = bool(_action_icon(nested_container)) or any(
+                isinstance(action, dict) and bool(_action_icon(action)) for action in action_items
+            )
+            if (nested_categories or action_items) and not has_icon:
+                missing_icon_paths.append(nested_path)
+        menu_summaries.append((index, menu, categories))
+
+    required = set(EXPECTED_ROW_ACTION_ORDER)
+    _, _, best_categories = max(menu_summaries, key=lambda item: len(item[2] & required))
+    missing_categories = sorted(required - best_categories, key=EXPECTED_ROW_ACTION_ORDER.get)
+    if missing_categories:
+        _add_issue(
+            issues,
+            "warning",
+            "list_row_menu_actions_missing",
+            "The list row menu must contain edit, view, and delete actions.",
+            path,
+            {"missing": missing_categories},
+        )
+    if missing_icon_paths:
+        _add_issue(
+            issues,
+            "warning",
+            "list_row_action_icon_missing",
+            "The outer row menu and every configured row action must have an icon.",
+            path,
+            {"missing_icon_paths": missing_icon_paths},
+        )
+
+
+def _row_action_container_categories(container: dict[str, Any]) -> set[str]:
+    actions = container.get("actions")
+    action_items = actions if isinstance(actions, list) else []
+    categories: set[str] = set()
+    for action in action_items:
+        if not isinstance(action, dict):
+            continue
+        category = _action_category(action, container)
+        if category:
+            categories.add(category)
+    container_category = _action_category(container)
+    if container_category:
+        categories.add(container_category)
+    return categories
+
+
+def _row_menu_has_view(containers: list[Any]) -> bool:
+    return any(
+        isinstance(container, dict) and "view" in _row_action_container_categories(container)
+        for container in containers
+    )
 
 
 def _row_menu_has_default_view(containers: list[Any]) -> bool:

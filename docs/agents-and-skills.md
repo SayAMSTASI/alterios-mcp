@@ -45,6 +45,9 @@
 - формулировать критерии приемки до реализации;
 - отделять verified, inferred, blocked и deferred;
 - требовать от каждого агента конкретный output, а не общий пересказ;
+- назначать ровно одного ответственного владельца результата каждого stage;
+- проверять private Gitea issue и handoff-комментарии через
+  `alterios_verify_delivery_evidence`;
 - после интеграции обновлять статус и backlog.
 
 Done:
@@ -53,6 +56,7 @@ Done:
 - acceptance criteria измеримы;
 - статус не скрывает открытые риски;
 - завершенный этап связан с commit hash в следующем статусном срезе.
+- для live apply подтверждены handoffs `analyst`, `implementer`, `verifier`.
 
 ### Business/System Analyst / Аналитик Требований
 
@@ -67,6 +71,7 @@ Done:
   relation field, view fields, filters, sorts, `openId/dataId` и readback;
 - перед live-write через сценарные tools требовать `alterios_live_task_preflight`
   со статусом `ready`;
+- не принимать строковые handoff refs без успешного Gitea verification receipt;
 - отдавать профильным агентам scoped handoff, а не общий пересказ задачи.
 
 Done:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -9,9 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from .client import AlteriosConfig, AlteriosConfigError, AlteriosRequestError, redact_sensitive
+from .delivery_evidence import validate_delivery_evidence
+from .gitea_workboard import GiteaClient, GiteaConfig
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
 from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_instances, collect_alterios_mcp_processes
+from .tool_profiles import allowed_tool_names
 from .ux_contract import UX_CONTRACT_VERSION
 
 
@@ -41,6 +45,10 @@ def run_live_task_preflight(
     include_replay_smoke: bool = True,
     include_live_replay: bool = False,
     require_delivery_evidence: bool = True,
+    verify_gitea_evidence: bool = True,
+    required_agent_roles: list[str] | None = None,
+    allow_closed_work_item: bool = False,
+    gitea_dotenv_path: str | None = None,
     artifacts_dir: str | None = None,
 ) -> dict[str, Any]:
     """Return a read-only go/no-go preflight for an Alterios live task."""
@@ -74,6 +82,10 @@ def run_live_task_preflight(
         _delivery_evidence_check(
             delivery_evidence=delivery_evidence,
             require_delivery_evidence=require_delivery_evidence,
+            verify_gitea_evidence=verify_gitea_evidence,
+            required_agent_roles=required_agent_roles,
+            allow_closed_work_item=allow_closed_work_item,
+            gitea_dotenv_path=gitea_dotenv_path,
             blockers=blockers,
             warnings=warnings,
         )
@@ -208,6 +220,10 @@ def _delivery_evidence_check(
     *,
     delivery_evidence: dict[str, Any] | None,
     require_delivery_evidence: bool,
+    verify_gitea_evidence: bool,
+    required_agent_roles: list[str] | None,
+    allow_closed_work_item: bool,
+    gitea_dotenv_path: str | None,
     blockers: list[dict[str, str]],
     warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
@@ -237,16 +253,63 @@ def _delivery_evidence_check(
                 "message": "Delivery evidence is incomplete; apply tools may still block later.",
             }
         )
+    receipt: dict[str, Any] | None = None
+    if not missing and verify_gitea_evidence:
+        receipt = _verify_gitea_delivery_evidence(
+            work_item_ref=work_item_ref,
+            handoff_refs=handoffs,
+            required_agent_roles=required_agent_roles,
+            allow_closed_work_item=allow_closed_work_item,
+            gitea_dotenv_path=gitea_dotenv_path,
+        )
+        if not receipt.get("ok"):
+            blockers.append(
+                {
+                    "code": "delivery_evidence_unverified",
+                    "message": "Private Gitea work item or structured agent handoffs could not be verified.",
+                }
+            )
     return {
         "name": "delivery_evidence",
-        "ok": not missing or not require_delivery_evidence,
+        "ok": (not missing or not require_delivery_evidence) and (receipt is None or bool(receipt.get("ok"))),
         "required": require_delivery_evidence,
+        "gitea_verification_required": verify_gitea_evidence,
         "missing": missing,
         "work_item_ref": work_item_ref or None,
         "agent_handoff_count": len(handoffs),
         "ux_contract_version": ux_contract_version or None,
         "expected_ux_contract_version": UX_CONTRACT_VERSION,
+        "verification_receipt": receipt,
     }
+
+
+def _verify_gitea_delivery_evidence(
+    *,
+    work_item_ref: str,
+    handoff_refs: list[str],
+    required_agent_roles: list[str] | None,
+    allow_closed_work_item: bool,
+    gitea_dotenv_path: str | None,
+) -> dict[str, Any]:
+    config = GiteaConfig.from_env(gitea_dotenv_path or ".env")
+    missing = config.missing_for_repo_call()
+    if missing:
+        return {
+            "ok": False,
+            "fingerprint": None,
+            "verified_roles": [],
+            "verified_comment_ids": [],
+            "blockers": [{"code": "gitea_config_missing", "missing": missing}],
+        }
+    configured_roles = os.environ.get("ALTERIOS_MCP_REQUIRED_AGENT_ROLES", "analyst,implementer,verifier")
+    roles = required_agent_roles or [role.strip() for role in configured_roles.split(",") if role.strip()]
+    return validate_delivery_evidence(
+        client=GiteaClient(config),
+        work_item_ref=work_item_ref,
+        handoff_refs=handoff_refs,
+        required_roles=roles,
+        allow_closed=allow_closed_work_item,
+    )
 
 
 def _scenario_check(*, scenario_tool: str | None, warnings: list[dict[str, str]]) -> dict[str, Any]:
@@ -349,6 +412,8 @@ def _next_actions(*, ok: bool, blockers: list[dict[str, str]], scenario_tool: st
         actions.append("Repair project health errors or explicitly narrow the write to a safe non-structural change.")
     if "delivery_evidence_missing" in codes:
         actions.append("Create/update private work item and add agent handoff refs plus current ux_contract_version.")
+    if "delivery_evidence_unverified" in codes:
+        actions.append("Fix the private Gitea issue or structured analyst/implementer/verifier handoffs, then rerun preflight.")
     if "replay_smoke_failed" in codes:
         actions.append("Fix MCP smoke failures before live write.")
     return actions or ["Resolve blockers and rerun preflight."]
@@ -359,7 +424,12 @@ def _server_tool_count() -> int | None:
         source = Path(__file__).with_name("server.py").read_text(encoding="utf-8")
     except OSError:
         return None
-    return len(re.findall(r"^@mcp\.tool\(\)", source, flags=re.MULTILINE))
+    names = re.findall(
+        r"^@mcp\.tool\(\)\s*\r?\ndef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+        source,
+        flags=re.MULTILINE,
+    )
+    return len(allowed_tool_names(names))
 
 
 def _utc_now() -> str:
@@ -380,6 +450,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-replay-smoke", action="store_true", help="Skip replay smoke.")
     parser.add_argument("--include-live-replay", action="store_true", help="Include read-only live discovery in replay smoke.")
     parser.add_argument("--no-delivery-evidence-required", action="store_true", help="Warn instead of blocking on missing delivery evidence.")
+    parser.add_argument("--no-gitea-evidence", action="store_true", help="Skip remote Gitea evidence verification.")
+    parser.add_argument("--required-agent-role", action="append", default=[], help="Required verified handoff role. Repeatable.")
+    parser.add_argument("--allow-closed-work-item", action="store_true", help="Allow a closed Gitea work item.")
+    parser.add_argument("--gitea-dotenv-path", help="Private dotenv path for Gitea configuration.")
     parser.add_argument("--no-clean-health-required", action="store_true", help="Warn through health summary but do not block on health errors.")
     parser.add_argument("--no-cached-health", action="store_true", help="Block if project health uses cached inventory.")
     parser.add_argument("--artifacts-dir", help="Override local artifacts root.")
@@ -404,6 +478,10 @@ def main(argv: list[str] | None = None) -> int:
         include_replay_smoke=not args.no_replay_smoke,
         include_live_replay=args.include_live_replay,
         require_delivery_evidence=not args.no_delivery_evidence_required,
+        verify_gitea_evidence=not args.no_gitea_evidence,
+        required_agent_roles=args.required_agent_role or None,
+        allow_closed_work_item=args.allow_closed_work_item,
+        gitea_dotenv_path=args.gitea_dotenv_path,
         artifacts_dir=args.artifacts_dir,
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None, sort_keys=True))

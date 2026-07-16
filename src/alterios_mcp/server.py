@@ -32,6 +32,7 @@ from .client import (
     strip_alterios_metadata,
 )
 from .discovery import discover_readonly, list_objects, list_projects
+from .delivery_evidence import validate_delivery_evidence
 from .form_surface import analyze_form_surface
 from .gitea_workboard import (
     GiteaClient,
@@ -65,6 +66,7 @@ from .runtime_info import (
 )
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
+from .tool_profiles import apply_tool_profile, build_tool_profile_summary
 from .write_control import (
     WriteOperation,
     assert_write_allowed,
@@ -78,6 +80,7 @@ from .write_plan import artifact_root, assert_plan_matches_audit, list_write_jou
 from .ux_contract import BLOCKING_FORM_ISSUE_CODES, UX_CONTRACT_VERSION
 
 mcp = FastMCP("alterios")
+_ACTIVE_TOOL_PROFILE: dict[str, Any] | None = None
 
 ALTERIOS_SCRIPT_TYPES = {"web", "cron", "manual", "event", "library", "diagram"}
 
@@ -95,8 +98,20 @@ def _dangerous_write_enabled() -> bool:
 
 
 def _runtime_fingerprint() -> dict[str, Any]:
-    tool_count = len(re.findall(r"^@mcp\.tool\(\)", Path(__file__).read_text(encoding="utf-8"), flags=re.MULTILINE))
-    return build_runtime_fingerprint(tool_count=tool_count)
+    profile = _ACTIVE_TOOL_PROFILE or build_tool_profile_summary(_decorated_tool_names())
+    runtime = build_runtime_fingerprint(tool_count=int(profile["enabled_count"]))
+    runtime["tool_profile"] = {
+        "profile": profile["profile"],
+        "registered_count": profile["input_count"],
+        "enabled_count": profile["enabled_count"],
+        "removed_count": profile["removed_count"],
+    }
+    return runtime
+
+
+def _decorated_tool_names() -> list[str]:
+    source = Path(__file__).read_text(encoding="utf-8")
+    return re.findall(r"^@mcp\.tool\(\)\s*\r?\ndef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", source, flags=re.MULTILINE)
 
 
 def _assert_runtime_gate(expected_runtime_fingerprint: str | None = None) -> dict[str, Any]:
@@ -122,11 +137,53 @@ def _assert_delivery_evidence(delivery_evidence: dict[str, Any] | None) -> dict[
         raise ValueError(
             f"delivery_evidence.ux_contract_version must be {UX_CONTRACT_VERSION!r}."
         )
+    receipt = _verify_delivery_evidence(
+        work_item_ref=work_item_ref,
+        handoff_refs=[str(item).strip() for item in handoffs if str(item).strip()],
+    )
+    if not receipt.get("ok"):
+        codes = ", ".join(str(item.get("code")) for item in receipt.get("blockers", []))
+        raise ValueError(f"Gitea delivery evidence verification failed: {codes or 'unknown blocker'}.")
     return {
         "work_item_ref": work_item_ref,
         "agent_handoff_refs": [str(item).strip() for item in handoffs if str(item).strip()],
         "ux_contract_version": contract_version,
+        "verification_receipt": receipt,
     }
+
+
+def _required_agent_roles(required_roles: list[str] | None = None) -> list[str]:
+    if required_roles is not None:
+        return [str(role).strip() for role in required_roles if str(role).strip()]
+    configured = os.environ.get("ALTERIOS_MCP_REQUIRED_AGENT_ROLES", "analyst,implementer,verifier")
+    return [role.strip() for role in configured.split(",") if role.strip()]
+
+
+def _verify_delivery_evidence(
+    *,
+    work_item_ref: str,
+    handoff_refs: list[str],
+    required_roles: list[str] | None = None,
+    allow_closed: bool = False,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    config = GiteaConfig.from_env(dotenv_path or ".env")
+    missing = config.missing_for_repo_call()
+    if missing:
+        return {
+            "ok": False,
+            "fingerprint": None,
+            "verified_roles": [],
+            "verified_comment_ids": [],
+            "blockers": [{"code": "gitea_config_missing", "missing": missing}],
+        }
+    return validate_delivery_evidence(
+        client=GiteaClient(config),
+        work_item_ref=work_item_ref,
+        handoff_refs=handoff_refs,
+        required_roles=_required_agent_roles(required_roles),
+        allow_closed=allow_closed,
+    )
 
 
 def _write_service_operation(function: str, args: dict[str, Any]) -> WriteOperation:
@@ -2054,7 +2111,16 @@ def _normalize_material_module_fields(
             persistent_help = str(normalized_field.pop("help", "") or "").strip()
             persistent_description = str(normalized_field.pop("description", "") or "").strip()
             if not str(normalized_field.get("tooltip") or "").strip():
-                normalized_field["tooltip"] = persistent_help or persistent_description
+                normalized_field["tooltip"] = (
+                    persistent_help
+                    or persistent_description
+                    or f"Укажите значение поля «{name}»."
+                )
+        else:
+            if not str(normalized_field.get("description") or "").strip():
+                normalized_field["description"] = f"Дата для поля «{name}»."
+            if not str(normalized_field.get("tooltip") or "").strip():
+                normalized_field["tooltip"] = f"Укажите дату для поля «{name}»."
         field_settings = dict(normalized_field.get("settings") or {})
         field_settings.setdefault("valueCount", 1)
         if field_type == "text":
@@ -3732,12 +3798,41 @@ def alterios_ux_contract() -> dict[str, Any]:
         "version": UX_CONTRACT_VERSION,
         "blocking_form_issue_codes": sorted(BLOCKING_FORM_ISSUE_CODES),
         "scenario_apply_requires": [
+            "plan_id",
             "work_item_ref",
             "agent_handoff_refs",
+            "verified_gitea_issue",
+            "analyst_implementer_verifier_handoffs",
             "ux_contract_version",
             "fresh_runtime_fingerprint",
         ],
     }
+
+
+@mcp.tool()
+def alterios_tool_profile() -> dict[str, Any]:
+    """Return the active MCP tool profile and filtered registry summary."""
+    profile = _ACTIVE_TOOL_PROFILE or build_tool_profile_summary(_decorated_tool_names())
+    return {"readonly": True, **profile}
+
+
+@mcp.tool()
+def alterios_verify_delivery_evidence(
+    work_item_ref: str,
+    agent_handoff_refs: list[str],
+    required_roles: list[str] | None = None,
+    allow_closed: bool = False,
+    dotenv_path: str | None = None,
+) -> dict[str, Any]:
+    """Verify a private Gitea work item and structured agent handoff comments."""
+    receipt = _verify_delivery_evidence(
+        work_item_ref=work_item_ref,
+        handoff_refs=agent_handoff_refs,
+        required_roles=required_roles,
+        allow_closed=allow_closed,
+        dotenv_path=dotenv_path,
+    )
+    return {"readonly": True, **receipt}
 
 
 @mcp.tool()
@@ -3754,6 +3849,10 @@ def alterios_live_task_preflight(
     include_replay_smoke: bool = True,
     include_live_replay: bool = False,
     require_delivery_evidence: bool = True,
+    verify_gitea_evidence: bool = True,
+    required_agent_roles: list[str] | None = None,
+    allow_closed_work_item: bool = False,
+    gitea_dotenv_path: str | None = None,
 ) -> dict[str, Any]:
     """Run a fast read-only go/no-go preflight before an Alterios live write task."""
     return run_live_task_preflight(
@@ -3769,6 +3868,10 @@ def alterios_live_task_preflight(
         include_replay_smoke=include_replay_smoke,
         include_live_replay=include_live_replay,
         require_delivery_evidence=require_delivery_evidence,
+        verify_gitea_evidence=verify_gitea_evidence,
+        required_agent_roles=required_agent_roles,
+        allow_closed_work_item=allow_closed_work_item,
+        gitea_dotenv_path=gitea_dotenv_path,
     )
 
 
@@ -4143,6 +4246,7 @@ def gitea_add_agent_report(
     role: str,
     scope: str,
     findings: str,
+    inputs: str = "",
     artifacts: str = "",
     verification: str = "",
     risks: str = "",
@@ -4159,6 +4263,7 @@ def gitea_add_agent_report(
     comment_body = body or agent_report_body(
         role=role,
         scope=scope,
+        inputs=inputs,
         findings=findings,
         artifacts=artifacts,
         verification=verification,
@@ -8797,6 +8902,15 @@ def alterios_rest_write(
     assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
     response = _client(profile, project_id).request(method, path, params=request_params, body=body).as_dict()
     return controlled_write_result(audit=audit, response=response, plan_id=plan_id)
+
+
+def _activate_tool_profile() -> dict[str, Any]:
+    global _ACTIVE_TOOL_PROFILE
+    _ACTIVE_TOOL_PROFILE = apply_tool_profile(mcp, _decorated_tool_names())
+    return _ACTIVE_TOOL_PROFILE
+
+
+_activate_tool_profile()
 
 
 def main() -> None:
