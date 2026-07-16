@@ -76,6 +76,7 @@ def collect_alterios_mcp_processes() -> list[dict[str, Any]]:
         processes.append(
             {
                 "pid": pid,
+                "parent_pid": _coerce_int(row.get("parent_pid")),
                 "name": row.get("name"),
                 "created_at": row.get("created_at"),
                 "command": _redact_process_command(command_line),
@@ -83,6 +84,43 @@ def collect_alterios_mcp_processes() -> list[dict[str, Any]]:
             }
         )
     return sorted(processes, key=_process_sort_key, reverse=True)
+
+
+def collect_alterios_mcp_instances(processes: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Group launcher/python process rows into logical Alterios MCP server instances."""
+    process_list = list(processes if processes is not None else collect_alterios_mcp_processes())
+    by_pid = {process.get("pid"): process for process in process_list if process.get("pid") is not None}
+
+    def root_pid_for(process: dict[str, Any]) -> int | None:
+        pid = _coerce_int(process.get("pid"))
+        current = process
+        seen: set[int] = set()
+        while current.get("parent_pid") in by_pid:
+            parent_pid = int(current["parent_pid"])
+            if parent_pid in seen:
+                break
+            seen.add(parent_pid)
+            current = by_pid[parent_pid]
+        return _coerce_int(current.get("pid")) or pid
+
+    grouped: dict[int | None, list[dict[str, Any]]] = {}
+    for process in process_list:
+        grouped.setdefault(root_pid_for(process), []).append(process)
+
+    instances: list[dict[str, Any]] = []
+    for root_pid, items in grouped.items():
+        sorted_items = sorted(items, key=_process_sort_key, reverse=True)
+        root = by_pid.get(root_pid) or sorted_items[-1]
+        instances.append(
+            {
+                "root_pid": root_pid,
+                "created_at": root.get("created_at"),
+                "process_count": len(sorted_items),
+                "current_process": any(item.get("current_process") for item in sorted_items),
+                "processes": sorted_items,
+            }
+        )
+    return sorted(instances, key=_instance_sort_key, reverse=True)
 
 
 def cleanup_alterios_mcp_processes(
@@ -94,17 +132,18 @@ def cleanup_alterios_mcp_processes(
         raise ValueError("keep_newest must be >= 0.")
     processes = collect_alterios_mcp_processes()
     current_pid = os.getpid()
-    kept = processes[:keep_newest]
+    instances = collect_alterios_mcp_instances(processes)
+    kept = instances[:keep_newest]
     candidates = [
-        process
-        for process in processes[keep_newest:]
-        if process.get("pid") is not None and process.get("pid") != current_pid
+        instance
+        for instance in instances[keep_newest:]
+        if instance.get("root_pid") is not None and instance.get("root_pid") != current_pid
     ]
     stopped: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     if not dry_run:
         for process in candidates:
-            pid = int(process["pid"])
+            pid = int(process["root_pid"])
             try:
                 _terminate_process(pid)
                 stopped.append(process)
@@ -114,6 +153,7 @@ def cleanup_alterios_mcp_processes(
         "dry_run": dry_run,
         "keep_newest": keep_newest,
         "process_count": len(processes),
+        "instance_count": len(instances),
         "kept": kept,
         "planned_stop": candidates,
         "stopped": stopped,
@@ -144,7 +184,7 @@ def _process_rows() -> list[dict[str, Any]]:
 def _windows_process_rows() -> list[dict[str, Any]]:
     command = (
         "Get-CimInstance Win32_Process | "
-        "Select-Object ProcessId,Name,CreationDate,CommandLine | "
+        "Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | "
         "ConvertTo-Json -Depth 3 -Compress"
     )
     completed = subprocess.run(
@@ -167,6 +207,7 @@ def _windows_process_rows() -> list[dict[str, Any]]:
         rows.append(
             {
                 "pid": item.get("ProcessId"),
+                "parent_pid": item.get("ParentProcessId"),
                 "name": item.get("Name"),
                 "created_at": item.get("CreationDate"),
                 "command_line": item.get("CommandLine"),
@@ -177,7 +218,7 @@ def _windows_process_rows() -> list[dict[str, Any]]:
 
 def _posix_process_rows() -> list[dict[str, Any]]:
     completed = subprocess.run(
-        ["ps", "-eo", "pid=,comm=,lstart=,args="],
+        ["ps", "-eo", "pid=,ppid=,comm=,lstart=,args="],
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -187,15 +228,16 @@ def _posix_process_rows() -> list[dict[str, Any]]:
     )
     rows: list[dict[str, Any]] = []
     for line in completed.stdout.splitlines():
-        parts = line.strip().split(None, 7)
-        if len(parts) < 8:
+        parts = line.strip().split(None, 8)
+        if len(parts) < 9:
             continue
         rows.append(
             {
                 "pid": parts[0],
-                "name": parts[1],
-                "created_at": " ".join(parts[2:7]),
-                "command_line": parts[7],
+                "parent_pid": parts[1],
+                "name": parts[2],
+                "created_at": " ".join(parts[3:8]),
+                "command_line": parts[8],
             }
         )
     return rows
@@ -229,10 +271,14 @@ def _process_sort_key(process: dict[str, Any]) -> tuple[str, int]:
     return (str(process.get("created_at") or ""), int(process.get("pid") or 0))
 
 
+def _instance_sort_key(instance: dict[str, Any]) -> tuple[str, int]:
+    return (str(instance.get("created_at") or ""), int(instance.get("root_pid") or 0))
+
+
 def _terminate_process(pid: int) -> None:
     if os.name == "nt":
         subprocess.run(
-            ["taskkill", "/PID", str(pid), "/F"],
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -317,7 +363,9 @@ def main() -> None:
             dry_run=not args.apply,
         ) if args.cleanup_stale else {
             "process_count": len(collect_alterios_mcp_processes()),
+            "instance_count": len(collect_alterios_mcp_instances()),
             "processes": collect_alterios_mcp_processes(),
+            "instances": collect_alterios_mcp_instances(),
         }
     print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None))
 

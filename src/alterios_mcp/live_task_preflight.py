@@ -11,7 +11,7 @@ from typing import Any
 from .client import AlteriosConfig, AlteriosConfigError, AlteriosRequestError, redact_sensitive
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
-from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_processes
+from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_instances, collect_alterios_mcp_processes
 from .ux_contract import UX_CONTRACT_VERSION
 
 
@@ -175,13 +175,14 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
     expected = (expected_fingerprint or "").strip()
     matches_expected = not expected or runtime["fingerprint"] == expected
     processes = collect_alterios_mcp_processes()
-    duplicate_process_count = max(0, len(processes) - 1)
-    ok = not runtime["stale"] and matches_expected and duplicate_process_count == 0
+    instances = collect_alterios_mcp_instances(processes)
+    duplicate_instance_count = max(0, len(instances) - 1)
+    ok = not runtime["stale"] and matches_expected and duplicate_instance_count == 0
     if runtime["stale"]:
         blockers.append({"code": "runtime_stale", "message": "Running MCP code/skills fingerprint is stale."})
     if not matches_expected:
         blockers.append({"code": "runtime_fingerprint_mismatch", "message": "Runtime fingerprint does not match expected_fingerprint."})
-    if duplicate_process_count:
+    if duplicate_instance_count:
         blockers.append({"code": "duplicate_mcp_processes", "message": "Duplicate alterios-mcp processes are running."})
     return {
         "name": "runtime_freshness",
@@ -193,11 +194,13 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
         "git": runtime.get("git"),
         "tool_schema_version": runtime.get("tool_schema_version"),
         "ux_contract_version": runtime.get("ux_contract_version"),
-        "process_hygiene": {
-            "process_count": len(processes),
-            "duplicate_process_count": duplicate_process_count,
-            "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
-        },
+            "process_hygiene": {
+                "process_count": len(processes),
+                "instance_count": len(instances),
+                "duplicate_instance_count": duplicate_instance_count,
+                "duplicate_process_count": duplicate_instance_count,
+                "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
+            },
     }
 
 

@@ -26,7 +26,13 @@
 - PID и время старта текущего процесса;
 - признак `stale`;
 - список локальных процессов, похожих на `alterios-mcp`;
-- количество дубликатов.
+- `instance_count`: количество логических MCP-серверов после группировки
+  Windows launcher/python child;
+- количество дубликатов MCP instances.
+
+На Windows один нормальный MCP запуск может отображаться несколькими
+OS-процессами: `alterios-mcp.exe` launcher и дочерний `python.exe`. Для live-gate
+важен не сырой `process_count`, а `instance_count` и `duplicate_instance_count`.
 
 ## Очистить старые процессы
 
@@ -57,7 +63,7 @@
 ## Быстрый live-preflight
 
 Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
-дубликаты MCP-процессов, project health, replay smoke и наличие приватной
+дубликаты MCP instances, project health, replay smoke и наличие приватной
 delivery evidence в единый результат `ready/blocked`:
 
 ```powershell
@@ -78,7 +84,7 @@ delivery evidence в единый результат `ready/blocked`:
 
 - `stale=false`;
 - `matches_expected=true`, если передан expected fingerprint;
-- `duplicate_process_count=0`;
+- `duplicate_instance_count=0`;
 - `ux_contract_version` соответствует активному `alterios_ux_contract`.
 - `project_health` не содержит blockers;
 - `delivery_evidence` содержит ссылку на приватную задачу и handoff агентов.
