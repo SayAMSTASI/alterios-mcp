@@ -269,8 +269,21 @@ def alterios_create_report_tab(
     report_columns = _project_database_columns(view_fields)
     client_config = getattr(client, "config", None)
     base_url = str(getattr(client_config, "base_url", "") or "")
+    planned_template = None
+    if template is None and not dry_run and plan_id:
+        if not profile or not project_id:
+            raise ValueError("Explicit profile and project_id are required to replay a saved report plan.")
+        saved_plan = load_write_plan(plan_id=plan_id, profile=profile, project_id=project_id)
+        planned_template = (
+            ((((saved_plan.get("response") or {}).get("planned") or {}).get("report") or {}).get("template"))
+        )
+        if not isinstance(planned_template, (str, dict)):
+            raise ValueError("Saved report plan does not contain a reusable report template.")
+
     if template is not None:
         template_payload: str | dict[str, Any] = template
+    elif planned_template is not None:
+        template_payload = planned_template
     elif normalized_report_type == "report":
         template_payload = _project_database_native_printable_template(
             report_name=normalized_report_name,

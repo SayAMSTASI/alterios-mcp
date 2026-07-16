@@ -12,6 +12,9 @@
   проектные UUID иконок.
 - `alterios_runtime_info` по умолчанию работает без OS-process scan и возвращает
   компактную сводку source hashes; подробная диагностика остается opt-in.
+- `alterios_create_report_tab` при apply повторно использует точный Stimulsoft-template
+  из проверенного dry-run плана, поэтому случайные внутренние ключи native builder
+  больше не нарушают проверку `plan_id`.
 
 ### Совместимость
 

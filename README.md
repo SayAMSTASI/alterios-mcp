@@ -189,6 +189,8 @@ ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1
 `alterios_create_report_tab` связывает source view, Project Database report и
 form tab, проверяет `openId`/`dataId`, template layout и readback. Печатный
 результат проверяется `alterios_validate_printable_render`.
+При apply без явного `template` сценарий берет точный шаблон из сохраненного
+dry-run плана; передавать сгенерированный Stimulsoft JSON повторно вручную не нужно.
 
 ### Процесс
 

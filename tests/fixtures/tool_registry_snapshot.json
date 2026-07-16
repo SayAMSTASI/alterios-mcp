@@ -4820,12 +4820,12 @@
           "title": "Expected Fingerprint"
         },
         "include_process_details": {
-          "default": true,
+          "default": false,
           "title": "Include Process Details",
           "type": "boolean"
         },
         "include_processes": {
-          "default": true,
+          "default": false,
           "title": "Include Processes",
           "type": "boolean"
         },
