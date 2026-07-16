@@ -63,6 +63,13 @@ For script write scenarios:
   resolve the actual populated `_idN` field. Never infer `_idN` from join order;
 - require `action_view_entity_id` when a row action binds `__entity_id` and use
   `save_before_execute=true` when the script must see freshly saved form data.
+- For selected-row side effects, use `alterios_fast_live_bulk_manual_script` or
+  `alterios_fast_live_bulk_process`; require exact IDs, expected count, cached
+  project health, a reviewed plan, and per-row readback.
+- Never route destructive selected-row work through a generic service tool.
+  Use `alterios_fast_live_bulk_delete` in `full/admin`; require expected content
+  type, matching plan, dangerous environment gate, `allow_destructive=true`,
+  and absence readback for every target.
 
 For view write scenarios:
 

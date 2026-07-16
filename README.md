@@ -22,8 +22,8 @@
 
 ## Что умеет сейчас
 
-Полная поверхность MCP: **104 инструмента**, из них **41 write-like инструмент**.
-Рекомендуемый профиль `live` публикует клиенту 78 инструментов.
+Полная поверхность MCP: **107 инструментов**, из них **44 write-like инструмента**.
+Рекомендуемый профиль `live` публикует клиенту 80 инструментов.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -78,6 +78,12 @@ MCP умеет собирать состав проекта:
   и replay smoke в одном отчете `ready/blocked`;
 - `alterios_fast_live_write` - двухфазный MCP workflow для типовых записывающих
   сценариев: preflight + dry-run `plan_id`, затем apply того же плана;
+- `alterios_fast_live_bulk_manual_script` - проверенный массовый запуск одного
+  manual script для выбранных записей;
+- `alterios_fast_live_bulk_process` - массовый запуск одного BPMN-процесса с
+  process/task readback по каждой выбранной записи;
+- `alterios_fast_live_bulk_delete` - отдельный destructive workflow, доступный
+  только в `full/admin` и требующий dangerous gate;
 - `alterios-replay-smoke` - локальная/read-only проверка MCP после обновления:
   tool registry, write gates, dry-run `plan_id`, form-surface, Stimulsoft layout
   и классификация risky routes.

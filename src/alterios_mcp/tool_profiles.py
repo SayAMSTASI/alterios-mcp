@@ -110,9 +110,17 @@ READ_ONLY_DISCOVERY_TOOL_NAMES = frozenset(
 SCENARIO_TOOL_NAMES = frozenset(
     {
         "alterios_fast_live_write",
+        "alterios_fast_live_bulk_manual_script",
+        "alterios_fast_live_bulk_process",
         "alterios_create_material_module",
         "alterios_create_report_tab",
         "alterios_create_process_flow",
+    }
+)
+
+DANGEROUS_WORKFLOW_TOOL_NAMES = frozenset(
+    {
+        "alterios_fast_live_bulk_delete",
     }
 )
 
@@ -246,6 +254,7 @@ DISCOVERY_TOOL_NAMES = frozenset(
 ADMIN_TOOL_NAMES = frozenset(
     DISCOVERY_TOOL_NAMES
     | SCENARIO_TOOL_NAMES
+    | DANGEROUS_WORKFLOW_TOOL_NAMES
     | TYPED_WRITE_TOOL_NAMES
     | ADMIN_SECURITY_WRITE_TOOL_NAMES
     | WORK_COORDINATION_TOOL_NAMES
@@ -280,6 +289,8 @@ def classify_tool(tool_name: str) -> str:
         return "raw_write_escape_hatch"
     if name in ADMIN_SECURITY_WRITE_TOOL_NAMES:
         return "admin_security_write"
+    if name in DANGEROUS_WORKFLOW_TOOL_NAMES:
+        return "dangerous_workflow"
     if name in SCENARIO_TOOL_NAMES:
         return "scenario"
     if name in TYPED_WRITE_TOOL_NAMES:

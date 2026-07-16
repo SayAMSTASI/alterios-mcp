@@ -473,11 +473,26 @@ tools:
 `allow_destructive=true`, dry-run target review и readback. Для production
 использовать их нельзя без отдельного sandbox/UI evidence и rollback-плана.
 
-Для множественного выбора строк используйте
+Для множественного изменения полей используйте
 `alterios_bulk_update_selected_content_fields`, если действие не destructive:
 передавайте `selected_content_ids`, `expected_count`, `expected_content_type_id`
-и `field_values`. Массовое удаление или массовый запуск script требует
-отдельного dangerous workflow.
+и `field_values`.
+
+Для side effects по выбранным строкам используйте отдельные workflows:
+
+- `alterios_fast_live_bulk_manual_script` - один сохраненный manual script,
+  общие args и отдельный `contentId` для каждой строки;
+- `alterios_fast_live_bulk_process` - одна BPMN-диаграмма и отдельный процесс
+  для каждой строки с process/task readback;
+- `alterios_fast_live_bulk_delete` - destructive удаление точного списка ID.
+
+Каждый workflow сначала запускается с `dry_run=true` и сохраняет `plan_id`.
+Apply принимает тот же список ID и тот же план. Bulk delete доступен только в
+`full/admin`; кроме `plan_id` обязательны `ALTERIOS_MCP_ALLOW_WRITE=1`,
+`ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, `allow_destructive=true`, точные
+`expected_count` и `expected_content_type_id`.
+Для manual script и BPMN в план также входит fingerprint исполняемого объекта:
+изменение кода скрипта или диаграммы между plan/apply блокирует выполнение.
 
 Для публикации типа материала в другие проекты используйте
 `alterios_plan_content_type_publish` как план и safety review. Для native

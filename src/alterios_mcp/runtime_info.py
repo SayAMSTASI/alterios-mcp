@@ -8,6 +8,9 @@ import re
 import signal
 import subprocess
 import sys
+import threading
+import time
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,12 +20,15 @@ from .ux_contract import UX_CONTRACT_VERSION
 
 
 PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-MCP_TOOL_SCHEMA_VERSION = "2026-07-16.4"
+MCP_TOOL_SCHEMA_VERSION = "2026-07-16.5"
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = 15
 ALTERIOS_MCP_COMMAND_RE = re.compile(
     r"(?:^|[\\/\s\"'])alterios-mcp(?:\.exe)?(?:$|[\s\"'])|-m\s+alterios_mcp\.server",
     re.IGNORECASE,
 )
 RUNTIME_INFO_COMMAND_RE = re.compile(r"alterios-runtime-info|runtime_info", re.IGNORECASE)
+_PROCESS_SNAPSHOT_LOCK = threading.Lock()
+_PROCESS_SNAPSHOT_CACHE: dict[str, Any] = {}
 
 
 def build_runtime_fingerprint(
@@ -123,6 +129,60 @@ def collect_alterios_mcp_instances(processes: list[dict[str, Any]] | None = None
     return sorted(instances, key=_instance_sort_key, reverse=True)
 
 
+def collect_alterios_mcp_process_snapshot(
+    *,
+    refresh: bool = False,
+    cache_ttl_seconds: int | None = None,
+) -> dict[str, Any]:
+    """Return one TTL-cached process/instance scan shared by runtime checks."""
+    ttl = DEFAULT_PROCESS_CACHE_TTL_SECONDS if cache_ttl_seconds is None else int(cache_ttl_seconds)
+    if ttl < 0:
+        raise ValueError("cache_ttl_seconds must be >= 0.")
+    with _PROCESS_SNAPSHOT_LOCK:
+        now = time.monotonic()
+        captured_at = float(_PROCESS_SNAPSHOT_CACHE.get("captured_at_monotonic") or 0.0)
+        age = max(0.0, now - captured_at) if captured_at else None
+        if not refresh and ttl > 0 and captured_at and age is not None and age <= ttl:
+            cached = deepcopy(_PROCESS_SNAPSHOT_CACHE["snapshot"])
+            cached["cache"] = {
+                "hit": True,
+                "ttl_seconds": ttl,
+                "age_seconds": round(age, 3),
+                "scan_duration_ms": cached.get("cache", {}).get("scan_duration_ms"),
+            }
+            return cached
+
+        started = time.perf_counter()
+        processes = collect_alterios_mcp_processes()
+        instances = collect_alterios_mcp_instances(processes)
+        scan_duration_ms = round((time.perf_counter() - started) * 1000, 1)
+        snapshot = {
+            "processes": processes,
+            "instances": instances,
+            "cache": {
+                "hit": False,
+                "ttl_seconds": ttl,
+                "age_seconds": 0.0,
+                "scan_duration_ms": scan_duration_ms,
+            },
+        }
+        if ttl > 0:
+            _PROCESS_SNAPSHOT_CACHE.clear()
+            _PROCESS_SNAPSHOT_CACHE.update(
+                {
+                    "captured_at_monotonic": time.monotonic(),
+                    "snapshot": deepcopy(snapshot),
+                }
+            )
+        return snapshot
+
+
+def clear_process_snapshot_cache() -> None:
+    """Clear the local process snapshot cache for tests and forced diagnostics."""
+    with _PROCESS_SNAPSHOT_LOCK:
+        _PROCESS_SNAPSHOT_CACHE.clear()
+
+
 def cleanup_alterios_mcp_processes(
     *,
     keep_newest: int = 1,
@@ -183,7 +243,7 @@ def _process_rows() -> list[dict[str, Any]]:
 
 def _windows_process_rows() -> list[dict[str, Any]]:
     command = (
-        "Get-CimInstance Win32_Process | "
+        "Get-CimInstance Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe' OR Name='alterios-mcp.exe'\" | "
         "Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | "
         "ConvertTo-Json -Depth 3 -Compress"
     )
@@ -358,14 +418,16 @@ def main() -> None:
     args = parser.parse_args()
     payload = build_runtime_fingerprint()
     if args.processes or args.cleanup_stale:
+        snapshot = collect_alterios_mcp_process_snapshot(refresh=True)
         payload["process_hygiene"] = cleanup_alterios_mcp_processes(
             keep_newest=args.keep_newest,
             dry_run=not args.apply,
         ) if args.cleanup_stale else {
-            "process_count": len(collect_alterios_mcp_processes()),
-            "instance_count": len(collect_alterios_mcp_instances()),
-            "processes": collect_alterios_mcp_processes(),
-            "instances": collect_alterios_mcp_instances(),
+            "process_count": len(snapshot["processes"]),
+            "instance_count": len(snapshot["instances"]),
+            "processes": snapshot["processes"],
+            "instances": snapshot["instances"],
+            "cache": snapshot["cache"],
         }
     print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None))
 

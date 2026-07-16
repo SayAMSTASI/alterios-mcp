@@ -56,7 +56,11 @@ def _smoke(*, ok: bool = True) -> dict[str, object]:
 
 def test_live_task_preflight_ready_with_cache_warning(monkeypatch) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
-    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_processes", lambda: [])
+    monkeypatch.setattr(
+        live_task_preflight,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}},
+    )
     monkeypatch.setattr(live_task_preflight, "run_project_health", lambda **kwargs: _health(ok=True, source="cache"))
     monkeypatch.setattr(live_task_preflight, "run_replay_smoke", lambda **kwargs: _smoke(ok=True))
 
@@ -79,7 +83,11 @@ def test_live_task_preflight_ready_with_cache_warning(monkeypatch) -> None:
 
 def test_live_task_preflight_blocks_missing_delivery_evidence(monkeypatch) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
-    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_processes", lambda: [])
+    monkeypatch.setattr(
+        live_task_preflight,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}},
+    )
 
     with patch.dict("os.environ", {}, clear=True):
         result = live_task_preflight.run_live_task_preflight(
@@ -96,7 +104,11 @@ def test_live_task_preflight_blocks_missing_delivery_evidence(monkeypatch) -> No
 
 def test_live_task_preflight_blocks_project_health_errors(monkeypatch) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
-    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_processes", lambda: [])
+    monkeypatch.setattr(
+        live_task_preflight,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}},
+    )
     monkeypatch.setattr(live_task_preflight, "run_project_health", lambda **kwargs: _health(ok=False, source="live"))
 
     with patch.dict("os.environ", ENV, clear=True):
@@ -116,8 +128,12 @@ def test_live_task_preflight_blocks_duplicate_mcp_processes(monkeypatch) -> None
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
     monkeypatch.setattr(
         live_task_preflight,
-        "collect_alterios_mcp_processes",
-        lambda: [{"pid": 1}, {"pid": 2}],
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {
+            "processes": [{"pid": 1}, {"pid": 2}],
+            "instances": [{"root_pid": 1, "process_count": 1}, {"root_pid": 2, "process_count": 1}],
+            "cache": {"hit": False},
+        },
     )
 
     with patch.dict("os.environ", ENV, clear=True):
@@ -138,7 +154,11 @@ def test_live_task_preflight_blocks_duplicate_mcp_processes(monkeypatch) -> None
 
 def test_live_task_preflight_cli_and_server_tool_use_safe_readonly_defaults(monkeypatch, capsys) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
-    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_processes", lambda: [])
+    monkeypatch.setattr(
+        live_task_preflight,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}},
+    )
 
     with patch.dict("os.environ", ENV, clear=True):
         exit_code = live_task_preflight.main(
@@ -176,7 +196,11 @@ def test_live_task_preflight_cli_and_server_tool_use_safe_readonly_defaults(monk
 
 def test_live_task_preflight_blocks_unverified_gitea_handoffs(monkeypatch) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
-    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_processes", lambda: [])
+    monkeypatch.setattr(
+        live_task_preflight,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}},
+    )
     monkeypatch.setattr(
         live_task_preflight,
         "_verify_gitea_delivery_evidence",

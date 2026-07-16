@@ -160,7 +160,7 @@ read-only live discovery.
 
 ## Этап 19. Fast live write и блокирующий UX-контракт
 
-Статус: выполнен для трех утвержденных сценариев записи.
+Статус: выполнен для сценариев создания и массовых side effects.
 
 Что сделано:
 
@@ -171,16 +171,20 @@ read-only live discovery.
 4. Разрешены только `alterios_create_material_module`,
    `alterios_create_report_tab` и `alterios_create_process_flow`.
 5. Generic REST, security и destructive writes через fast-live недоступны.
+6. Добавлены отдельные fast-live workflows для bulk manual script и BPMN
+   process; оба используют cached health, точный список выбранных ID, plan/apply
+   и построчный readback.
+7. Destructive bulk delete вынесен в отдельный admin-only workflow с
+   `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, `allow_destructive=true` и проверкой
+   отсутствия каждой удаленной записи.
+8. Process inventory для `alterios_runtime_info(include_processes=true)` теперь
+   использует фильтрованный Windows scan и общий TTL cache с forced refresh.
 
 Что еще не готово:
 
 1. `server.py` остается физическим монолитом; профили разделяют реестр tools,
    но доменные пакеты пока не вынесены в отдельные registration modules.
-2. `alterios_runtime_info(include_processes=true)` требует отдельной оптимизации
-   MCP-вызова: CLI-проверка процессов работает быстрее текущего tool transport.
-3. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
+2. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
    каждого нового паттерна остаются отдельным этапом.
-4. Истинный backend incremental scan без полного project read требует надежных
+3. Истинный backend incremental scan без полного project read требует надежных
    `updatedAt`/version-маркеров Alterios для всех проверяемых сущностей.
-5. Bulk selected manual-script/process actions и destructive bulk delete не
-   входят в fast-live и требуют отдельных typed workflows.
