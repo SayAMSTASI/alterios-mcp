@@ -37,8 +37,10 @@ def build_runtime_fingerprint(
     tool_count: int | None = None,
 ) -> dict[str, Any]:
     root = Path(package_root).resolve() if package_root else Path(__file__).resolve().parent
-    current = _capture_identity(root)
+    current = _capture_identity(root, include_git=package_root is not None)
     loaded = current if package_root is not None else _LOADED_IDENTITY
+    if package_root is None:
+        current["git"] = loaded["git"]
     identity = {
         "package_version": __version__,
         "tool_schema_version": MCP_TOOL_SCHEMA_VERSION,
@@ -222,7 +224,7 @@ def cleanup_alterios_mcp_processes(
     }
 
 
-def _capture_identity(root: Path) -> dict[str, Any]:
+def _capture_identity(root: Path, *, include_git: bool = True) -> dict[str, Any]:
     repo_root = root.parent.parent
     return {
         "source_hashes": {
@@ -231,7 +233,7 @@ def _capture_identity(root: Path) -> dict[str, Any]:
             if path.is_file()
         },
         "skills_hash": _tree_hash(repo_root / "skills"),
-        "git": _git_state(repo_root),
+        "git": _git_state(repo_root) if include_git else {"available": False, "commit": None, "dirty": None},
     }
 
 

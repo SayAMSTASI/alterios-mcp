@@ -15,13 +15,23 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
 
 def alterios_runtime_info(
     expected_fingerprint: str | None = None,
-    include_processes: bool = True,
+    include_processes: bool = False,
     refresh_processes: bool = False,
     process_cache_ttl_seconds: int = 15,
-    include_process_details: bool = True,
+    include_process_details: bool = False,
 ) -> dict[str, Any]:
     """Return the active MCP source/skills/tool-schema fingerprint and stale-process status."""
+    started = time.perf_counter()
     runtime = _runtime_fingerprint()
+    source_hashes = runtime.pop("source_hashes", {})
+    disk = runtime.get("disk") if isinstance(runtime.get("disk"), dict) else {}
+    disk_source_hashes = disk.pop("source_hashes", {}) if isinstance(disk, dict) else {}
+    runtime["source_summary"] = {
+        "loaded_file_count": len(source_hashes),
+        "disk_file_count": len(disk_source_hashes),
+        "loaded_digest": _hash_mapping(source_hashes),
+        "disk_digest": _hash_mapping(disk_source_hashes),
+    }
     expected = (expected_fingerprint or "").strip()
     runtime["expected_fingerprint"] = expected or None
     runtime["matches_expected"] = not expected or runtime["fingerprint"] == expected
@@ -46,7 +56,16 @@ def alterios_runtime_info(
     runtime["ok"] = not runtime["stale"] and runtime["matches_expected"]
     if include_processes and runtime["process_hygiene"]["duplicate_process_count"]:
         runtime["ok"] = False
+    runtime["timing_ms"] = round((time.perf_counter() - started) * 1000, 1)
     return runtime
+
+
+def _hash_mapping(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
 
 def alterios_ux_contract() -> dict[str, Any]:
     """Return the active machine-readable Alterios UX contract."""
