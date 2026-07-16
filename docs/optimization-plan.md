@@ -127,12 +127,14 @@ read-only live discovery.
 
 ## Этап 18. Inventory optimization
 
-Статус: выполнен в суженном write-preflight объеме.
+Статус: выполнен в write-preflight объеме с TTL и persisted diff cache.
 
 Что сделано:
 
-1. Кеш inventory в `artifacts/inventories/<profile>/<project_id>/`.
-2. Diff scan по последнему snapshot.
+1. Кеш inventory в `artifacts/inventories/<profile>/<project_id>/` с TTL;
+   стандартное значение — 300 секунд.
+2. Автоматический live refresh просроченного snapshot и persisted diff в
+   `latest-diff.json` плюс архив `diffs/`.
 3. Health summary через `alterios-project-health` / `alterios_project_health`:
    - broken forms;
    - broken views/view fields;
@@ -155,3 +157,30 @@ read-only live discovery.
 4. Сделать `alterios_create_process_flow`. Готово.
 5. Stage 17 пропущен по решению пользователя; viewer/render diagnostics остается deferred.
 6. Stage 18 закрыт как read-only write-preflight: cache/diff/project health.
+
+## Этап 19. Fast live write и блокирующий UX-контракт
+
+Статус: выполнен для трех утвержденных сценариев записи.
+
+Что сделано:
+
+1. `alterios_validate_form_contract` добавлен как строгий alias валидатора форм.
+2. `alterios_fast_live_write` объединяет live preflight и сценарный вызов.
+3. Режим остается двухфазным: `dry_run=true` сохраняет `plan_id`, а
+   `dry_run=false` применяет тот же набор аргументов и проверенный план.
+4. Разрешены только `alterios_create_material_module`,
+   `alterios_create_report_tab` и `alterios_create_process_flow`.
+5. Generic REST, security и destructive writes через fast-live недоступны.
+
+Что еще не готово:
+
+1. `server.py` остается физическим монолитом; профили разделяют реестр tools,
+   но доменные пакеты пока не вынесены в отдельные registration modules.
+2. `alterios_runtime_info(include_processes=true)` требует отдельной оптимизации
+   MCP-вызова: CLI-проверка процессов работает быстрее текущего tool transport.
+3. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
+   каждого нового паттерна остаются отдельным этапом.
+4. Истинный backend incremental scan без полного project read требует надежных
+   `updatedAt`/version-маркеров Alterios для всех проверяемых сущностей.
+5. Bulk selected manual-script/process actions и destructive bulk delete не
+   входят в fast-live и требуют отдельных typed workflows.

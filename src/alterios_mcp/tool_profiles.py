@@ -95,6 +95,7 @@ READ_ONLY_DISCOVERY_TOOL_NAMES = frozenset(
         "alterios_resolve_project_icon",
         "alterios_list_comments",
         "alterios_analyze_form_surface",
+        "alterios_validate_form_contract",
         "alterios_view_data",
         "alterios_validate_script",
         "alterios_list_process_tasks",
@@ -108,6 +109,7 @@ READ_ONLY_DISCOVERY_TOOL_NAMES = frozenset(
 
 SCENARIO_TOOL_NAMES = frozenset(
     {
+        "alterios_fast_live_write",
         "alterios_create_material_module",
         "alterios_create_report_tab",
         "alterios_create_process_flow",
@@ -186,6 +188,7 @@ LIVE_READ_HELPER_TOOL_NAMES = frozenset(
         "alterios_resolve_project_icon",
         "alterios_list_comments",
         "alterios_analyze_form_surface",
+        "alterios_validate_form_contract",
         "alterios_view_data",
         "alterios_validate_script",
         "alterios_list_process_tasks",

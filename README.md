@@ -62,9 +62,12 @@ MCP умеет собирать состав проекта:
 
 - `alterios-deep-inventory` - формы, скрипты, BPMN-связи и иконки;
 - `alterios-project-health` - быстрый read-only preflight перед записью:
-  cache inventory, diff с прошлым snapshot и health по forms/views/scripts/BPMN/reports;
+  TTL cache inventory, persisted diff с прошлым snapshot и health по
+  forms/views/scripts/BPMN/reports;
 - `alterios-form-surface-check` - проверка формы на layout/F-pattern,
   источники данных, роли, стили и действия;
+- `alterios_validate_form_contract` - строгий MCP alias проверки формы:
+  подтвержденные нарушения UX-контракта возвращаются как blocking errors;
 - `alterios-stimulsoft-layout-check` - статическая проверка Stimulsoft layout
   на пересечения, выход за страницу и риски динамической высоты;
 - `alterios-runtime-info` - fingerprint запущенного MCP: commit, путь к
@@ -73,6 +76,8 @@ MCP умеет собирать состав проекта:
 - `alterios-live-task-preflight` - быстрый read-only go/no-go перед live-задачей:
   явный профиль/проект, runtime freshness, delivery evidence, project health
   и replay smoke в одном отчете `ready/blocked`;
+- `alterios_fast_live_write` - двухфазный MCP workflow для типовых записывающих
+  сценариев: preflight + dry-run `plan_id`, затем apply того же плана;
 - `alterios-replay-smoke` - локальная/read-only проверка MCP после обновления:
   tool registry, write gates, dry-run `plan_id`, form-surface, Stimulsoft layout
   и классификация risky routes.
@@ -347,6 +352,11 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 ```powershell
 .\.venv\Scripts\alterios-project-health.exe --profile secondary --project-id <sandbox-project-id> --refresh --json --pretty
 ```
+
+По умолчанию cache действует 300 секунд. TTL можно изменить через
+`ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS` или аргумент `--cache-ttl-seconds`.
+Последний diff хранится отдельно в
+`artifacts/inventories/<profile>/<project_id>/latest-diff.json`.
 
 Минимальная локальная проверка конфигурации без записи:
 

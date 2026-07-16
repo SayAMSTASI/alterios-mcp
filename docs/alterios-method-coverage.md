@@ -113,11 +113,13 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_validate_report_project_base` | Report Project Database validation read |
 | `alterios_validate_stimulsoft_layout` | Stimulsoft report layout validation read |
 | `alterios_create_report_tab` | Controlled scenario tool for Project Database report plus openId form tab and dataId context check |
+| `alterios_validate_form_contract` | Strict blocking validation alias for the active form UX contract |
+| `alterios_fast_live_write` | Two-phase fast workflow: live preflight plus scenario plan/apply |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
 | `alterios_profile_smoke_matrix` | Profile/project read-only smoke matrix |
 | `alterios_replay_smoke` | Local/read-only MCP replay smoke after updates |
-| `alterios_project_health` | Read-only cached project health/diff preflight before writes |
+| `alterios_project_health` | Read-only TTL-cached project health with persisted diff before writes |
 | `alterios_live_task_preflight` | Fast read-only go/no-go preflight before live write tasks |
 | `alterios_tool_profile` | Active `full/live/discovery/admin` registry profile and removed-tool summary |
 | `alterios_verify_delivery_evidence` | Read-only private Gitea issue and structured agent handoff verification |

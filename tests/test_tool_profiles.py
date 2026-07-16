@@ -19,6 +19,8 @@ SAMPLE_TOOLS = [
     "alterios_tool_profile",
     "alterios_list_content_types",
     "alterios_live_task_preflight",
+    "alterios_validate_form_contract",
+    "alterios_fast_live_write",
     "alterios_create_material_module",
     "alterios_upsert_content_type",
     "alterios_upsert_user",
@@ -55,6 +57,8 @@ def test_classify_tool_covers_profile_boundaries() -> None:
     assert classify_tool(TOOL_PROFILE_INTROSPECTION) == "introspection"
     assert classify_tool("alterios_list_content_types") == "read_only_discovery"
     assert classify_tool("alterios_live_task_preflight") == "runtime_guard"
+    assert classify_tool("alterios_validate_form_contract") == "read_only_discovery"
+    assert classify_tool("alterios_fast_live_write") == "scenario"
     assert classify_tool("alterios_create_material_module") == "scenario"
     assert classify_tool("alterios_upsert_content_type") == "typed_write"
     assert classify_tool("alterios_delete_user") == "admin_security_write"
@@ -74,6 +78,7 @@ def test_discovery_profile_is_read_only_and_preserves_introspection() -> None:
         TOOL_PROFILE_INTROSPECTION,
         "alterios_list_content_types",
         "alterios_live_task_preflight",
+        "alterios_validate_form_contract",
     }
 
 
@@ -84,6 +89,7 @@ def test_live_profile_keeps_scenarios_and_typed_helpers() -> None:
         TOOL_PROFILE_INTROSPECTION,
         "alterios_live_task_preflight",
         "alterios_create_material_module",
+        "alterios_fast_live_write",
         "alterios_upsert_content_type",
         "alterios_list_content_types",
     } <= enabled

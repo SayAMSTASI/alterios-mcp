@@ -18,6 +18,9 @@ from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_plan import ARTIFACTS_ENV
 
 PROJECT_HEALTH_SCHEMA_VERSION = 1
+PROJECT_HEALTH_DIFF_SCHEMA_VERSION = 1
+HEALTH_CACHE_TTL_ENV = "ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS"
+DEFAULT_HEALTH_CACHE_TTL_SECONDS = 300
 
 
 def run_project_health(
@@ -27,6 +30,7 @@ def run_project_health(
     refresh: bool = False,
     use_cache: bool = True,
     write_cache: bool = True,
+    cache_ttl_seconds: int | None = None,
     include_processes: bool = True,
     include_report_templates: bool = False,
     artifacts_dir: str | None = None,
@@ -39,12 +43,20 @@ def run_project_health(
     try:
         target_profile = (profile or "").strip()
         target_project_id = (project_id or "").strip()
+        resolved_cache_ttl = resolve_cache_ttl_seconds(cache_ttl_seconds)
         previous_snapshot = load_latest_snapshot(profile=target_profile, project_id=target_project_id) if use_cache else None
+        cache_status = snapshot_cache_status(
+            profile=target_profile,
+            project_id=target_project_id,
+            ttl_seconds=resolved_cache_ttl,
+            snapshot=previous_snapshot,
+        )
         source = "provided"
         written: dict[str, Any] | None = None
+        diff_written: dict[str, Any] | None = None
 
         if snapshot is None:
-            if use_cache and previous_snapshot is not None and not refresh:
+            if use_cache and previous_snapshot is not None and cache_status["fresh"] and not refresh:
                 snapshot = previous_snapshot
                 previous_snapshot = None
                 source = "cache"
@@ -60,9 +72,47 @@ def run_project_health(
                     written = save_snapshot(snapshot)
 
         health = build_project_health(snapshot=snapshot, previous_snapshot=previous_snapshot)
+        if source == "cache":
+            cached_diff = load_latest_diff_cache(profile=target_profile, project_id=target_project_id)
+            if cached_diff and cached_diff.get("current_fingerprint") == health["summary"]["fingerprint"]:
+                health["diff"] = cached_diff.get("diff") or health["diff"]
+                health["summary"]["previous_fingerprint"] = cached_diff.get("previous_fingerprint")
+                health["summary"]["changed_since_previous"] = bool(
+                    cached_diff.get("previous_fingerprint")
+                    and cached_diff.get("previous_fingerprint") != cached_diff.get("current_fingerprint")
+                )
+                health["diff_cache"] = {
+                    "hit": True,
+                    "path": cached_diff.get("path"),
+                    "generated_at": cached_diff.get("generated_at"),
+                }
+            else:
+                health["diff_cache"] = {"hit": False}
+        elif write_cache and source == "live":
+            diff_written = save_diff_cache(
+                snapshot=snapshot,
+                previous_snapshot=previous_snapshot,
+                diff=health["diff"],
+            )
+            health["diff_cache"] = {"hit": False, "write": diff_written}
+
         health["source"] = source
+        health["cache"] = {
+            **cache_status,
+            "enabled": use_cache,
+            "hit": source == "cache",
+            "refresh_requested": refresh,
+            "refresh_reason": _cache_refresh_reason(
+                source=source,
+                refresh=refresh,
+                use_cache=use_cache,
+                cache_status=cache_status,
+            ),
+        }
         if written:
             health["cache_write"] = written
+        if diff_written:
+            health["diff_cache_write"] = diff_written
         return redact_sensitive(health)
     finally:
         if artifacts_dir:
@@ -234,6 +284,89 @@ def load_latest_snapshot(*, profile: str, project_id: str) -> dict[str, Any] | N
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def resolve_cache_ttl_seconds(value: int | None = None) -> int:
+    raw_value: Any = value if value is not None else os.environ.get(HEALTH_CACHE_TTL_ENV, DEFAULT_HEALTH_CACHE_TTL_SECONDS)
+    try:
+        ttl_seconds = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{HEALTH_CACHE_TTL_ENV} must be a non-negative integer.") from exc
+    if ttl_seconds < 0:
+        raise ValueError("cache_ttl_seconds must be non-negative.")
+    return ttl_seconds
+
+
+def snapshot_cache_status(
+    *,
+    profile: str,
+    project_id: str,
+    ttl_seconds: int,
+    snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    path = inventory_cache_dir(profile=profile or "default", project_id=project_id or "default") / "latest.json"
+    if snapshot is None or not path.exists():
+        return {
+            "available": False,
+            "fresh": False,
+            "ttl_seconds": ttl_seconds,
+            "age_seconds": None,
+            "path": _relative_artifact_path(path),
+            "fingerprint": None,
+        }
+    age_seconds = max(0.0, datetime.now(timezone.utc).timestamp() - path.stat().st_mtime)
+    return {
+        "available": True,
+        "fresh": age_seconds <= ttl_seconds,
+        "ttl_seconds": ttl_seconds,
+        "age_seconds": round(age_seconds, 3),
+        "path": _relative_artifact_path(path),
+        "fingerprint": snapshot_fingerprint(snapshot),
+    }
+
+
+def save_diff_cache(
+    *,
+    snapshot: dict[str, Any],
+    previous_snapshot: dict[str, Any] | None,
+    diff: dict[str, Any],
+) -> dict[str, Any]:
+    context = snapshot.get("context") or {}
+    profile = str(context.get("profile") or "default")
+    project_id = str(context.get("project_id") or "default")
+    generated_at = _utc_now()
+    directory = inventory_cache_dir(profile=profile, project_id=project_id)
+    diff_dir = directory / "diffs"
+    diff_dir.mkdir(parents=True, exist_ok=True)
+    path = diff_dir / f"{_safe_component(generated_at)}.json"
+    latest_path = directory / "latest-diff.json"
+    payload = {
+        "schema_version": PROJECT_HEALTH_DIFF_SCHEMA_VERSION,
+        "kind": "alterios_project_health_diff",
+        "generated_at": generated_at,
+        "profile": profile,
+        "project_id": project_id,
+        "current_fingerprint": snapshot_fingerprint(snapshot),
+        "previous_fingerprint": snapshot_fingerprint(previous_snapshot),
+        "diff": diff,
+    }
+    _write_json(path, payload)
+    _write_json(latest_path, payload)
+    return {
+        "path": _relative_artifact_path(path),
+        "latest_path": _relative_artifact_path(latest_path),
+        "current_fingerprint": payload["current_fingerprint"],
+        "previous_fingerprint": payload["previous_fingerprint"],
+    }
+
+
+def load_latest_diff_cache(*, profile: str, project_id: str) -> dict[str, Any] | None:
+    path = inventory_cache_dir(profile=profile or "default", project_id=project_id or "default") / "latest-diff.json"
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["path"] = _relative_artifact_path(path)
+    return payload
 
 
 def inventory_cache_dir(*, profile: str, project_id: str) -> Path:
@@ -602,6 +735,26 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _cache_refresh_reason(
+    *,
+    source: str,
+    refresh: bool,
+    use_cache: bool,
+    cache_status: dict[str, Any],
+) -> str | None:
+    if source != "live":
+        return None
+    if refresh:
+        return "refresh_requested"
+    if not use_cache:
+        return "cache_disabled"
+    if not cache_status.get("available"):
+        return "cache_miss"
+    if not cache_status.get("fresh"):
+        return "cache_expired"
+    return "live_required"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build a read-only Alterios project health summary.")
     parser.add_argument("--profile", default=None, help="Alterios profile.")
@@ -609,6 +762,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--refresh", action="store_true", help="Read live project state instead of using latest cache.")
     parser.add_argument("--no-cache", action="store_true", help="Do not read an existing cache snapshot.")
     parser.add_argument("--no-write-cache", action="store_true", help="Do not write a new local cache snapshot after live read.")
+    parser.add_argument(
+        "--cache-ttl-seconds",
+        type=int,
+        default=None,
+        help=f"Maximum cache age; defaults to {HEALTH_CACHE_TTL_ENV} or {DEFAULT_HEALTH_CACHE_TTL_SECONDS} seconds.",
+    )
     parser.add_argument("--include-processes", action=argparse.BooleanOptionalAction, default=True, help="Include process/task readback per diagram.")
     parser.add_argument("--include-report-templates", action="store_true", help="Fetch full report templates for static layout health.")
     parser.add_argument("--artifacts-dir", default=None, help="Override local artifacts root.")
@@ -623,6 +782,7 @@ def main(argv: list[str] | None = None) -> int:
             refresh=args.refresh,
             use_cache=not args.no_cache,
             write_cache=not args.no_write_cache,
+            cache_ttl_seconds=args.cache_ttl_seconds,
             include_processes=args.include_processes,
             include_report_templates=args.include_report_templates,
             artifacts_dir=args.artifacts_dir,

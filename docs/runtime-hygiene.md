@@ -80,6 +80,17 @@ delivery evidence в единый результат `ready/blocked`:
   --pretty
 ```
 
+Для типового записывающего сценария используйте `alterios_fast_live_write`.
+Он объединяет preflight и сценарный dry-run/apply, но сохраняет обязательную
+двухфазность: первый вызов возвращает `plan_id`, второй применяет тот же план.
+Полный replay smoke по умолчанию не повторяется на каждой операции; его нужно
+запускать после обновления MCP или явно включать через `include_replay_smoke=true`.
+
+Project health использует только свежий cache. Стандартный TTL равен 300
+секундам и настраивается через `ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS` либо
+`health_cache_ttl_seconds`. Просроченный snapshot используется как база diff,
+после чего выполняется live refresh.
+
 ## Правило для live-записи
 
 Для сценарных write-tools `alterios_create_material_module`,

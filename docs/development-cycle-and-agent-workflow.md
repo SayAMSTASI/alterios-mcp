@@ -789,11 +789,13 @@ Git:
   исследования неизвестных routes;
 - `alterios_live_task_preflight` перед любой live-задачей, чтобы одним шагом
   проверить профиль/проект, runtime freshness, delivery evidence, health и replay;
+- `alterios_fast_live_write` для объединенного plan/apply типовых записывающих
+  сценариев без отказа от проверенного `plan_id`;
 - `alterios_project_health` как детальная диагностика forms/views/scripts/BPMN/reports;
 - `alterios_create_material_module` для типового модуля материалов;
 - `alterios_create_report_tab` для report tab;
 - `alterios_create_process_flow` для BPMN/process flow;
-- `alterios_form_surface_check` для форм;
+- `alterios_validate_form_contract` как blocking stage gate для форм;
 - `alterios_validate_stimulsoft_layout` для отчетов;
 - `alterios_replay_smoke` после обновления MCP;
 - typed write tools вместо ручного generic REST, если workflow повторяется.

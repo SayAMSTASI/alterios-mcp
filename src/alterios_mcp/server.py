@@ -54,6 +54,7 @@ from .local_workboard import (
     list_local_work_items,
 )
 from .live_task_preflight import run_live_task_preflight
+from .live_write import run_fast_live_write
 from .profile_smoke import run_profile_smoke
 from .printable_render import render_printable_pdf
 from .project_health import run_project_health
@@ -3844,6 +3845,7 @@ def alterios_live_task_preflight(
     expected_fingerprint: str | None = None,
     include_project_health: bool = True,
     refresh_health: bool = False,
+    health_cache_ttl_seconds: int | None = None,
     allow_cached_health: bool = True,
     require_clean_health: bool = True,
     include_replay_smoke: bool = True,
@@ -3863,6 +3865,7 @@ def alterios_live_task_preflight(
         expected_fingerprint=expected_fingerprint,
         include_project_health=include_project_health,
         refresh_health=refresh_health,
+        health_cache_ttl_seconds=health_cache_ttl_seconds,
         allow_cached_health=allow_cached_health,
         require_clean_health=require_clean_health,
         include_replay_smoke=include_replay_smoke,
@@ -7463,6 +7466,40 @@ def alterios_analyze_form_surface(
     project_id: str | None = None,
 ) -> dict[str, Any]:
     """Analyze an Alterios form for layout gaps, data sources, roles, styles, and icon-first actions."""
+    return _form_surface_result(
+        form_id=form_id,
+        form=form,
+        profile=profile,
+        project_id=project_id,
+        strict=False,
+    )
+
+
+@mcp.tool()
+def alterios_validate_form_contract(
+    form_id: str | None = None,
+    form: dict[str, Any] | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate an Alterios form against the blocking UX contract."""
+    return _form_surface_result(
+        form_id=form_id,
+        form=form,
+        profile=profile,
+        project_id=project_id,
+        strict=True,
+    )
+
+
+def _form_surface_result(
+    *,
+    form_id: str | None,
+    form: dict[str, Any] | None,
+    profile: str | None,
+    project_id: str | None,
+    strict: bool,
+) -> dict[str, Any]:
     if not form_id and form is None:
         raise ValueError("Provide form_id for live read or form JSON for offline analysis.")
     if form_id and form is not None:
@@ -7480,7 +7517,7 @@ def alterios_analyze_form_surface(
         raise ValueError("Form payload must be a JSON object.")
     return {
         "form": _resource_summary(form_body),
-        "surface": analyze_form_surface(form_body, field_type_map=field_type_map),
+        "surface": analyze_form_surface(form_body, field_type_map=field_type_map, strict=strict),
     }
 
 
@@ -8665,6 +8702,45 @@ def alterios_create_report_tab(
 
 
 @mcp.tool()
+def alterios_fast_live_write(
+    scenario_tool: str,
+    scenario_args: dict[str, Any],
+    delivery_evidence: dict[str, Any],
+    profile: str,
+    project_id: str,
+    expected_runtime_fingerprint: str | None = None,
+    dry_run: bool = True,
+    plan_id: str | None = None,
+    refresh_health: bool = False,
+    health_cache_ttl_seconds: int | None = None,
+    allow_cached_health: bool = True,
+    require_clean_health: bool = True,
+    include_replay_smoke: bool = False,
+) -> dict[str, Any]:
+    """Plan or apply one approved scenario through the fast live-write workflow."""
+    return run_fast_live_write(
+        scenario_tool=scenario_tool,
+        scenario_args=scenario_args,
+        profile=profile,
+        project_id=project_id,
+        delivery_evidence=delivery_evidence,
+        expected_runtime_fingerprint=expected_runtime_fingerprint,
+        dry_run=dry_run,
+        plan_id=plan_id,
+        refresh_health=refresh_health,
+        health_cache_ttl_seconds=health_cache_ttl_seconds,
+        allow_cached_health=allow_cached_health,
+        require_clean_health=require_clean_health,
+        include_replay_smoke=include_replay_smoke,
+        scenario_runners={
+            "alterios_create_material_module": alterios_create_material_module,
+            "alterios_create_report_tab": alterios_create_report_tab,
+            "alterios_create_process_flow": alterios_create_process_flow,
+        },
+    )
+
+
+@mcp.tool()
 def alterios_discover_readonly(
     profile: str | None = None,
     project_id: str | None = None,
@@ -8716,6 +8792,7 @@ def alterios_project_health(
     refresh: bool = False,
     use_cache: bool = True,
     write_cache: bool = True,
+    cache_ttl_seconds: int | None = None,
     include_processes: bool = True,
     include_report_templates: bool = False,
 ) -> dict[str, Any]:
@@ -8726,6 +8803,7 @@ def alterios_project_health(
         refresh=refresh,
         use_cache=use_cache,
         write_cache=write_cache,
+        cache_ttl_seconds=cache_ttl_seconds,
         include_processes=include_processes,
         include_report_templates=include_report_templates,
     )
