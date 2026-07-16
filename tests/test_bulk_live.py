@@ -53,6 +53,18 @@ class FakeClient:
         return FakeResponse({"items": [] if content_id in self.deleted else [{"_id": content_id}]})
 
 
+class EmptyProcessReadbackClient(FakeClient):
+    def start_process(self, diagram_id: str, **kwargs) -> FakeResponse:
+        self.process_calls.append((diagram_id, kwargs))
+        return FakeResponse({})
+
+    def list_processes(self, **kwargs) -> FakeResponse:
+        return FakeResponse({"items": []})
+
+    def list_tasks(self, **kwargs) -> FakeResponse:
+        return FakeResponse({"items": []})
+
+
 def test_normalize_bulk_ids_enforces_count_duplicates_and_limit() -> None:
     assert normalize_bulk_ids([" a ", "b"], expected_count=2, max_count=2) == ["a", "b"]
     with pytest.raises(ValueError, match="duplicates"):
@@ -97,3 +109,19 @@ def test_bulk_helpers_execute_manual_process_and_delete_with_readback() -> None:
 def test_load_bulk_targets_blocks_content_type_mismatch() -> None:
     with pytest.raises(ValueError, match="type mismatch"):
         load_bulk_content_targets(FakeClient(), ["a"], expected_content_type_id="type-2")
+
+
+def test_bulk_process_rejects_empty_process_id_and_readback() -> None:
+    result = execute_bulk_process_start(
+        EmptyProcessReadbackClient(),
+        diagram_id="diagram-1",
+        content_ids=["a"],
+        params={"mode": "bulk"},
+        name="Bulk process",
+        stop_on_error=True,
+    )
+
+    assert result["ok"] is False
+    assert result["failed_count"] == 1
+    assert result["rows"][0]["ok"] is False
+    assert "process id" in result["rows"][0]["error"]["message"]

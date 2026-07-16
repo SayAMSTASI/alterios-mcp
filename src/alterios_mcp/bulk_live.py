@@ -138,8 +138,18 @@ def execute_bulk_process_start(
             )
             if not process_id and processes:
                 process_id = processes[0].get("_id") or processes[0].get("id")
+            if not process_id:
+                raise ValueError("Process start did not return a process id and process readback was empty.")
+            matching_processes = [
+                process
+                for process in processes
+                if str(process.get("_id") or process.get("id") or process.get("processId") or "")
+                == str(process_id)
+            ]
+            if not matching_processes:
+                raise ValueError(f"Process {process_id!r} was not confirmed by process readback.")
             task_payload = client.list_tasks(
-                process_id=str(process_id) if process_id else None,
+                process_id=str(process_id),
                 diagram_id=diagram_id,
                 content_id=content_id,
             ).body
