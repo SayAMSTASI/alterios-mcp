@@ -1,0 +1,47 @@
+name: One-time public history sanitization
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sanitize:
+    if: github.repository == 'SayAMSTASI/alterios-mcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove project-specific artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f             docs/alterios-entity-surface-catalog.md             docs/form-surface-inventory.json             docs/form-surface-inventory.md             docs/icon-usage-matrix.json             docs/live-write-evidence-2026-07-10.md             docs/profile-smoke-matrix-2026-07-10.json             docs/profile-smoke-matrix-2026-07-10.md             docs/project-status.md             docs/reinventory-2026-07-10.md             docs/report-tab-openid-ui-research-2026-07-10.md             docs/script-bpmn-linkage.json             docs/script-bpmn-linkage.md             docs/script-diagram-report-research-2026-07-10.md             docs/skill-forward-test-2026-07-10.md             docs/ui-har-write-evidence-2026-07-10.md             docs/view-format-ui-evidence-2026-07-11.md             scripts/artx_practice_metadata.py             tests/test_artx_practice_metadata.py             .github/workflows/one-time-sanitize.yml
+          git add -A
+
+      - name: Verify sanitized tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_public_tree.py
+          python -m pip install -e '.[dev]'
+          python -m pytest -q
+          test -z "$(git diff --cached --check)"
+
+      - name: Replace main with a clean root commit
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: SayAMSTASI
+          GIT_AUTHOR_EMAIL: SayAMSTASI@users.noreply.github.com
+          GIT_COMMITTER_NAME: SayAMSTASI
+          GIT_COMMITTER_EMAIL: SayAMSTASI@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          tree="$(git write-tree)"
+          new_commit="$(printf '%s\n' 'Sanitized public Alterios MCP baseline' | git commit-tree "$tree")"
+          git push --force origin "$new_commit:refs/heads/main"
