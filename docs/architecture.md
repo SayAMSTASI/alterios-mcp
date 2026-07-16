@@ -1,5 +1,8 @@
 # Архитектура Alterios MCP
 
+Актуально для версии 0.2.0. Текущий публичный registry: 107 tools; профили
+`live`/`discovery`/`admin`/`full` содержат 80/54/105/107 tools соответственно.
+
 ## 1. Назначение
 
 Архитектура разделяет MCP-регистрацию, бизнес-сценарии и переиспользуемые
@@ -10,7 +13,7 @@
 
 | Слой | Каталог | Ответственность |
 |---|---|---|
-| Composition root | `src/alterios_mcp/server.py` | Создание FastMCP, регистрация tools, применение профиля, запуск сервера |
+| Composition root | `src/alterios_mcp/server.py` | Создание FastMCP, регистрация tools, применение профиля, запуск сервера; около 100 строк |
 | Registration | `src/alterios_mcp/tools/` | Доменные списки tools и их регистрация без бизнес-логики |
 | Scenarios | `src/alterios_mcp/scenarios/` | Чтение, планирование, запись, readback и составные workflow без зависимости от FastMCP |
 | Builders | `src/alterios_mcp/builders/` | Чистое построение payload, write operations и UI-фрагментов |

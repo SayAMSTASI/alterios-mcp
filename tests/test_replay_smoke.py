@@ -21,6 +21,7 @@ def test_replay_smoke_runs_local_contract_checks_without_live_network(tmp_path) 
     assert checks["write_gate_and_plan"]["sensitive_values_are_redacted"] is True
     assert checks["form_surface_validator"]["ok"] is True
     assert checks["stimulsoft_layout_validator"]["render_evidence"]["status"] == "not_collected"
+    assert "alterios_validate_printable_render" in checks["stimulsoft_layout_validator"]["render_evidence"]["note"]
     assert checks["live_readonly_discovery"]["skipped"] is True
     assert "secret-token" not in json.dumps(result, ensure_ascii=False, sort_keys=True)
 

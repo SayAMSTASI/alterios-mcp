@@ -233,7 +233,11 @@ def _stimulsoft_layout_check() -> dict[str, Any]:
         "overlap_issue_codes": overlap.get("issues_by_code"),
         "render_evidence": {
             "status": "not_collected",
-            "note": "This smoke checks static template geometry; browser/PDF/image render proof remains a separate Stage 17 task.",
+            "note": (
+                "Replay smoke checks static template geometry only. Collect printable "
+                "Chromium/PDF evidence with alterios_validate_printable_render and "
+                "verify the embedded viewer with a separate UI spot-check."
+            ),
         },
     }
 
