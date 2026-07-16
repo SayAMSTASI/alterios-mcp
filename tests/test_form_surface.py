@@ -114,7 +114,7 @@ def test_form_surface_flags_row_action_order_and_missing_icon() -> None:
 
     assert result["ok"] is True
     assert result["issues_by_code"]["row_action_order"] == 1
-    assert result["issues_by_code"]["missing_action_icon"] == 1
+    assert result["issues_by_code"]["row_action_missing_icon"] == 1
 
 
 def test_form_surface_understands_russian_row_action_titles() -> None:
@@ -503,6 +503,96 @@ def test_form_surface_flags_non_table_cell_header() -> None:
     assert result["issues_by_code"]["non_table_cell_header"] == 1
 
 
+def test_form_surface_reads_runtime_displaying_header_and_checks_padding() -> None:
+    form = {
+        "name": "Параметры",
+        "pageTitle": "Параметры",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {
+                                    "fields": {"name": {}},
+                                    "header": {
+                                        "title": "Параметры",
+                                        "styles": {
+                                            "textAlign": "center",
+                                            "fontWeight": "bold",
+                                            "paddingTop": "8px",
+                                        },
+                                    },
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"table_cell_header_top_padding": 1}
+
+
+def test_form_surface_contract_blocks_layout_gaps_and_wide_element_action_strip() -> None:
+    form = {
+        "name": "Редактировать параметр",
+        "pageTitle": "Параметр",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"name": {}}},
+                                "cellActionContainers": [
+                                    {"type": "action", "iconId": f"icon-{index}", "actions": [{"type": "forms"}]}
+                                    for index in range(4)
+                                ],
+                            },
+                            {},
+                        ]
+                    }
+                ]
+            }
+        ],
+        "formActionContainers": [
+            {"title": "Закрыть", "iconId": "close", "actions": [{"type": "routing", "routingType": "redirect_back"}]},
+            {"title": "Сохранить", "iconId": "save", "actions": [{"type": "submit"}]},
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"]["empty_layout_slot"] == 1
+    assert result["blocking_issues_by_code"]["element_actions_must_use_menu"] == 1
+
+
+def test_form_surface_contract_blocks_nonstandard_add_page_title() -> None:
+    form = {
+        "name": "Показатели. Добавить",
+        "pageTitle": "Показатели. Добавить",
+        "tabs": [{"rows": [{"cells": [{"type": "content", "styles": {"width": "100%"}, "params": {"contentTypeId": "type-1"}}]}]}],
+        "formActionContainers": [
+            {"title": "Закрыть", "iconId": "close", "actions": [{"type": "routing", "routingType": "redirect_back"}]},
+            {"title": "Сохранить", "iconId": "save", "actions": [{"type": "submit"}]},
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"add_page_title_must_start_with_add": 1}
+
+
 def test_form_surface_flags_persistent_footnote_on_non_date_field() -> None:
     form = {
         "name": "Question",
@@ -782,12 +872,13 @@ def test_form_surface_contract_profile_blocks_confirmed_warning_codes() -> None:
     assert default_result["blocking_issue_count"] == 0
     assert contract_result["ok"] is False
     assert contract_result["validation_profile"] == "contract"
-    assert contract_result["blocking_issue_count"] == 4
+    assert contract_result["blocking_issue_count"] == 5
     assert contract_result["blocking_issues_by_code"] == {
         "element_action_title_must_be_tooltip": 1,
         "field_footnote_requires_date": 1,
         "non_table_cell_header": 1,
         "table_cell_header_style": 1,
+        "table_cell_header_top_padding": 1,
     }
 
 
@@ -1344,7 +1435,14 @@ def test_form_surface_contract_blocks_view_detail_without_close() -> None:
                                 "type": "view_data",
                                 "styles": {"width": "100%"},
                                 "params": {"viewId": "view-1", "openId": True},
-                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "displaying": {
+                                    "fields": {
+                                        "title": {
+                                            "hidden": False,
+                                            "outputConfig": {"outputType": "default"},
+                                        }
+                                    }
+                                },
                             }
                         ]
                     }
@@ -1356,6 +1454,50 @@ def test_form_surface_contract_blocks_view_detail_without_close() -> None:
     result = analyze_form_surface(form, strict=True)
 
     assert result["blocking_issues_by_code"] == {"view_detail_close_action_missing": 1}
+
+
+def test_form_surface_contract_blocks_editable_field_config_on_view_detail() -> None:
+    form = {
+        "name": "Показатель. Просмотр",
+        "pageTitle": "Показатель",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {
+                                    "fields": {
+                                        "name": {
+                                            "hidden": False,
+                                            "inputConfig": {"inputType": "text"},
+                                        }
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "formActionContainers": [
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {
+        "view_detail_field_input_config_present": 1,
+        "view_detail_field_output_config_missing": 1,
+    }
 
 
 @pytest.mark.parametrize("flag", ["--strict", "--contract"])

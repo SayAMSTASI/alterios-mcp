@@ -726,7 +726,7 @@ git pull --ff-only
 
 На текущем этапе основной функциональный контур готов для эксплуатации:
 
-- версия пакета - 0.2.0;
+- версия пакета - 0.2.1;
 - полный registry - 107 MCP tools; `live` - 80, `discovery` - 54,
   `admin` - 105;
 - `server.py` является composition root, а registration, scenarios, builders и

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 from alterios_mcp.builders.common import _content_summary, _resource_operation
@@ -8,9 +9,16 @@ from alterios_mcp.scenarios.runtime import alterios_ux_contract
 from alterios_mcp.scenarios.views_forms import alterios_analyze_form_surface
 from alterios_mcp.tools import DOMAIN_MODULES, all_tool_functions, all_tool_names
 from alterios_mcp.validators.common import _validate_script_type_config
+from alterios_mcp.ux_contract import (
+    BLOCKING_FORM_ISSUE_CODES,
+    PRINTABLE_REPORT_DEFAULT,
+    SCENARIO_APPLY_REQUIRES,
+    UX_CONTRACT_VERSION,
+)
 
 
 PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "alterios_mcp"
+REPO_ROOT = Path(__file__).parents[1]
 
 
 def test_server_is_a_small_composition_root() -> None:
@@ -86,3 +94,14 @@ def test_scenarios_are_directly_testable_without_fastmcp() -> None:
     assert contract["version"]
     assert surface["form"]["name"] == "Список"
     assert isinstance(surface["surface"]["issues"], list)
+
+
+def test_machine_readable_ux_contract_is_synchronized_with_code_and_docs() -> None:
+    contract_json = json.loads((REPO_ROOT / "docs" / "ux-contract.json").read_text(encoding="utf-8"))
+    contract_markdown = (REPO_ROOT / "docs" / "ux-contract.md").read_text(encoding="utf-8")
+
+    assert contract_json["version"] == UX_CONTRACT_VERSION
+    assert set(contract_json["blocking_form_issue_codes"]) == set(BLOCKING_FORM_ISSUE_CODES)
+    assert contract_json["scenario_apply_requires"] == list(SCENARIO_APPLY_REQUIRES)
+    assert contract_json["printable_report_default"] == PRINTABLE_REPORT_DEFAULT
+    assert f"Версия контракта: `{UX_CONTRACT_VERSION}`" in contract_markdown

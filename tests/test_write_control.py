@@ -2568,6 +2568,16 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
         {"name": "Наименование", "mname": "mat_name", "field_type": "text"},
         {"name": "Количество", "mname": "mat_count", "field_type": "number"},
     ]
+    icon_ids = {
+        "icon_id": "00000000-0000-4000-8000-000000000001",
+        "add_icon_id": "00000000-0000-4000-8000-000000000002",
+        "edit_icon_id": "00000000-0000-4000-8000-000000000003",
+        "view_icon_id": "00000000-0000-4000-8000-000000000004",
+        "delete_icon_id": "00000000-0000-4000-8000-000000000005",
+        "menu_icon_id": "00000000-0000-4000-8000-000000000006",
+        "close_icon_id": "00000000-0000-4000-8000-000000000007",
+        "save_icon_id": "00000000-0000-4000-8000-000000000008",
+    }
 
     with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
         dry_run_client = FakeMaterialClient()
@@ -2578,6 +2588,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
                 fields,
                 content_name_template="{{mat_name}}",
                 delivery_evidence=DELIVERY_EVIDENCE,
+                **icon_ids,
                 profile="primary",
                 project_id="project-1",
             )
@@ -2597,6 +2608,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             fields,
             content_name_template="{{mat_name}}",
             delivery_evidence=DELIVERY_EVIDENCE,
+            **icon_ids,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="primary",
@@ -2648,13 +2660,13 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     list_cell = apply_client.forms["form-4"]["tabs"][0]["rows"][0]["cells"][0]
     assert list_cell["type"] == "view_data_list"
     assert list_cell["displaying"]["fields"]["test__mat_name"]["order"] == 1
-    assert list_cell["cellActionContainers"][0]["iconId"] == "add"
+    assert list_cell["cellActionContainers"][0]["iconId"] == icon_ids["add_icon_id"]
     assert list_cell["cellActionContainers"][0]["title"] == ""
     assert list_cell["cellActionContainers"][0]["tooltip"] == "Добавить"
     assert list_cell["cellActionContainers"][0]["default"] is True
     row_menu = list_cell["valueActionContainers"][0]
     assert row_menu["type"] == "menu"
-    assert row_menu["iconId"] == "menu"
+    assert row_menu["iconId"] == icon_ids["menu_icon_id"]
     assert [item["title"] for item in row_menu["containers"]] == ["Редактировать", "Просмотр", "Удалить"]
     assert row_menu["containers"][1]["default"] is True
     assert row_menu["containers"][2]["actions"][0]["type"] == "delete_contents"
@@ -2843,9 +2855,16 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
                 "form-1": {
                     "_id": "form-1",
                     "name": "Материалы. Карточка",
+                    "pageTitle": "Материалы",
                     "description": "Codex-managed",
-                    "tabs": [{"name": None, "rows": []}],
-                    "formActionContainers": [],
+                    "tabs": [],
+                    "formActionContainers": [
+                        {
+                            "title": "Закрыть",
+                            "iconId": "00000000-0000-4000-8000-000000000007",
+                            "actions": [{"type": "routing", "routingType": "redirect_back"}],
+                        }
+                    ],
                 }
             }
             self.reports: dict[str, dict[str, object]] = {}
@@ -2939,7 +2958,7 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     data_band = template["Pages"]["0"]["Components"]["2"]
     assert data_band["DataSourceName"] == "data"
     assert [item["Text"]["Value"] for item in data_band["Components"].values()] == ["{data.name}", "{data.count}"]
-    tab = apply_client.forms["form-1"]["tabs"][1]
+    tab = apply_client.forms["form-1"]["tabs"][0]
     assert tab["name"] == "Отчет"
     cell = tab["rows"][0]["cells"][0]
     assert cell["type"] == "report"

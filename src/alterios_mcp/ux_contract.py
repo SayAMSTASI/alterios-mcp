@@ -3,13 +3,19 @@ from __future__ import annotations
 from typing import Any
 
 
-UX_CONTRACT_VERSION = "2026-07-16.3"
+UX_CONTRACT_VERSION = "2026-07-17.1"
 
 BLOCKING_FORM_ISSUE_CODES = frozenset(
     {
         "add_edit_page_action_order",
+        "add_page_title_must_start_with_add",
         "close_action_missing_redirect_back",
+        "data_cell_missing_full_width_style",
+        "element_actions_must_use_menu",
         "element_action_title_must_be_tooltip",
+        "empty_layout_slot",
+        "empty_row",
+        "empty_tab",
         "embedded_view_missing_filter_or_context",
         "field_footnote_requires_date",
         "list_row_action_icon_missing",
@@ -18,17 +24,44 @@ BLOCKING_FORM_ISSUE_CODES = frozenset(
         "manual_script_empty_argument_binding",
         "manual_script_id_must_be_uuid",
         "manual_script_value_entity_ambiguous",
+        "missing_action_icon",
+        "missing_cell_type",
         "missing_page_title",
         "non_table_cell_header",
         "report_or_analytics_form_should_open_new_tab",
         "report_or_analytics_target_missing_close",
+        "row_action_order",
         "row_menu_default_view_missing",
         "table_cell_header_style",
+        "table_cell_header_top_padding",
         "technical_list_field_must_be_hidden",
         "view_detail_close_action_missing",
+        "view_detail_field_input_config_present",
+        "view_detail_field_output_config_missing",
         "view_detail_view_data_must_be_readonly",
     }
 )
+
+SCENARIO_APPLY_REQUIRES = (
+    "plan_id",
+    "work_item_ref",
+    "agent_handoff_refs",
+    "verified_gitea_issue",
+    "analyst_implementer_verifier_handoffs",
+    "ux_contract_version",
+    "fresh_runtime_fingerprint",
+)
+
+PRINTABLE_REPORT_DEFAULT = {
+    "report_type": "report",
+    "page_ident": "StiPage",
+    "required_bands": [
+        "StiReportTitleBand",
+        "StiPageHeaderBand",
+        "StiDataBand",
+        "StiPageFooterBand",
+    ],
+}
 
 
 def apply_form_contract(issues: list[dict[str, Any]], *, strict: bool) -> list[dict[str, Any]]:
