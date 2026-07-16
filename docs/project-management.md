@@ -21,7 +21,7 @@ Lead Engineer отвечает за итоговое состояние репо
 
 ## Контрольные артефакты
 
-- `docs/project-status.md` - текущая status board.
+- приватная Gitea или локальный project workspace - текущая status board.
 - `docs/git-team-workflow.md` - правила веток, push и разграничения reusable
   repo changes от внутренних business task artifacts.
 - `docs/roadmap.md` - durable delivery roadmap.
@@ -71,7 +71,8 @@ Lead Engineer отвечает за итоговое состояние репо
 
 ## Ритм отчетности
 
-В конце каждого implementation stage обновлять `docs/project-status.md`:
+В конце каждого implementation stage обновлять приватную Gitea-задачу или
+локальный статус проекта:
 
 - что сделано;
 - commit hash;

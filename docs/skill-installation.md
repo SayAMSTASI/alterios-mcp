@@ -35,9 +35,9 @@
 ## Проверка
 
 ```powershell
-Get-ChildItem -Directory C:\Users\admin\.codex\skills\alterios-* |
+Get-ChildItem -Directory "$env:USERPROFILE\.codex\skills\alterios-*" |
   ForEach-Object {
-    .\.venv\Scripts\python C:\Users\admin\.codex\skills\.system\skill-creator\scripts\quick_validate.py $_.FullName
+    .\.venv\Scripts\python "$env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py" $_.FullName
   }
 ```
 

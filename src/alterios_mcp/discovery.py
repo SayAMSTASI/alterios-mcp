@@ -119,7 +119,7 @@ def response_shape(value: Any) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run read-only Alterios endpoint discovery.")
-    parser.add_argument("--profile", help="Alterios profile, e.g. vniimt or artx.")
+    parser.add_argument("--profile", help="Alterios profile, e.g. primary or secondary.")
     parser.add_argument("--project-id", help="Explicit Alterios project id for project-scoped probes.")
     parser.add_argument("--profiles", action="store_true", help="List configured Alterios instance profiles only.")
     parser.add_argument("--projects", action="store_true", help="List projects only.")
