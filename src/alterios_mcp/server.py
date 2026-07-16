@@ -9037,12 +9037,12 @@ def alterios_fast_live_bulk_manual_script(
     delivery_evidence: dict[str, Any],
     profile: str,
     project_id: str,
+    expected_count: int,
+    expected_content_type_id: str,
     shared_args: dict[str, Any] | None = None,
     content_arg_name: str = "contentId",
     expected_script_name: str | None = None,
     expected_script_active: bool = True,
-    expected_count: int | None = None,
-    expected_content_type_id: str | None = None,
     max_count: int = 100,
     readback_content: bool = True,
     stop_on_error: bool = True,
@@ -9058,6 +9058,9 @@ def alterios_fast_live_bulk_manual_script(
     """Plan or execute one reviewed manual script for selected content rows."""
     if not looks_like_uuid(script_id):
         raise ValueError("script_id must be a saved manual script UUID.")
+    normalized_content_type_id = str(expected_content_type_id or "").strip()
+    if not normalized_content_type_id:
+        raise ValueError("expected_content_type_id is required for bulk manual-script execution.")
     normalized_arg_name = str(content_arg_name or "").strip()
     if not normalized_arg_name:
         raise ValueError("content_arg_name must not be empty.")
@@ -9117,7 +9120,7 @@ def alterios_fast_live_bulk_manual_script(
     targets = load_bulk_content_targets(
         client,
         content_ids,
-        expected_content_type_id=expected_content_type_id,
+        expected_content_type_id=normalized_content_type_id,
     )
     script_fingerprint = _resource_fingerprint(
         script,
@@ -9135,7 +9138,7 @@ def alterios_fast_live_bulk_manual_script(
             "selectedContentIds": content_ids,
             "sharedArgs": normalized_shared_args,
             "contentArgName": normalized_arg_name,
-            "expectedContentTypeId": expected_content_type_id,
+            "expectedContentTypeId": normalized_content_type_id,
             "readbackContent": readback_content,
             "stopOnError": stop_on_error,
             "runtimeFingerprint": runtime_fingerprint,
@@ -9201,11 +9204,11 @@ def alterios_fast_live_bulk_process(
     delivery_evidence: dict[str, Any],
     profile: str,
     project_id: str,
+    expected_count: int,
+    expected_content_type_id: str,
     params: dict[str, Any] | None = None,
     process_name: str | None = None,
     expected_diagram_name: str | None = None,
-    expected_count: int | None = None,
-    expected_content_type_id: str | None = None,
     max_count: int = 100,
     stop_on_error: bool = True,
     expected_runtime_fingerprint: str | None = None,
@@ -9220,6 +9223,9 @@ def alterios_fast_live_bulk_process(
     """Plan or start one verified BPMN process for selected content rows."""
     if not str(diagram_id or "").strip():
         raise ValueError("diagram_id must not be empty.")
+    normalized_content_type_id = str(expected_content_type_id or "").strip()
+    if not normalized_content_type_id:
+        raise ValueError("expected_content_type_id is required for bulk process start.")
     content_ids = normalize_bulk_ids(
         selected_content_ids,
         expected_count=expected_count,
@@ -9259,7 +9265,7 @@ def alterios_fast_live_bulk_process(
     targets = load_bulk_content_targets(
         client,
         content_ids,
-        expected_content_type_id=expected_content_type_id,
+        expected_content_type_id=normalized_content_type_id,
     )
     diagram_fingerprint = _resource_fingerprint(
         diagram,
@@ -9277,7 +9283,7 @@ def alterios_fast_live_bulk_process(
             "selectedContentIds": content_ids,
             "params": params,
             "name": process_name,
-            "expectedContentTypeId": expected_content_type_id,
+            "expectedContentTypeId": normalized_content_type_id,
             "stopOnError": stop_on_error,
             "runtimeFingerprint": runtime_fingerprint,
             "deliveryEvidence": delivery_evidence,

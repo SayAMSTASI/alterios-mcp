@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from unittest.mock import patch
 
 import pytest
@@ -196,6 +197,16 @@ def test_fast_bulk_process_plan_contains_diagram_and_targets(tmp_path, monkeypat
     assert result["status"] == "planned"
     assert result["response"]["diagram"]["_id"] == "diagram-1"
     assert result["response"]["selected_count"] == 2
+
+
+def test_fast_bulk_manual_and_process_require_expected_count_and_content_type() -> None:
+    for tool in (
+        server.alterios_fast_live_bulk_manual_script,
+        server.alterios_fast_live_bulk_process,
+    ):
+        parameters = inspect.signature(tool).parameters
+        assert parameters["expected_count"].default is inspect.Parameter.empty
+        assert parameters["expected_content_type_id"].default is inspect.Parameter.empty
 
 
 def test_fast_bulk_delete_requires_dangerous_gate_and_verifies_absence(tmp_path, monkeypatch) -> None:
