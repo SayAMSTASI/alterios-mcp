@@ -15,6 +15,9 @@
 - `alterios_create_report_tab` при apply повторно использует точный Stimulsoft-template
   из проверенного dry-run плана, поэтому случайные внутренние ключи native builder
   больше не нарушают проверку `plan_id`.
+- Printable Chromium/PDF renderer нормализует одноэлементные Alterios-массивы
+  в скаляры, а многозначные поля - в строку; в PDF выводятся значения, а не
+  индексы массивов.
 
 ### Совместимость
 

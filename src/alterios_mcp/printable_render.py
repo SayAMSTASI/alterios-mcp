@@ -107,7 +107,7 @@ def render_printable_pdf(
                 "chromiumPath": str(chromium),
                 "reportsScript": str(Path(reports_script).resolve()),
                 "template": template,
-                "rows": rows,
+                "rows": _normalize_json_dataset_rows(rows),
             },
             ensure_ascii=False,
         ),
@@ -133,6 +133,30 @@ def render_printable_pdf(
         "pdf_size": len(pdf),
         "pdf_sha256": hashlib.sha256(pdf).hexdigest(),
     }
+
+
+def _normalize_json_dataset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert Alterios single/multi-value field arrays into printable scalar values."""
+    return [
+        {key: _normalize_json_dataset_value(value) for key, value in row.items()}
+        for row in rows
+    ]
+
+
+def _normalize_json_dataset_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _normalize_json_dataset_value(item) for key, item in value.items()}
+    if not isinstance(value, list):
+        return value
+    normalized = [_normalize_json_dataset_value(item) for item in value]
+    if not normalized:
+        return ""
+    if len(normalized) == 1:
+        return normalized[0]
+    return "; ".join(
+        json.dumps(item, ensure_ascii=False, sort_keys=True) if isinstance(item, (dict, list)) else str(item)
+        for item in normalized
+    )
 
 
 def _find_node() -> Path:

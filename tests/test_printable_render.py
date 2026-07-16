@@ -29,7 +29,7 @@ def test_render_printable_pdf_writes_verified_artifact(tmp_path: Path) -> None:
     ):
         result = render_printable_pdf(
             {"Pages": {"0": {"Ident": "StiPage"}}},
-            rows=[{"name": "A"}],
+            rows=[{"name": ["A"], "count": [10], "tags": ["x", "y"], "empty": []}],
             reports_script=reports_script,
             output_path=output,
         )
@@ -39,7 +39,8 @@ def test_render_printable_pdf_writes_verified_artifact(tmp_path: Path) -> None:
     assert result["page_count"] == 2
     assert result["pdf_size"] == len(pdf)
     assert len(result["pdf_sha256"]) == 64
-    assert run.call_args.kwargs["input"]
+    render_input = json.loads(run.call_args.kwargs["input"])
+    assert render_input["rows"] == [{"name": "A", "count": 10, "tags": "x; y", "empty": ""}]
 
 
 def test_ux_contract_tool_is_machine_readable() -> None:
