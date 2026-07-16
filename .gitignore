@@ -15,5 +15,13 @@ local-artifacts/
 private-artifacts/
 work-notes/
 workboard/
+docs/private/
+docs/project-status.md
+docs/*-evidence-*.md
+docs/*-evidence-*.json
+docs/form-surface-inventory.*
+docs/icon-usage-matrix.json
+docs/profile-smoke-matrix-*
+docs/script-bpmn-linkage.*
 *.har
 *.har.json
