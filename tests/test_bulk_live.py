@@ -30,6 +30,9 @@ class FakeClient:
 
     def execute_manual_script(self, script_id: str, args: dict) -> FakeResponse:
         self.manual_calls.append((script_id, args))
+        if "contentIds" in args:
+            self.deleted.update(args["contentIds"])
+            return FakeResponse({"deleted": len(args["contentIds"])})
         return FakeResponse({"ok": True, "contentId": args["contentId"]})
 
     def start_process(self, diagram_id: str, **kwargs) -> FakeResponse:
@@ -95,15 +98,21 @@ def test_bulk_helpers_execute_manual_process_and_delete_with_readback() -> None:
         name="Bulk process",
         stop_on_error=True,
     )
-    deleted = execute_bulk_delete(client, content_ids=["a", "b"])
+    deleted = execute_bulk_delete(
+        client,
+        script_id="delete-script",
+        content_ids=["a", "b"],
+        content_ids_arg_name="contentIds",
+    )
 
     assert len(targets) == 2
     assert manual["ok"] is True
-    assert [call[1]["contentId"] for call in client.manual_calls] == ["a", "b"]
+    assert [call[1]["contentId"] for call in client.manual_calls if "contentId" in call[1]] == ["a", "b"]
     assert processes["ok"] is True
     assert [row["process_id"] for row in processes["rows"]] == ["process-a", "process-b"]
     assert deleted["ok"] is True
     assert deleted["deleted_count"] == 2
+    assert client.manual_calls[-1] == ("delete-script", {"contentIds": ["a", "b"]})
 
 
 def test_load_bulk_targets_blocks_content_type_mismatch() -> None:

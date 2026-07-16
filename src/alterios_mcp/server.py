@@ -9339,6 +9339,10 @@ def alterios_fast_live_bulk_delete(
     delivery_evidence: dict[str, Any],
     profile: str,
     project_id: str,
+    script_id: str,
+    expected_script_name: str,
+    content_ids_arg_name: str = "contentIds",
+    expected_script_active: bool = True,
     max_count: int = 50,
     expected_runtime_fingerprint: str | None = None,
     dry_run: bool = True,
@@ -9351,6 +9355,11 @@ def alterios_fast_live_bulk_delete(
     include_replay_smoke: bool = False,
 ) -> dict[str, Any]:
     """Plan or destructively delete explicitly reviewed content rows through a dedicated dangerous workflow."""
+    if not looks_like_uuid(script_id):
+        raise ValueError("script_id must be a saved manual delete script UUID.")
+    normalized_arg_name = str(content_ids_arg_name or "").strip()
+    if not normalized_arg_name:
+        raise ValueError("content_ids_arg_name must not be empty.")
     normalized_content_type_id = str(expected_content_type_id or "").strip()
     if not normalized_content_type_id:
         raise ValueError("expected_content_type_id is required for destructive bulk delete.")
@@ -9382,14 +9391,44 @@ def alterios_fast_live_bulk_delete(
             preflight=preflight,
             dry_run=dry_run,
         )
+    client = _client(profile, project_id)
+    script = _find_script(client, script_id=script_id)
+    if not script:
+        raise ValueError(f"Script {script_id!r} was not found.")
+    if script.get("type") != "manual":
+        raise ValueError(f"Script {script_id!r} has type {script.get('type')!r}; expected 'manual'.")
+    if script.get("name") != expected_script_name:
+        raise ValueError(
+            f"Script name mismatch: expected {expected_script_name!r}, got {script.get('name')!r}."
+        )
+    if script.get("active") is not expected_script_active:
+        raise ValueError(
+            f"Script active mismatch: expected {expected_script_active!r}, got {script.get('active')!r}."
+        )
+    declared_arguments = script_argument_keys(script)
+    if normalized_arg_name not in declared_arguments:
+        raise ValueError(
+            f"Destructive script must declare argument {normalized_arg_name!r} in config.arguments."
+        )
+    missing_arguments = sorted(declared_arguments - {normalized_arg_name})
+    if missing_arguments:
+        raise ValueError(
+            "Destructive script declares unsupported extra required arguments: " + ", ".join(missing_arguments) + "."
+        )
+    script_fingerprint = _resource_fingerprint(
+        script,
+        ("_id", "name", "type", "active", "body", "value", "config", "librariesIds", "apiKey"),
+    )
     operation = _resource_operation(
-        name="deleteManyContents x selected",
+        name="POST /api/scripts/execute-manual destructive x selected",
         kind="destructive_bulk_delete",
         method="POST",
-        path="/api/scripts/service/deleteManyContents",
+        path="/api/scripts/execute-manual",
         summary="Delete only the reviewed content IDs after a matching dry-run plan and dangerous gates.",
         request={
-            "function": "deleteManyContents",
+            "scriptId": script_id,
+            "scriptFingerprint": script_fingerprint,
+            "contentIdsArgName": normalized_arg_name,
             "selectedContentIds": content_ids,
             "expectedCount": expected_count,
             "expectedContentTypeId": normalized_content_type_id,
@@ -9407,7 +9446,6 @@ def alterios_fast_live_bulk_delete(
         dangerous_write_enabled=_dangerous_write_enabled(),
         allow_destructive=allow_destructive,
     )
-    client = _client(profile, project_id)
     targets = load_bulk_content_targets(
         client,
         content_ids,
@@ -9416,6 +9454,8 @@ def alterios_fast_live_bulk_delete(
     response_payload: dict[str, Any] = {
         "preflight": preflight,
         "runtime_fingerprint": runtime_fingerprint,
+        "script": _resource_summary(script),
+        "script_fingerprint": script_fingerprint,
         "selected_count": len(content_ids),
         "targets": targets,
         "required_execution_gates": [
@@ -9441,7 +9481,12 @@ def alterios_fast_live_bulk_delete(
         allow_destructive=allow_destructive,
     )
     assert_plan_matches_audit(plan_id=str(plan_id), audit=audit.as_dict())
-    response_payload["execution"] = execute_bulk_delete(client, content_ids=content_ids)
+    response_payload["execution"] = execute_bulk_delete(
+        client,
+        script_id=script_id,
+        content_ids=content_ids,
+        content_ids_arg_name=normalized_arg_name,
+    )
     result = controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
     status = "applied" if response_payload["execution"]["ok"] else "readback_failed"
     return {"kind": "alterios_fast_live_bulk_delete", "status": status, **result}

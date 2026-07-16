@@ -69,7 +69,9 @@ For script write scenarios:
 - Never route destructive selected-row work through a generic service tool.
   Use `alterios_fast_live_bulk_delete` in `full/admin`; require expected content
   type, matching plan, dangerous environment gate, `allow_destructive=true`,
-  and absence readback for every target.
+  and absence readback for every target. Pass a saved active `manual` delete
+  script UUID that declares one `contentIds` argument; the reviewed plan freezes
+  the script fingerprint and executes it through `/api/scripts/execute-manual`.
 
 For view write scenarios:
 
