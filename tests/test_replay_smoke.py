@@ -8,7 +8,7 @@ from alterios_mcp.replay_smoke import render_markdown, run_replay_smoke
 
 def test_replay_smoke_runs_local_contract_checks_without_live_network(tmp_path) -> None:
     result = run_replay_smoke(
-        profile="vniimt",
+        profile="primary",
         project_id="project-1",
         artifacts_dir=str(tmp_path),
     )
@@ -27,7 +27,7 @@ def test_replay_smoke_runs_local_contract_checks_without_live_network(tmp_path) 
 
 def test_replay_smoke_markdown_summarizes_checks(tmp_path) -> None:
     result = run_replay_smoke(
-        profile="vniimt",
+        profile="primary",
         project_id="project-1",
         artifacts_dir=str(tmp_path),
     )
@@ -40,7 +40,7 @@ def test_replay_smoke_markdown_summarizes_checks(tmp_path) -> None:
 
 def test_server_replay_smoke_tool_uses_safe_defaults() -> None:
     result = server.alterios_replay_smoke(
-        profile="vniimt",
+        profile="primary",
         project_id="project-1",
         include_live=False,
     )
@@ -52,12 +52,12 @@ def test_server_replay_smoke_tool_uses_safe_defaults() -> None:
 
 
 def test_replay_smoke_include_live_skips_when_config_is_missing(tmp_path, monkeypatch) -> None:
-    monkeypatch.delenv("ALTERIOS_ARTX_API_TOKEN", raising=False)
-    monkeypatch.delenv("ALTERIOS_ARTX_BASE_URL", raising=False)
+    monkeypatch.delenv("ALTERIOS_SECONDARY_API_TOKEN", raising=False)
+    monkeypatch.delenv("ALTERIOS_SECONDARY_BASE_URL", raising=False)
     monkeypatch.setenv("ALTERIOS_DOTENV_PATH", str(tmp_path / "missing.env"))
 
     result = run_replay_smoke(
-        profile="artx",
+        profile="secondary",
         project_id="project-1",
         include_live=True,
         artifacts_dir=str(tmp_path),

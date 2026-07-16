@@ -54,7 +54,7 @@ def test_analyze_har_redacts_secrets_and_classifies_routes() -> None:
         }
     }
 
-    analysis = analyze_ui_flow(payload, profile="vniimt", project_id="project-1234567890", scenario="form-open")
+    analysis = analyze_ui_flow(payload, profile="primary", project_id="project-1234567890", scenario="form-open")
 
     assert analysis["source_type"] == "har"
     assert analysis["summary"]["total_events"] == 4

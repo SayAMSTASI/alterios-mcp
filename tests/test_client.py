@@ -28,40 +28,40 @@ def test_profile_does_not_fall_back_to_default_target() -> None:
     }
 
     with patch.dict(os.environ, env, clear=True):
-        config = AlteriosConfig.from_env(dotenv_path=None, profile="vniimt")
+        config = AlteriosConfig.from_env(dotenv_path=None, profile="primary")
 
-    assert config.profile == "vniimt"
+    assert config.profile == "primary"
     assert config.base_url == ""
     assert config.api_token == ""
     assert config.project_id == ""
     assert config.endpoint_template == "{base_url}/api/scripts/execute-manual"
     assert config.missing_for_instance_call() == [
-        "ALTERIOS_VNIIMT_API_TOKEN",
-        "ALTERIOS_VNIIMT_BASE_URL",
+        "ALTERIOS_PRIMARY_API_TOKEN",
+        "ALTERIOS_PRIMARY_BASE_URL",
     ]
     assert config.missing_for_project_call() == [
-        "ALTERIOS_VNIIMT_API_TOKEN",
-        "ALTERIOS_VNIIMT_BASE_URL",
-        "ALTERIOS_VNIIMT_PROJECT_ID",
+        "ALTERIOS_PRIMARY_API_TOKEN",
+        "ALTERIOS_PRIMARY_BASE_URL",
+        "ALTERIOS_PRIMARY_PROJECT_ID",
     ]
 
 
 def test_profile_overrides_shared_settings() -> None:
     env = {
-        "ALTERIOS_PROFILE": "vniimt",
+        "ALTERIOS_PROFILE": "primary",
         "ALTERIOS_ENDPOINT_TEMPLATE": "{base_url}/api/scripts/execute-manual",
-        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
-        "ALTERIOS_VNIIMT_API_TOKEN": "profile-token",
-        "ALTERIOS_VNIIMT_PROJECT_ID": "profile-project",
-        "ALTERIOS_VNIIMT_AUTH_HEADER": "x-api-key",
-        "ALTERIOS_VNIIMT_AUTH_SCHEME": "",
+        "ALTERIOS_PRIMARY_BASE_URL": "https://primary.example",
+        "ALTERIOS_PRIMARY_API_TOKEN": "profile-token",
+        "ALTERIOS_PRIMARY_PROJECT_ID": "profile-project",
+        "ALTERIOS_PRIMARY_AUTH_HEADER": "x-api-key",
+        "ALTERIOS_PRIMARY_AUTH_SCHEME": "",
     }
 
     with patch.dict(os.environ, env, clear=True):
         config = AlteriosConfig.from_env(dotenv_path=None)
 
-    assert config.profile == "vniimt"
-    assert config.base_url == "https://vniimt.example"
+    assert config.profile == "primary"
+    assert config.base_url == "https://primary.example"
     assert config.api_token == "profile-token"
     assert config.project_id == "profile-project"
     assert config.auth_header == "x-api-key"
@@ -70,44 +70,44 @@ def test_profile_overrides_shared_settings() -> None:
 
 def test_discover_profile_names_from_explicit_list_and_prefixes() -> None:
     values = {
-        "ALTERIOS_PROFILE": "vniimt",
-        "ALTERIOS_PROFILES": "artx-prod; demo",
-        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
-        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
+        "ALTERIOS_PROFILE": "primary",
+        "ALTERIOS_PROFILES": "secondary; demo",
+        "ALTERIOS_PRIMARY_BASE_URL": "https://primary.example",
+        "ALTERIOS_SECONDARY_BASE_URL": "http://secondary.local",
         "ALTERIOS_EXTRA_INSTANCE_API_TOKEN": "token",
     }
 
-    assert discover_profile_names(values) == ["vniimt", "artx-prod", "demo", "extra_instance"]
+    assert discover_profile_names(values) == ["primary", "demo", "extra_instance", "secondary"]
 
 
 def test_configured_profiles_returns_redacted_multi_instance_inventory() -> None:
     env = {
-        "ALTERIOS_PROFILE": "vniimt",
-        "ALTERIOS_PROFILES": "vniimt, artx-prod",
+        "ALTERIOS_PROFILE": "primary",
+        "ALTERIOS_PROFILES": "primary, secondary",
         "ALTERIOS_ENDPOINT_TEMPLATE": "{base_url}/api/scripts/execute-manual",
-        "ALTERIOS_VNIIMT_BASE_URL": "https://vniimt.example",
-        "ALTERIOS_VNIIMT_API_TOKEN": "vniimt-token",
-        "ALTERIOS_VNIIMT_PROJECT_ID": "vniimt-project",
-        "ALTERIOS_VNIIMT_AUTH_HEADER": "x-api-key",
-        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
-        "ALTERIOS_ARTX_PROD_API_TOKEN": "artx-token",
+        "ALTERIOS_PRIMARY_BASE_URL": "https://primary.example",
+        "ALTERIOS_PRIMARY_API_TOKEN": "primary-token",
+        "ALTERIOS_PRIMARY_PROJECT_ID": "primary-project",
+        "ALTERIOS_PRIMARY_AUTH_HEADER": "x-api-key",
+        "ALTERIOS_SECONDARY_BASE_URL": "http://secondary.local",
+        "ALTERIOS_SECONDARY_API_TOKEN": "secondary-token",
     }
 
     with patch.dict(os.environ, env, clear=True):
         payload = configured_profiles(dotenv_path=None)
 
-    assert payload["selected_profile"] == "vniimt"
+    assert payload["selected_profile"] == "primary"
     assert payload["profile_count"] == 2
     by_profile = {item["profile"]: item for item in payload["profiles"]}
-    assert by_profile["vniimt"]["selected"] is True
-    assert by_profile["vniimt"]["config"]["api_token"] == "<set>"
-    assert by_profile["vniimt"]["config"]["project_id"] == "vniimt-project"
-    assert by_profile["vniimt"]["missing_for_instance_call"] == []
-    assert by_profile["artx-prod"]["selected"] is False
-    assert by_profile["artx-prod"]["config"]["api_token"] == "<set>"
-    assert by_profile["artx-prod"]["missing_for_project_call"] == ["ALTERIOS_ARTX_PROD_PROJECT_ID"]
-    assert "vniimt-token" not in json_dump(payload)
-    assert "artx-token" not in json_dump(payload)
+    assert by_profile["primary"]["selected"] is True
+    assert by_profile["primary"]["config"]["api_token"] == "<set>"
+    assert by_profile["primary"]["config"]["project_id"] == "primary-project"
+    assert by_profile["primary"]["missing_for_instance_call"] == []
+    assert by_profile["secondary"]["selected"] is False
+    assert by_profile["secondary"]["config"]["api_token"] == "<set>"
+    assert by_profile["secondary"]["missing_for_project_call"] == ["ALTERIOS_SECONDARY_PROJECT_ID"]
+    assert "primary-token" not in json_dump(payload)
+    assert "secondary-token" not in json_dump(payload)
 
 
 def test_configured_profiles_can_inventory_default_config() -> None:
@@ -130,16 +130,16 @@ def test_configured_profiles_can_inventory_default_config() -> None:
 
 def test_profile_script_missing_key_is_profile_scoped() -> None:
     env = {
-        "ALTERIOS_PROFILE": "artx-prod",
-        "ALTERIOS_ARTX_PROD_BASE_URL": "http://artx.local",
-        "ALTERIOS_ARTX_PROD_API_TOKEN": "artx-token",
-        "ALTERIOS_ARTX_PROD_PROJECT_ID": "artx-project",
+        "ALTERIOS_PROFILE": "secondary",
+        "ALTERIOS_SECONDARY_BASE_URL": "http://secondary.local",
+        "ALTERIOS_SECONDARY_API_TOKEN": "secondary-token",
+        "ALTERIOS_SECONDARY_PROJECT_ID": "secondary-project",
     }
 
     with patch.dict(os.environ, env, clear=True):
         config = AlteriosConfig.from_env(dotenv_path=None)
 
-    assert config.missing_for_script_call() == ["ALTERIOS_ARTX_PROD_ENDPOINT_TEMPLATE"]
+    assert config.missing_for_script_call() == ["ALTERIOS_SECONDARY_ENDPOINT_TEMPLATE"]
 
 
 def test_redacted_config_strips_url_credentials_and_sensitive_query() -> None:
@@ -154,10 +154,10 @@ def test_alterios_dotenv_path_overrides_default_dotenv(tmp_path) -> None:
     env_file.write_text(
         "\n".join(
             [
-                "ALTERIOS_PROFILE=vniimt",
-                "ALTERIOS_VNIIMT_BASE_URL=https://vniimt.example",
-                "ALTERIOS_VNIIMT_API_TOKEN=profile-token",
-                "ALTERIOS_VNIIMT_PROJECT_ID=profile-project",
+                "ALTERIOS_PROFILE=primary",
+                "ALTERIOS_PRIMARY_BASE_URL=https://primary.example",
+                "ALTERIOS_PRIMARY_API_TOKEN=profile-token",
+                "ALTERIOS_PRIMARY_PROJECT_ID=profile-project",
             ]
         ),
         encoding="utf-8",
@@ -166,8 +166,8 @@ def test_alterios_dotenv_path_overrides_default_dotenv(tmp_path) -> None:
     with patch.dict(os.environ, {"ALTERIOS_DOTENV_PATH": str(env_file)}, clear=True):
         config = AlteriosConfig.from_env()
 
-    assert config.profile == "vniimt"
-    assert config.base_url == "https://vniimt.example"
+    assert config.profile == "primary"
+    assert config.base_url == "https://primary.example"
     assert config.api_token == "profile-token"
     assert config.project_id == "profile-project"
 
@@ -191,7 +191,7 @@ def test_prepare_script_request_redacts_secret_headers() -> None:
 
 def test_project_id_can_be_overridden_per_call() -> None:
     config = AlteriosConfig(
-        profile="vniimt",
+        profile="primary",
         base_url="https://alterios.example",
         api_token="secret-token",
         project_id="default-project",
@@ -200,7 +200,7 @@ def test_project_id_can_be_overridden_per_call() -> None:
     override = config.with_project_id("explicit-project")
 
     assert override.project_id == "explicit-project"
-    assert override.profile == "vniimt"
+    assert override.profile == "primary"
     assert override.base_url == "https://alterios.example"
 
 
@@ -458,372 +458,119 @@ def test_script_diagram_report_process_and_task_write_routes_without_network() -
     assert requests[1].method == "POST"
     assert requests[1].url == "https://alterios.example/api/scripts"
     assert requests[2].method == "PATCH"
-    assert requests[2].url == "https://alterios.example/api/diagrams/diagram-1"
-    assert requests[3].method == "PUT"
-    assert requests[3].url == "https://alterios.example/api/reports"
-    assert requests[4].method == "POST"
-    assert requests[4].url == "https://alterios.example/api/processes"
-    assert requests[4].body == {"diagramId": "diagram-1", "contentId": "content-1", "params": {"source": "test"}}
-    assert requests[5].method == "DELETE"
-    assert requests[5].url == "https://alterios.example/api/tasks/complete"
-    assert requests[5].body == {"_id": "task-1", "nextFlowId": "Flow_to_end", "contents": []}
-
-
-def test_content_type_field_content_group_and_help_write_routes_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {"_id": "saved"})) as send:
-        client.save_content_type({"_id": "ct-1", "name": "Type", "author": "ignored"})
-        client.save_field({"_id": "field-1", "name": "Title", "token": "ignored"})
-        client.create_content("ct-1", {"field_title": "Row"}, groups_ids=["group-1"], name="Row")
-        client.save_group({"_id": "group-1", "name": "Group"})
-        client.save_help({"_id": "help-1", "name": "Help", "value": "Body"})
-
-    requests = [call.args[0] for call in send.call_args_list]
-    assert requests[0].method == "POST"
-    assert requests[0].url == "https://alterios.example/api/content-types/save"
-    assert requests[0].body == {"_id": "ct-1", "name": "Type"}
-    assert requests[1].method == "POST"
-    assert requests[1].url == "https://alterios.example/api/fields/save"
-    assert requests[1].body == {"_id": "field-1", "name": "Title"}
-    assert requests[2].method == "POST"
-    assert requests[2].url == "https://alterios.example/api/contents/save"
-    assert requests[2].body == {
-        "contentTypeId": "ct-1",
-        "fields": {"field_title": ["Row"]},
-        "groupsIds": ["group-1"],
-        "name": "Row",
-    }
-    assert requests[3].method == "PATCH"
-    assert requests[3].url == "https://alterios.example/api/groups/group-1"
-    assert requests[4].method == "PATCH"
-    assert requests[4].url == "https://alterios.example/api/helps/help-1"
-
-
-def test_list_fields_builds_expected_query_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
-        client.list_fields(content_type_id="ct-1", field_id="field-1", limit=10, offset=5)
-
-    parsed = urlparse(send.call_args.args[0].url)
-    assert parsed.path == "/api/fields"
-    assert parse_qs(parsed.query) == {
-        "contentTypeId": ["ct-1"],
-        "_id": ["field-1"],
-        "limit": ["10"],
-        "offset": ["5"],
-    }
-
-
-def test_file_metadata_requires_ids_and_repeats_query_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with pytest.raises(ValueError, match="file_ids"):
-        client.file_metadata([])
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
-        client.file_metadata(["file-1", "file-2"])
-
-    parsed = urlparse(send.call_args.args[0].url)
-    assert parsed.path == "/api/file/list"
-    assert parse_qs(parsed.query) == {"id": ["file-1", "file-2"]}
-
-
-def test_file_elfinder_builds_expected_query_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
-        client.file_elfinder(command="open", target="public_hash", extra={"tree": "1"})
-
-    parsed = urlparse(send.call_args.args[0].url)
-    assert parsed.path == "/api/file/elfinder"
-    assert parse_qs(parsed.query) == {"cmd": ["open"], "target": ["public_hash"], "tree": ["1"]}
-
-
-def test_download_file_url_encodes_elfinder_paths_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-    opened_urls: list[str] = []
-
-    class FakeUrlopenResponse:
-        headers = {"Content-Type": "image/svg+xml"}
-
-        def __enter__(self) -> "FakeUrlopenResponse":
-            return self
-
-        def __exit__(self, *_args: object) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return b"<svg></svg>"
-
-    def fake_urlopen(request: object, timeout: float) -> FakeUrlopenResponse:
-        opened_urls.append(request.full_url)  # type: ignore[attr-defined]
-        assert timeout == config.timeout_seconds
-        return FakeUrlopenResponse()
-
-    with patch("alterios_mcp.client.urlopen", side_effect=fake_urlopen):
-        data, content_type = client.download_file_url("/files/add icon (1).svg")
-
-    assert data == b"<svg></svg>"
-    assert content_type == "image/svg+xml"
-    assert opened_urls == ["https://alterios.example/files/add%20icon%20%281%29.svg"]
-
-
-def test_content_by_id_uses_id_filter_and_returns_single_row_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    body = {"total": 1, "values": [{"_id": "content-1", "fields": {"field_title": ["Old"]}}]}
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", body)) as send:
-        response = client.content_by_id("content-1")
-
-    parsed = urlparse(send.call_args.args[0].url)
-    assert parsed.path == "/api/contents/listandcount"
-    assert parse_qs(parsed.query) == {"_id": ["content-1"], "limit": ["1"], "offset": ["0"]}
-    assert response.body == {"_id": "content-1", "fields": {"field_title": ["Old"]}}
-
-
-def test_update_content_fields_patches_existing_content_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-    responses = [
-        AlteriosResponse(
-            200,
-            "application/json",
-            {
-                "total": 1,
-                "values": [
-                    {
-                        "_id": "content-1",
-                        "contentTypeId": "ct-1",
-                        "name": "Row",
-                        "groupsIds": ["group-1"],
-                        "fields": {"field_title": ["Old"], "field_score": [1]},
-                    }
-                ],
-            },
-        ),
-        AlteriosResponse(200, "application/json", {"_id": "content-1", "ok": True}),
+    assert requests[2].url == "https://alterios.example/api/diagrams/di…16026 tokens truncated…                              {
+                                            "title": "Run missing script",
+                                            "actions": [{"type": "manual_script", "scriptId": "missing-script"}],
+                                        },
+                                    ],
+                                },
+                                {
+                                    "name": "Report",
+                                    "type": "report",
+                                    "params": {"reportId": "missing-report", "openId": True},
+                                    "styles": {"width": "100%"},
+                                },
+                            ]
+                        }
+                    ]
+                }
+            ],
+        }
     ]
-
-    with patch.object(client, "_send", side_effect=responses) as send:
-        client.update_content_fields("content-1", {"field_title": "New", "field_empty": []})
-
-    prepared = send.call_args_list[1].args[0]
-    assert prepared.method == "PATCH"
-    assert prepared.url == "https://alterios.example/api/contents/save"
-    assert prepared.body == {
-        "_id": "content-1",
-        "contentTypeId": "ct-1",
-        "name": "Row",
-        "groupsIds": ["group-1"],
-        "fields": {"field_title": ["New"], "field_score": [1], "field_empty": []},
-    }
-
-
-def test_upload_file_to_field_posts_multipart_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
+    scripts = [{"_id": "script-existing", "name": "Existing", "type": "manual", "body": script_body}]
+    diagrams = [
+        {
+            "_id": "diagram-1",
+            "name": "Flow",
+            "value": """
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn">
+  <bpmn2:process id="Process_1">
+    <bpmn2:userTask id="Task_1" name="Fill" camunda:formKey="missing-task-form" />
+  </bpmn2:process>
+</bpmn2:definitions>
+""",
+        },
+        {"_id": "diagram-bad", "name": "Broken XML", "value": "<bpmn2:definitions>"},
+    ]
+    return build_deep_inventory(
+        forms=forms,
+        scripts=scripts,
+        diagrams=diagrams,
+        groups=[],
+        profile="secondary",
         project_id="project-1",
-        auth_header="x-api-key",
-        auth_scheme="",
-    )
-    client = AlteriosClient(config)
-    captured = {}
-
-    class FakeHTTPResponse:
-        status = 200
-        headers = {"Content-Type": "application/json"}
-
-        def __enter__(self) -> "FakeHTTPResponse":
-            return self
-
-        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return b'{"_id":"file-1","filename":"demo.txt","size":4}'
-
-    def fake_urlopen(request: object, timeout: float) -> FakeHTTPResponse:
-        captured["request"] = request
-        captured["timeout"] = timeout
-        return FakeHTTPResponse()
-
-    with patch("alterios_mcp.client.urlopen", side_effect=fake_urlopen):
-        response = client.upload_file_to_field(
-            b"demo",
-            filename="demo.txt",
-            content_type_id="ct-1",
-            field_id="field-1",
-            mime_type="text/plain",
-        )
-
-    request = captured["request"]
-    headers = {key.lower(): value for key, value in request.header_items()}
-    assert request.get_method() == "POST"
-    assert request.full_url == "https://alterios.example/api/file/upload/field"
-    assert headers["projectid"] == "project-1"
-    assert headers["x-api-key"] == "secret-token"
-    assert headers["contenttype"] == "ct-1"
-    assert headers["field"] == "field-1"
-    assert headers["content-type"].startswith("multipart/form-data; boundary=")
-    assert b'filename="demo.txt"' in request.data
-    assert b"demo" in request.data
-    assert response.body == {"_id": "file-1", "filename": "demo.txt", "size": 4}
-
-
-def test_list_comments_builds_v1_query_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
-        client.list_comments("entity-1", entity="content", limit=50, depth=4, page=2)
-
-    parsed = urlparse(send.call_args.args[0].url)
-    assert parsed.path == "/api/v1/comments"
-    assert parse_qs(parsed.query) == {
-        "entity": ["content"],
-        "entityId": ["entity-1"],
-        "limit": ["50"],
-        "depth": ["4"],
-        "page": ["2"],
-    }
-
-
-def test_add_comment_posts_v1_payload_without_network() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-    )
-    client = AlteriosClient(config)
-
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {})) as send:
-        client.add_comment("entity-1", "Body", entity="content", parent_id="parent-1")
-
-    prepared = send.call_args.args[0]
-    parsed = urlparse(prepared.url)
-    assert parsed.path == "/api/v1/comments"
-    assert prepared.method == "POST"
-    assert prepared.body == {
-        "entity": "content",
-        "entityId": "entity-1",
-        "body": "Body",
-        "parentId": "parent-1",
-    }
-
-
-def test_mutating_service_requires_allow_write() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-        endpoint_template="{base_url}/api/scripts/execute-manual",
+        generated_at="2026-07-10T00:00:00Z",
     )
 
-    with pytest.raises(AlteriosRequestError):
-        AlteriosClient(config).prepare_script_request("deleteManyContents", {"_id": ["1"]})
 
-
-def test_execute_manual_endpoint_requires_script_uuid() -> None:
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
-        project_id="project-1",
-        endpoint_template="{base_url}/api/scripts/execute-manual",
+def _snapshot(*, script_body: str = "noop();") -> dict:
+    return build_health_snapshot(
+        deep_inventory=_deep_inventory(script_body=script_body),
+        views=[{"_id": "view-ok", "name": "Visible view"}],
+        reports=[{"_id": "report-ok", "name": "Visible report"}],
+        full_reports=[
+            {
+                "_id": "report-layout-bad",
+                "name": "Bad layout",
+                "template": {
+                    "Pages": {
+                        "0": {
+                            "Width": 100,
+                            "Height": 100,
+                            "Components": {
+                                "0": {"Ident": "StiTextElement", "Name": "A", "ClientRectangle": "0,0,0,30"},
+                            },
+                        }
+                    }
+                },
+            }
+        ],
     )
 
-    with pytest.raises(AlteriosRequestError, match="requires a script UUID"):
-        AlteriosClient(config).prepare_script_request("getTasks", {"limit": 1})
+
+def test_project_health_detects_prewrite_risks() -> None:
+    health = build_project_health(snapshot=_snapshot())
+    codes = health["summary"]["issues_by_code"]
+
+    assert health["summary"]["ok"] is False
+    assert codes["missing_view_ref"] == 1
+    assert codes["missing_report_ref"] == 1
+    assert codes["missing_form_action_target"] == 1
+    assert codes["missing_form_script_ref"] == 1
+    assert codes["missing_bpmn_form_key"] == 1
+    assert codes["bpmn_parse_error"] == 1
+    assert codes["report_layout_issues"] == 1
+    assert health["summary"]["counts"] == {"forms": 1, "scripts": 1, "diagrams": 2, "views": 1, "reports": 1}
 
 
-def test_execute_manual_script_bypasses_runtime_service_catalog_without_network() -> None:
-    script_id = "11111111-1111-4111-8111-111111111111"
-    config = AlteriosConfig(
-        base_url="https://alterios.example",
-        api_token="secret-token",
+def test_project_health_diff_detects_changed_script() -> None:
+    before = _snapshot(script_body="noop();")
+    after = _snapshot(script_body="updateContent({});")
+
+    diff = diff_snapshots(before, after)
+
+    assert diff["available"] is True
+    assert diff["changed"] is True
+    assert diff["entities"]["scripts"]["changed"] == 1
+    assert diff["entities"]["forms"]["changed"] == 0
+
+
+def test_project_health_cache_roundtrip_and_server_tool(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    written = save_snapshot(_snapshot())
+    loaded = load_latest_snapshot(profile="secondary", project_id="project-1")
+
+    assert loaded is not None
+    assert Path(tmp_path, written["latest_path"]).exists()
+
+    result = server.alterios_project_health(
+        profile="secondary",
         project_id="project-1",
-        endpoint_template="{base_url}/api/scripts/execute-manual",
-        body_style="rpc",
+        refresh=False,
+        use_cache=True,
+        write_cache=False,
     )
-    client = AlteriosClient(config)
 
-    with patch.object(client, "_send", return_value=AlteriosResponse(200, "application/json", {"ok": True})) as send:
-        client.execute_manual_script(script_id, {"contentId": "content-1"})
-
-    prepared = send.call_args.args[0]
-    assert prepared.method == "POST"
-    assert prepared.url == "https://alterios.example/api/scripts/execute-manual"
-    assert prepared.body == {"_id": script_id, "args": {"contentId": "content-1"}}
-
-
-def test_script_body_styles() -> None:
-    assert build_script_body("getTasks", {"limit": 1}, "rpc") == {"function": "getTasks", "args": {"limit": 1}}
-    assert build_script_body("getTasks", {"limit": 1}, "service") == {"service": "getTasks", "args": {"limit": 1}}
-    assert build_script_body("getTasks", {"limit": 1}, "params") == {"function": "getTasks", "params": {"limit": 1}}
-    assert build_script_body("getTasks", {"limit": 1}, "direct") == {"function": "getTasks", "args": {"limit": 1}}
-
-
-def test_direct_body_uses_script_id_shape_for_uuid() -> None:
-    script_id = "11111111-2222-3333-4444-555555555555"
-
-    assert build_script_body(script_id, {"contentId": "c1"}, "direct") == {
-        "_id": script_id,
-        "args": {"contentId": "c1"},
-    }
-
-
-def test_manual_script_body_requires_uuid() -> None:
-    script_id = "11111111-2222-3333-4444-555555555555"
-
-    assert build_script_body(script_id, {"contentId": "c1"}, "manual_script") == {
-        "_id": script_id,
-        "args": {"contentId": "c1"},
-    }
-    with pytest.raises(AlteriosConfigError):
-        build_script_body("getTasks", {"limit": 1}, "manual_script")
-
-
-def json_dump(value: object) -> str:
-    import json
-
-    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    assert result["source"] == "cache"
+    assert result["readonly"] is True
+    assert result["summary"]["issue_count"] >= 1
