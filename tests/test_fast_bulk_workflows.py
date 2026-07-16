@@ -10,6 +10,7 @@ from alterios_mcp.write_control import ControlledWriteError
 
 
 SCRIPT_ID = "11111111-1111-4111-8111-111111111111"
+DELETE_SCRIPT_ID = "22222222-2222-4222-8222-222222222222"
 DELIVERY_EVIDENCE = {
     "work_item_ref": "gitea:#10",
     "agent_handoff_refs": ["gitea:#10/comment/1"],
@@ -37,6 +38,17 @@ class FakeClient:
         self.script_value = "return true;"
 
     def script_by_id(self, script_id: str) -> FakeResponse:
+        if script_id == DELETE_SCRIPT_ID:
+            return FakeResponse(
+                {
+                    "_id": script_id,
+                    "name": "Bulk delete script",
+                    "type": "manual",
+                    "active": True,
+                    "value": self.script_value,
+                    "config": {"arguments": [{"key": "contentIds"}]},
+                }
+            )
         return FakeResponse(
             {
                 "_id": script_id,
@@ -54,6 +66,9 @@ class FakeClient:
         return FakeResponse({"_id": content_id, "name": f"Row {content_id}", "contentTypeId": "type-1"})
 
     def execute_manual_script(self, script_id: str, args: dict) -> FakeResponse:
+        if script_id == DELETE_SCRIPT_ID:
+            self.deleted.update(args["contentIds"])
+            return FakeResponse({"deleted": len(args["contentIds"])})
         self.manual_calls.append(args)
         return FakeResponse({"ok": True})
 
@@ -219,6 +234,8 @@ def test_fast_bulk_delete_requires_dangerous_gate_and_verifies_absence(tmp_path,
         "delivery_evidence": DELIVERY_EVIDENCE,
         "profile": "primary",
         "project_id": "project-1",
+        "script_id": DELETE_SCRIPT_ID,
+        "expected_script_name": "Bulk delete script",
     }
     base_env = {
         "ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path),

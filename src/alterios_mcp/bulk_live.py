@@ -16,8 +16,6 @@ class BulkClient(Protocol):
 
     def list_tasks(self, **kwargs: Any) -> Any: ...
 
-    def call_script_service(self, function: str, args: Any = None, *, allow_write: bool = False) -> Any: ...
-
     def request(self, method: str, path: str, **kwargs: Any) -> Any: ...
 
 
@@ -174,13 +172,18 @@ def execute_bulk_process_start(
     return _batch_result(rows, requested_count=len(content_ids))
 
 
-def execute_bulk_delete(client: BulkClient, *, content_ids: list[str]) -> dict[str, Any]:
+def execute_bulk_delete(
+    client: BulkClient,
+    *,
+    script_id: str,
+    content_ids: list[str],
+    content_ids_arg_name: str,
+) -> dict[str, Any]:
     deletion: dict[str, Any]
     try:
-        deletion = client.call_script_service(
-            "deleteManyContents",
-            {"_id": content_ids},
-            allow_write=True,
+        deletion = client.execute_manual_script(
+            script_id,
+            {content_ids_arg_name: content_ids},
         ).as_dict()
     except Exception as exc:  # Readback still runs because the service may have partially mutated data.
         deletion = {
