@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
-from alterios_mcp import server
+import pytest
+
+from alterios_mcp import project_health, server
 from alterios_mcp.deep_inventory import build_deep_inventory
 from alterios_mcp.project_health import (
     build_health_snapshot,
     build_project_health,
     diff_snapshots,
     load_latest_snapshot,
+    resolve_cache_ttl_seconds,
     save_snapshot,
 )
 
@@ -151,3 +156,68 @@ def test_project_health_cache_roundtrip_and_server_tool(tmp_path, monkeypatch) -
     assert result["source"] == "cache"
     assert result["readonly"] is True
     assert result["summary"]["issue_count"] >= 1
+
+
+def test_project_health_expired_cache_refreshes_live_and_persists_diff(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    save_snapshot(_snapshot(script_body="noop();"))
+    latest = tmp_path / "inventories" / "secondary" / "project-1" / "latest.json"
+    expired_at = time.time() - 600
+    os.utime(latest, (expired_at, expired_at))
+    monkeypatch.setattr(
+        project_health,
+        "collect_live_health_inventory",
+        lambda **kwargs: _snapshot(script_body="updateContent({});"),
+    )
+
+    result = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        cache_ttl_seconds=60,
+    )
+
+    assert result["source"] == "live"
+    assert result["cache"]["fresh"] is False
+    assert result["cache"]["refresh_reason"] == "cache_expired"
+    assert result["diff"]["available"] is True
+    assert result["diff"]["entities"]["scripts"]["changed"] == 1
+    assert Path(tmp_path, result["diff_cache_write"]["latest_path"]).exists()
+
+
+def test_project_health_cache_hit_restores_persisted_diff(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    save_snapshot(_snapshot(script_body="noop();"))
+    monkeypatch.setattr(
+        project_health,
+        "collect_live_health_inventory",
+        lambda **kwargs: _snapshot(script_body="updateContent({});"),
+    )
+    refreshed = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        refresh=True,
+        cache_ttl_seconds=300,
+    )
+
+    cached = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        cache_ttl_seconds=300,
+        write_cache=False,
+    )
+
+    assert refreshed["diff"]["changed"] is True
+    assert cached["source"] == "cache"
+    assert cached["cache"]["hit"] is True
+    assert cached["diff_cache"]["hit"] is True
+    assert cached["diff"]["changed"] is True
+    assert cached["summary"]["previous_fingerprint"] == refreshed["summary"]["previous_fingerprint"]
+
+
+def test_project_health_cache_ttl_validation(monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS", "45")
+
+    assert resolve_cache_ttl_seconds() == 45
+    assert resolve_cache_ttl_seconds(0) == 0
+    with pytest.raises(ValueError, match="non-negative"):
+        resolve_cache_ttl_seconds(-1)

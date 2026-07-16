@@ -53,6 +53,9 @@ field-based/current-record фильтрации.
 строки в `agent_handoff_refs` недостаточно.
 
 Активную версию и блокирующие коды возвращает `alterios_ux_contract`, а
+`alterios_validate_form_contract` применяет контракт в строгом режиме к форме
+по `form_id` или переданному JSON. `alterios_analyze_form_surface` остается
+неблокирующим диагностическим анализатором. Инструмент
 `alterios_runtime_info` возвращает commit, путь к исходникам, PID, время старта,
 версию схемы tools, hashes исходников и skills и признак устаревшего процесса.
 

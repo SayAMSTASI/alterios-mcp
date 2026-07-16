@@ -4,7 +4,21 @@ import json
 
 import pytest
 
+from alterios_mcp import server
 from alterios_mcp.form_surface import analyze_form_surface, main
+
+
+def test_validate_form_contract_tool_is_strict_alias() -> None:
+    form = {"name": "Records", "tabs": []}
+
+    analyzed = server.alterios_analyze_form_surface(form=form)
+    validated = server.alterios_validate_form_contract(form=form)
+
+    assert analyzed["surface"]["validation_profile"] == "default"
+    assert analyzed["surface"]["ok"] is True
+    assert validated["surface"]["validation_profile"] == "contract"
+    assert validated["surface"]["ok"] is False
+    assert validated["surface"]["blocking_issues_by_code"] == {"missing_page_title": 1}
 
 
 def test_form_surface_accepts_clean_view_row() -> None:

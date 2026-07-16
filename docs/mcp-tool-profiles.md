@@ -27,6 +27,11 @@ ALTERIOS_MCP_TOOL_PROFILE = "live"
 `ALTERIOS_MCP_ALLOW_WRITE=1`, успешный `alterios_live_task_preflight`, проверенный
 `plan_id`, совпадающий runtime fingerprint и readback.
 
+В профиле `live` доступен `alterios_fast_live_write`. Он принимает только
+утвержденные сценарии `alterios_create_material_module`,
+`alterios_create_report_tab` и `alterios_create_process_flow`; generic REST и
+security/destructive operations через него недоступны.
+
 `live`, `discovery` и `admin` не публикуют generic escape hatches
 `alterios_rest_write` и `alterios_call_write_service`. Если повторяемая операция
 требует один из них, сначала следует добавить или расширить typed tool.

@@ -44,6 +44,8 @@ def test_live_profile_keeps_delivery_tools_and_hides_raw_escape_hatches() -> Non
 
     assert {
         "alterios_live_task_preflight",
+        "alterios_validate_form_contract",
+        "alterios_fast_live_write",
         "alterios_create_material_module",
         "alterios_create_report_tab",
         "alterios_create_process_flow",
@@ -61,6 +63,7 @@ def test_discovery_profile_has_no_mutating_work_tools() -> None:
 
     assert "alterios_project_health" in names
     assert "alterios_get_form" in names
+    assert "alterios_validate_form_contract" in names
     assert "gitea_workboard_probe" in names
     assert "alterios_create_material_module" not in names
     assert "gitea_create_work_item" not in names

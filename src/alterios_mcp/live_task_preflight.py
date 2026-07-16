@@ -40,6 +40,7 @@ def run_live_task_preflight(
     expected_fingerprint: str | None = None,
     include_project_health: bool = True,
     refresh_health: bool = False,
+    health_cache_ttl_seconds: int | None = None,
     allow_cached_health: bool = True,
     require_clean_health: bool = True,
     include_replay_smoke: bool = True,
@@ -98,6 +99,7 @@ def run_live_task_preflight(
                 profile=target_profile,
                 project_id=target_project_id,
                 refresh=refresh_health,
+                cache_ttl_seconds=health_cache_ttl_seconds,
                 allow_cached_health=allow_cached_health,
                 require_clean_health=require_clean_health,
                 artifacts_dir=artifacts_dir,
@@ -328,6 +330,7 @@ def _project_health_check(
     profile: str,
     project_id: str,
     refresh: bool,
+    cache_ttl_seconds: int | None,
     allow_cached_health: bool,
     require_clean_health: bool,
     artifacts_dir: str | None,
@@ -341,6 +344,7 @@ def _project_health_check(
             refresh=refresh,
             use_cache=True,
             write_cache=True,
+            cache_ttl_seconds=cache_ttl_seconds,
             include_processes=True,
             include_report_templates=False,
             artifacts_dir=artifacts_dir,
@@ -351,11 +355,20 @@ def _project_health_check(
 
     source = str(health.get("source") or "")
     summary = health.get("summary") or {}
+    cache = health.get("cache") or {}
     health_ok = bool(summary.get("ok"))
     if source == "cache" and not allow_cached_health:
         blockers.append({"code": "project_health_cache_not_allowed", "message": "Project health used cache, but live refresh is required."})
     elif source == "cache":
-        warnings.append({"code": "project_health_cache", "message": "Project health used cached inventory; use refresh_health=true for live read."})
+        warnings.append(
+            {
+                "code": "project_health_cache",
+                "message": (
+                    "Project health used a fresh cached inventory "
+                    f"(age={cache.get('age_seconds')}s, ttl={cache.get('ttl_seconds')}s)."
+                ),
+            }
+        )
     if require_clean_health and not health_ok:
         blockers.append({"code": "project_health_errors", "message": "Project health contains blocking errors."})
     return {
@@ -363,6 +376,8 @@ def _project_health_check(
         "ok": (health_ok or not require_clean_health) and (allow_cached_health or source != "cache"),
         "source": source,
         "summary": summary,
+        "cache": cache,
+        "diff_cache": health.get("diff_cache"),
         "cache_write": health.get("cache_write"),
     }
 
@@ -446,6 +461,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ux-contract-version", default=UX_CONTRACT_VERSION, help="Expected UX contract version in delivery evidence.")
     parser.add_argument("--expected-fingerprint", help="Expected runtime fingerprint.")
     parser.add_argument("--refresh-health", action="store_true", help="Refresh live project inventory instead of using cache when possible.")
+    parser.add_argument("--health-cache-ttl-seconds", type=int, default=None, help="Maximum age of cached project health inventory.")
     parser.add_argument("--no-project-health", action="store_true", help="Skip project health.")
     parser.add_argument("--no-replay-smoke", action="store_true", help="Skip replay smoke.")
     parser.add_argument("--include-live-replay", action="store_true", help="Include read-only live discovery in replay smoke.")
@@ -473,6 +489,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_fingerprint=args.expected_fingerprint,
         include_project_health=not args.no_project_health,
         refresh_health=args.refresh_health,
+        health_cache_ttl_seconds=args.health_cache_ttl_seconds,
         allow_cached_health=not args.no_cached_health,
         require_clean_health=not args.no_clean_health_required,
         include_replay_smoke=not args.no_replay_smoke,
