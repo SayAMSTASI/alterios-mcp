@@ -1,0 +1,315 @@
+# Gitea как закрытое рабочее поле
+
+Этот документ описывает, как использовать приватный Gitea как Jira-подобное
+рабочее поле для реальных Alterios-задач, не публикуя проектную информацию в
+публичный репозиторий `alterios-mcp`.
+
+## 1. Назначение
+
+Gitea-workboard нужен для хранения реальных рабочих задач:
+
+- постановки по проектам;
+- sprint backlog;
+- Kanban-статусы;
+- ответственные по этапам;
+- отчеты агентов;
+- ссылки на закрытые Alterios-проекты;
+- evidence, screenshots, HAR, readback и рабочие заметки.
+
+Публичный GitHub-репозиторий `alterios-mcp` хранит только MCP, правила,
+шаблоны, обезличенные примеры и reusable skills. Реальные задачи и данные
+клиентов должны храниться в закрытом Gitea или локальном private workboard.
+
+## 2. Граница данных
+
+| Где хранится | Можно хранить | Нельзя хранить |
+|---|---|---|
+| `alterios-mcp` GitHub | MCP code, tests, docs, templates, skills, обезличенные правила | Реальные URL, project ids, users, roles, client data, raw HAR, screenshots |
+| Private Gitea | Реальные задачи, постановки, sprint board, evidence, agent reports | Токены, пароли, секреты в открытом тексте |
+| Локальные artifacts | Временные выгрузки, write-plans, write-journal, raw inventory | Долгосрочные артефакты без владельца и срока хранения |
+
+Если реальная задача выявила полезное общее правило, в `alterios-mcp` переносится
+только обезличенное улучшение: skill, validator, template, doc или typed tool.
+
+## 3. Модель Gitea
+
+| Gitea объект | Как используем |
+|---|---|
+| Organization/User | Закрытый контур команды |
+| Repository | Отдельный private repo, например `alterios-workboard` |
+| Issues | Рабочие задачи, постановки, bugs, исследования, проверки |
+| Projects | Kanban-доска |
+| Milestones | Спринты или этапы поставки |
+| Labels | Тип задачи, область, stage, риск, статус проверки |
+| Assignees | Ответственные лица |
+| Comments | Отчеты агентов, решения, результаты проверок |
+| Attachments | Evidence, screenshots, export-файлы, если разрешено политикой контура |
+| Pull requests | Только если в private repo есть код/конфиги, которые реально меняются |
+
+## 4. Рекомендуемые статусы Kanban
+
+Базовые колонки проекта:
+
+1. `Backlog` - идея или входящий запрос.
+2. `Ready` - есть постановка, Mermaid-схема и acceptance criteria.
+3. `In Progress` - идет discovery/design/build.
+4. `Review` - результат собран, требуется инженерная проверка.
+5. `Verify` - выполняются readback, UI evidence, tests, safety checks.
+6. `Done` - задача закрыта по Definition of Done.
+7. `Blocked` - есть внешний блокер или риск, который не может быть снят агентом.
+
+Статус `Done` нельзя ставить без ответственного, артефактов и проверки.
+
+## 5. Спринты
+
+Milestone в Gitea используется как sprint.
+
+Рекомендуемый формат имени:
+
+```text
+2026-07-S1 Alterios delivery
+```
+
+Минимальные поля sprint:
+
+- цель sprint;
+- период;
+- владелец;
+- список issues;
+- Definition of Done;
+- риски и блокеры;
+- ссылка на итоговый отчет.
+
+## 6. Типы задач
+
+| Тип | Когда использовать |
+|---|---|
+| `brief` | Постановка, ТРЗ, формализация бизнес-запроса |
+| `feature` | Новая функция, интерфейс, модуль, сценарий |
+| `bug` | Ошибка MCP, формы, представления, скрипта, отчета |
+| `research` | Read-only исследование API/UI/проектной базы |
+| `verification` | Независимая проверка, smoke, UI evidence, safety review |
+| `docs` | Инструкция, регламент, описание workflow |
+| `chore` | Техническая задача без пользовательского эффекта |
+
+## 7. Обязательная структура Issue
+
+Issue по рабочей задаче должен содержать:
+
+- тип задачи;
+- ответственного владельца результата;
+- sprint/milestone;
+- stage gate;
+- Mermaid-схему;
+- постановку;
+- acceptance criteria;
+- затрагиваемые Alterios-объекты;
+- план проверки;
+- Git-решение: что пойдет в public MCP repo, а что останется private;
+- ссылки на evidence или artifacts.
+
+Для шаблонов используйте:
+
+- `templates/gitea/issue-brief.md`;
+- `templates/gitea/issue-task.md`;
+- `templates/gitea/agent-report.md`.
+
+## 8. Ответственные лица
+
+У каждого stage должен быть один ответственный владелец результата.
+
+| Stage | Типовой ответственный |
+|---|---|
+| Intake | PM Control Loop / Lead Engineer |
+| Постановка | Business/System Analyst |
+| Discovery | Project Base Explorer |
+| Design | Data Model Engineer / View Builder / Form Surface Engineer |
+| Build | профильный инженер |
+| Verify | Safety Verifier |
+| Docs/Git | Lead Engineer / Documentation Scribe |
+
+Соисполнители могут быть указаны в задаче, но владелец stage должен быть один.
+
+## 9. Комментарии агентов
+
+Каждый агент пишет отчет в комментарий issue по шаблону:
+
+```text
+Роль:
+Scope:
+Что сделано:
+Артефакты:
+Проверка:
+Риски:
+Следующий шаг:
+```
+
+Агент не переводит задачу в `Done` сам, если не является ответственным за
+закрывающий stage.
+
+## 10. Связь с Git
+
+В issue можно указывать commit hash из публичного `alterios-mcp`, если задача
+породила reusable-изменение.
+
+Правило:
+
+- реальная задача остается в Gitea;
+- reusable MCP-изменение пушится в GitHub;
+- в GitHub commit message не добавляются названия реальных проектов,
+  пользователей, URL и project ids.
+
+## 11. Подключение через окружение
+
+Секреты хранятся только во внешнем private `.env`.
+
+Пример переменных:
+
+```env
+GITEA_BASE_URL=https://gitea.example.local
+GITEA_TOKEN=put-token-here
+GITEA_OWNER=alterios-team
+GITEA_REPO=alterios-workboard
+GITEA_DEFAULT_PROJECT=put-project-board-id-here
+GITEA_DEFAULT_MILESTONE=2026-07-S1
+GITEA_TIMEOUT_SECONDS=20
+GITEA_BOARD_COOKIE_FILE=
+GITEA_BOARD_COOKIE_HEADER=
+GITEA_BOARD_CSRF_TOKEN=
+GITEA_MCP_ALLOW_WRITE=0
+```
+
+В публичном `.env.example` допускаются только placeholders.
+
+## 12. MCP tools
+
+Первый рабочий слой typed tools уже добавлен:
+
+- `gitea_workboard_config` - показывает redacted-конфиг, missing keys и состояние `GITEA_MCP_ALLOW_WRITE`;
+- `gitea_workboard_probe` - проверяет API `/api/v1/version` и, если настроены token/owner/repo, доступ к repository;
+- `gitea_list_work_items` - читает private issues по state, labels и query;
+- `gitea_sync_standard_labels` - dry-run и apply стандартных labels из `templates/gitea/labels.yaml`;
+- `gitea_create_sprint` - dry-run и apply Gitea milestone, который используется как sprint;
+- `gitea_list_sprint_tasks` - читает issues выбранного sprint/milestone;
+- `gitea_create_work_item` - dry-run и apply private issue; labels на apply разрешаются в id;
+- `gitea_add_agent_report` - dry-run и apply структурированного комментария агента в issue;
+- `gitea_transition_issue_stage` - dry-run и apply перехода статуса через замену `stage:*`
+  label с сохранением остальных labels и API-readback;
+- `gitea_sync_board_by_labels` - dry-run и apply синхронизации Projects board по labels `stage:*`.
+
+Для ручного запуска и запуска по расписанию добавлена CLI-команда:
+
+```powershell
+gitea_transition_issue_stage 1 verify --dotenv C:\path\to\private\.env --pretty
+gitea_transition_issue_stage 1 verify --dotenv C:\path\to\private\.env --apply --pretty
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --pretty
+gitea_sync_board_by_labels --dotenv C:\path\to\private\.env --project-id 3 --apply --pretty
+```
+
+Статус задачи считается надежно измененным, когда `gitea_transition_issue_stage`
+возвращает `target_stage_set=true` и readback показывает ровно один актуальный
+`stage:*` label. Board-колонка не является источником истины, потому в текущей
+проверенной сборке Gitea board API не опубликован.
+
+Если имена колонок отличаются от стандартных `Backlog`, `Ready`, `In Progress`,
+`Review`, `Verify`, `Done`, `Blocked`, передайте JSON-карту:
+
+```powershell
+gitea_sync_board_by_labels --project-id 3 --stage-column-map-json '{"stage:done":"Готово","stage:build":"В работе"}'
+```
+
+Write calls в Gitea не используют `ALTERIOS_MCP_ALLOW_WRITE`. Для private workboard есть отдельный gate
+`GITEA_MCP_ALLOW_WRITE=1`, чтобы не смешивать live-запись в Alterios и публикацию задач в Gitea.
+
+Следующий слой после проверки в реальном private repo:
+
+- `gitea_update_work_item_status`;
+- `gitea_link_commit`;
+- `gitea_close_work_item`.
+
+## 13. Ограничение Gitea Projects board
+
+На текущем проверенном контуре надежный API-слой Gitea закрывает repository
+issues, labels, comments и milestones/sprints. Доска `Projects` в установленной
+версии Gitea не опубликована в `/swagger.v1.json`, а проверенные варианты
+`/api/v1/.../projects` возвращают `404`.
+
+Web UI доски использует browser-session и CSRF, а не API token:
+
+- project page: `/<owner>/-/projects/<project_id>`;
+- сортировка колонок: `POST /<owner>/-/projects/<project_id>/move`;
+- создание колонки: `POST /<owner>/-/projects/<project_id>/columns/new`;
+- обновление колонки: `PUT /<owner>/-/projects/<project_id>/<column_id>`;
+- перемещение карточек: `POST /<owner>/-/projects/<project_id>/<column_id>/move`;
+- привязка issue к project из sidebar: `POST /<owner>/<repo>/issues/projects?issue_ids=<internal_issue_id>`
+  с payload `id=<project_id>`.
+
+Вывод: обычный MCP с `GITEA_TOKEN` может надежно автоматизировать задачи,
+sprints, labels и agent reports. Управление колонками и карточками Projects
+board требует отдельного browser-backed workflow или настройки web-session/CSRF.
+Для этого в MCP есть режим `gitea_sync_board_by_labels`: сначала он пробует будущие
+API routes, затем при `apply_mode=auto` может использовать web bridge через
+`GITEA_BOARD_COOKIE_FILE` или `GITEA_BOARD_COOKIE_HEADER`. Реальные cookie и CSRF
+нельзя коммитить в Git; они должны храниться только во внешнем private `.env`.
+
+До появления официального board API источником истины для автоматизации остаются
+labels `stage:*` и milestones, а Projects board синхронизируется из labels.
+
+## 14. Локальный private workboard, если Gitea недоступна
+
+Если Gitea недоступна, не настроена или web-доска не может быть использована,
+рабочий процесс фиксируется локально в файлах пользователя. Это закрытый контур:
+его нельзя коммитить в public `alterios-mcp`.
+
+Рекомендуемый путь:
+
+```env
+LOCAL_WORKBOARD_DIR=~/Documents/AlteriosCodex/workboard
+```
+
+Структура:
+
+```text
+workboard/
+  index.md
+  issues/
+    <item_id>/
+      brief.md
+      agent-reports.md
+      evidence/
+      closeout.md
+  sprints/
+    <sprint>/
+      board.md
+```
+
+Правила:
+
+- `brief.md` хранит постановку, Mermaid-схему, acceptance criteria и Git-решение;
+- `agent-reports.md` хранит отчеты PM, аналитика, инженера, тестировщика и писаря;
+- `evidence/` хранит HAR, screenshots, readback и выгрузки, если они содержат реальные данные;
+- `index.md` и `sprints/<sprint>/board.md` дают локальный Kanban/реестр;
+- статусы совпадают с Gitea labels: `backlog`, `ready`, `in_progress`, `review`, `verify`, `done`, `blocked`;
+- при появлении Gitea локальную задачу можно перенести вручную или через отдельный sync-tool,
+  но до синхронизации источником правды считается локальный каталог.
+
+MCP tools для fallback:
+
+- `local_workboard_config` - показывает локальный target;
+- `local_workboard_init` - создает структуру каталогов;
+- `local_workboard_create_item` - dry-run/apply локальной задачи;
+- `local_workboard_list_items` - читает локальные задачи;
+- `local_workboard_add_agent_report` - добавляет отчет агента в локальную задачу.
+
+## 15. Definition of Done для Gitea-задачи
+
+Задача может быть закрыта только если:
+
+- есть постановка с Mermaid-схемой;
+- назначен ответственный по каждому активному stage;
+- acceptance criteria закрыты;
+- проверка выполнена и описана;
+- reusable-изменения, если были, запушены в `alterios-mcp`;
+- private evidence осталось в Gitea или локальном закрытом контуре;
+- финальный отчет содержит состав объектов: таблицы/типы материалов, поля,
+  представления, формы, скрипты, BPMN, отчеты и ограничения, если они применимы.

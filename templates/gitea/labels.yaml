@@ -1,0 +1,95 @@
+# Standard labels for private Gitea workboard.
+# Import or create equivalent labels in the private repository.
+
+labels:
+  - name: type:brief
+    color: "5319E7"
+    description: "Постановка, ТРЗ или формализация запроса"
+  - name: type:feature
+    color: "1D76DB"
+    description: "Новая функция или пользовательский сценарий"
+  - name: type:bug
+    color: "D73A4A"
+    description: "Ошибка или регрессия"
+  - name: type:research
+    color: "0052CC"
+    description: "Read-only исследование"
+  - name: type:verification
+    color: "0E8A16"
+    description: "Проверка, smoke, UI evidence, safety review"
+  - name: type:docs
+    color: "0075CA"
+    description: "Документация, инструкция, регламент"
+  - name: type:chore
+    color: "C5DEF5"
+    description: "Техническая задача"
+
+  - name: area:materials
+    color: "FBCA04"
+    description: "Типы материалов, таблицы, поля, связи"
+  - name: area:views
+    color: "FBCA04"
+    description: "Представления, view fields, filters, joins"
+  - name: area:forms
+    color: "FBCA04"
+    description: "Формы, tabs, rows, cells, actions"
+  - name: area:scripts
+    color: "FBCA04"
+    description: "Scripts, args, libraries, manual/event/web/cron/diagram"
+  - name: area:bpmn
+    color: "FBCA04"
+    description: "BPMN, tasks, process flow, side effects"
+  - name: area:reports
+    color: "FBCA04"
+    description: "Reports, Stimulsoft, dashboards, print forms"
+  - name: area:icons
+    color: "FBCA04"
+    description: "Icons, iconId, menus, actions"
+  - name: area:mcp
+    color: "FBCA04"
+    description: "MCP tools, skills, validators, docs"
+
+  - name: stage:intake
+    color: "EDEDED"
+    description: "Входящий запрос"
+  - name: stage:discovery
+    color: "EDEDED"
+    description: "Read-only discovery"
+  - name: stage:design
+    color: "EDEDED"
+    description: "Проектирование решения"
+  - name: stage:build
+    color: "EDEDED"
+    description: "Реализация"
+  - name: stage:verify
+    color: "EDEDED"
+    description: "Проверка"
+  - name: stage:done
+    color: "EDEDED"
+    description: "Закрыто"
+
+  - name: risk:low
+    color: "0E8A16"
+    description: "Низкий риск"
+  - name: risk:medium
+    color: "FBCA04"
+    description: "Средний риск"
+  - name: risk:high
+    color: "D93F0B"
+    description: "Высокий риск"
+  - name: risk:blocked
+    color: "B60205"
+    description: "Заблокировано"
+
+  - name: gate:dry-run-required
+    color: "C2E0C6"
+    description: "Перед apply нужен dry-run"
+  - name: gate:ui-evidence-required
+    color: "C2E0C6"
+    description: "Нужно UI evidence"
+  - name: gate:security-review
+    color: "D4C5F9"
+    description: "Нужна security/destructive проверка"
+  - name: gate:private-only
+    color: "BFDADC"
+    description: "Не переносить данные в публичный Git"

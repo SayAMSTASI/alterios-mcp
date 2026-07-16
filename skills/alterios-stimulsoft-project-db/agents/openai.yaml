@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Stimulsoft"
+  short_description: "Build Alterios Stimulsoft reports"
+  default_prompt: "Use $alterios-stimulsoft-project-db to build Alterios Stimulsoft reports from Project Database sources."

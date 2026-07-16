@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Write Tools"
+  short_description: "Build guarded Alterios write tools"
+  default_prompt: "Use $alterios-write-tools to implement or review guarded Alterios MCP write tools."

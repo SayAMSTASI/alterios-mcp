@@ -1,0 +1,161 @@
+{
+  "generated_at": "2026-07-11",
+  "source": "sandbox live probing plus Alterios frontend enum extraction",
+  "redaction": {
+    "real_base_urls_included": false,
+    "real_project_ids_included": false,
+    "tokens_included": false
+  },
+  "frontend_formats": [
+    "table",
+    "grid",
+    "list",
+    "leaflet",
+    "gantt",
+    "reference",
+    "calendar"
+  ],
+  "non_paginable_formats": [
+    "leaflet",
+    "calendar"
+  ],
+  "formats": {
+    "table": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "ui_required_settings": [
+        "title"
+      ],
+      "optional_settings": [
+        "mergeRows"
+      ],
+      "validation": "read populated view fields and get-data or get-data-simplified; UI preview requires title as one view-field mname"
+    },
+    "reference": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "ui_required_settings": [
+        "title"
+      ],
+      "optional_settings": [],
+      "validation": "use as ref source=view and verify selector source data"
+    },
+    "grid": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [
+        "desc",
+        "iconField",
+        "iconWidth",
+        "iconHeight"
+      ],
+      "validation": "get-data returns rows, headers, and settings; form-surface UI must confirm desc syntax because a raw mname can render as literal text"
+    },
+    "list": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion"
+      ],
+      "optional_settings": [],
+      "validation": "get-data returns rows; frontend config component is empty"
+    },
+    "gantt": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion",
+        "defaultView",
+        "date1.field",
+        "date2.field"
+      ],
+      "optional_settings": [
+        "plannedDate1",
+        "plannedDate2",
+        "title",
+        "resource",
+        "completion",
+        "showDate",
+        "showDuration",
+        "showPlannedDate",
+        "showResource",
+        "showCompletion"
+      ],
+      "allowed_default_view": [
+        "day",
+        "week",
+        "month",
+        "quarter",
+        "year"
+      ],
+      "validation": "readback preserves gantt settings and get-data returns rows"
+    },
+    "leaflet": {
+      "mode": "experimental/v2",
+      "status": "live_verified",
+      "required_settings": [
+        "engineVersion",
+        "geoFields[].name",
+        "geoFields[].markerIcons"
+      ],
+      "optional_settings": [
+        "tileLayers",
+        "featureLayers",
+        "defaultMarkerSource",
+        "minZoom",
+        "maxZoom"
+      ],
+      "allowed_marker_icons": [
+        "default",
+        "img",
+        "field"
+      ],
+      "validation": "geoFields name uses populated view-field mname without field_ prefix; get-data returns rows"
+    },
+    "calendar": {
+      "mode": "experimental/v2",
+      "status": "live_ui_verified",
+      "required_settings": [
+        "engineVersion",
+        "title",
+        "startDate"
+      ],
+      "optional_settings": [
+        "endDate",
+        "bgColor"
+      ],
+      "validation": "UI edit page saves title/startDate/endDate/bgColor and preview renders month grid with events"
+    },
+    "classic_table": {
+      "mode": "classic/legacy",
+      "status": "live_verified_exception",
+      "required_settings": [],
+      "validation": "requires allow_legacy_mode=true and documented evidence"
+    }
+  },
+  "gotchas": [
+    "cards is not present in the confirmed frontend view.format enum",
+    "get-data-simplified returns rows only; full get-data returns headers and settings",
+    "when fieldNamePrefix is set, pass short field suffixes to create-field to avoid double prefixing",
+    "experimental table/reference/list UI preview can require settings.title; use a single populated view-field mname, not a Mustache template",
+    "content type fields do not appear in a view until added as view fields; ordinary fields use contentTypeFieldId, system _id uses attribute",
+    "ref source=view stores the related row id; create a joined table view to show readable related attributes such as employee FIO",
+    "person fields store structured objects, but table populatedValue can be null; verify person display in UI/form before using it as list/report text",
+    "leaflet final geoFields should be saved after view fields are attached and read back",
+    "leaflet marker rendering needs GeoJSON Feature values, not bare Point geometry",
+    "calendar UI preview requires settings.title in addition to startDate",
+    "user-facing v2 table/list/joined form headers come from viewField.alias; displaying.fields.title alone is not enough",
+    "reference view is a selector/ref source and should not be embedded as a standalone user list; use a help note or a ref field scenario instead",
+    "when embedding a relation join in a form, hide both _id and generated related id aliases such as _id0",
+    "grid desc must be UI-verified in form-viewer because an unconfirmed mname value can be displayed literally"
+  ]
+}

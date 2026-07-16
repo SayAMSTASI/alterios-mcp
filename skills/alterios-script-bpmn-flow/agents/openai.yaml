@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Script BPMN"
+  short_description: "Trace Alterios script BPMN flows"
+  default_prompt: "Use $alterios-script-bpmn-flow to map Alterios scripts, forms, BPMN tasks, and side effects."

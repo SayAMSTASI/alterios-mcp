@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alterios-mcp"
+version = "0.1.0"
+description = "MCP server and discovery toolkit for Alterios/LIMS"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+alterios-mcp = "alterios_mcp.server:main"
+alterios-discover = "alterios_mcp.discovery:main"
+alterios-static-scan = "alterios_mcp.static_scan:main"
+alterios-stimulsoft-layout-check = "alterios_mcp.stimulsoft_layout:main"
+alterios-form-surface-check = "alterios_mcp.form_surface:main"
+alterios-deep-inventory = "alterios_mcp.deep_inventory:main"
+alterios-ui-flow = "alterios_mcp.ui_flow:main"
+alterios-profile-smoke = "alterios_mcp.profile_smoke:main"
+alterios-replay-smoke = "alterios_mcp.replay_smoke:main"
+alterios-project-health = "alterios_mcp.project_health:main"
+alterios-runtime-info = "alterios_mcp.runtime_info:main"
+gitea_sync_board_by_labels = "alterios_mcp.gitea_board_sync:main"
+gitea-sync-board-by-labels = "alterios_mcp.gitea_board_sync:main"
+gitea_transition_issue_stage = "alterios_mcp.gitea_stage_transition:main"
+gitea-transition-issue-stage = "alterios_mcp.gitea_stage_transition:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

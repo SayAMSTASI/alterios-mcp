@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alterios Field Types"
+  short_description: "Design and audit Alterios content type fields"
+  default_prompt: "Use $alterios-field-types to choose persisted Alterios field types and relation settings safely."
