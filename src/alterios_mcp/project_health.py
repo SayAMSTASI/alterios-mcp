@@ -539,6 +539,26 @@ def _add_script_bpmn_issues(issues: list[dict[str, Any]], linkage: dict[str, Any
                 path=str(link.get("path") or ""),
                 details={"target_script_id": link.get("target_script_id"), "target_script_name": link.get("target_script_name")},
             )
+        contract = link.get("argument_contract")
+        if not isinstance(contract, dict):
+            continue
+        for contract_issue in contract.get("issues") or []:
+            if not isinstance(contract_issue, dict):
+                continue
+            _add_issue(
+                issues,
+                str(contract_issue.get("severity") or "warning"),
+                str(contract_issue.get("code") or "manual_script_argument_contract_issue"),
+                "scripts",
+                "Manual script form action has an argument binding contract issue.",
+                path=str(link.get("path") or ""),
+                details={
+                    "form_id": link.get("form_id"),
+                    "target_script_id": link.get("target_script_id"),
+                    "argument": contract_issue.get("argument"),
+                    "bindings": contract.get("bindings"),
+                },
+            )
     for link in linkage.get("user_task_form_links") or []:
         if not link.get("form_match"):
             _add_issue(

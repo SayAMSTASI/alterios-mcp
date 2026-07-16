@@ -23,6 +23,7 @@ SAMPLE_TOOLS = [
     "alterios_fast_live_write",
     "alterios_create_material_module",
     "alterios_upsert_content_type",
+    "alterios_upsert_form_manual_script_action",
     "alterios_upsert_user",
     "alterios_delete_role",
     "alterios_call_write_service",
@@ -61,6 +62,7 @@ def test_classify_tool_covers_profile_boundaries() -> None:
     assert classify_tool("alterios_fast_live_write") == "scenario"
     assert classify_tool("alterios_create_material_module") == "scenario"
     assert classify_tool("alterios_upsert_content_type") == "typed_write"
+    assert classify_tool("alterios_upsert_form_manual_script_action") == "typed_write"
     assert classify_tool("alterios_delete_user") == "admin_security_write"
     assert classify_tool("alterios_rest_write") == "raw_write_escape_hatch"
     assert classify_tool("gitea_create_work_item") == "work_coordination"
@@ -91,6 +93,7 @@ def test_live_profile_keeps_scenarios_and_typed_helpers() -> None:
         "alterios_create_material_module",
         "alterios_fast_live_write",
         "alterios_upsert_content_type",
+        "alterios_upsert_form_manual_script_action",
         "alterios_list_content_types",
     } <= enabled
     assert "alterios_upsert_user" not in enabled

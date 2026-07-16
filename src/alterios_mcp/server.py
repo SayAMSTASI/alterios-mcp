@@ -34,6 +34,16 @@ from .client import (
 from .discovery import discover_readonly, list_objects, list_projects
 from .delivery_evidence import validate_delivery_evidence
 from .form_surface import analyze_form_surface
+from .form_script_actions import (
+    available_cell_provider_keys,
+    build_manual_script_action_container,
+    cell_view_id,
+    find_manual_script_action,
+    form_cell,
+    normalize_argument_bindings,
+    upsert_manual_script_action,
+    validate_manual_script_bindings,
+)
 from .gitea_workboard import (
     GiteaClient,
     GiteaConfig,
@@ -7455,6 +7465,200 @@ def alterios_patch_form_cell_listeners(
     saved = client.save_form(payload).as_dict()
     readback = client.form_by_id(form_id).as_dict()
     response_payload.update({"saved": saved, "readback": readback})
+    return controlled_write_result(audit=audit, response=response_payload)
+
+
+@mcp.tool()
+def alterios_upsert_form_manual_script_action(
+    form_id: str,
+    script_id: str,
+    scope: str,
+    title: str,
+    icon_id: str,
+    argument_bindings: dict[str, str] | None = None,
+    argument_entity_ids: dict[str, str] | None = None,
+    action_view_entity_id: str | None = None,
+    view_id: str | None = None,
+    tab_index: int | None = None,
+    row_index: int | None = None,
+    cell_index: int | None = None,
+    menu_icon_id: str | None = None,
+    tooltip: str | None = None,
+    position: str | None = None,
+    default: bool = False,
+    save_before_execute: bool = False,
+    expected_form_name: str | None = None,
+    expected_script_name: str | None = None,
+    expected_script_active: bool = True,
+    enforce_ux_contract: bool = False,
+    allow_unmanaged_update: bool = False,
+    dry_run: bool = True,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan or upsert a manual script action on a page, element, or row value with verified id bindings."""
+    normalized_scope = str(scope or "").strip().lower()
+    if normalized_scope not in {"page", "element", "value"}:
+        raise ValueError("scope must be one of: page, element, value.")
+    if not looks_like_uuid(script_id):
+        raise ValueError("script_id must be a saved manual script UUID.")
+    if not looks_like_uuid(icon_id):
+        raise ValueError("icon_id must be a project-local icon UUID.")
+    if menu_icon_id and not looks_like_uuid(menu_icon_id):
+        raise ValueError("menu_icon_id must be a project-local icon UUID.")
+
+    client = _client(profile, project_id)
+    existing = _find_form(client, form_id=form_id)
+    if not existing:
+        raise ValueError(f"Form {form_id!r} was not found.")
+    if expected_form_name and existing.get("name") != expected_form_name:
+        raise ValueError(f"Form name mismatch: expected {expected_form_name!r}, got {existing.get('name')!r}.")
+    _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
+
+    script = _find_script(client, script_id=script_id)
+    if not script:
+        raise ValueError(f"Script {script_id!r} was not found.")
+    if script.get("type") != "manual":
+        raise ValueError(f"Script {script_id!r} has type {script.get('type')!r}; expected 'manual'.")
+    if expected_script_name and script.get("name") != expected_script_name:
+        raise ValueError(
+            f"Script name mismatch: expected {expected_script_name!r}, got {script.get('name')!r}."
+        )
+    if script.get("active") is not expected_script_active:
+        raise ValueError(
+            f"Script active mismatch: expected {expected_script_active!r}, got {script.get('active')!r}."
+        )
+
+    cell = None
+    if normalized_scope != "page":
+        cell = form_cell(
+            existing,
+            tab_index=tab_index,
+            row_index=row_index,
+            cell_index=cell_index,
+        )
+    cell_bound_view_id = cell_view_id(cell)
+    if view_id and cell_bound_view_id and view_id != cell_bound_view_id:
+        raise ValueError(
+            f"view_id {view_id!r} does not match the target cell viewId {cell_bound_view_id!r}."
+        )
+    resolved_view_id = view_id or cell_bound_view_id
+    needs_view_fields = bool(argument_entity_ids) or (
+        normalized_scope in {"element", "value"} and bool(argument_bindings)
+    )
+    if needs_view_fields and not resolved_view_id:
+        raise ValueError("A viewId is required to validate or resolve element/value action bindings.")
+    view_fields = _view_fields_body(client, resolved_view_id) if resolved_view_id else []
+    bindings, resolved_entities = normalize_argument_bindings(
+        argument_bindings,
+        argument_entity_ids,
+        view_fields=view_fields,
+    )
+    normalized_action_view_entity_id = str(action_view_entity_id or "").strip() or None
+    entity_ids = {
+        str(entity_id or "").strip()
+        for entity_id in (argument_entity_ids or {}).values()
+        if str(entity_id or "").strip()
+    }
+    if normalized_scope == "value" and normalized_action_view_entity_id is None and len(entity_ids) == 1:
+        normalized_action_view_entity_id = next(iter(entity_ids))
+    binding_validation = validate_manual_script_bindings(
+        script=script,
+        scope=normalized_scope,
+        bindings=bindings,
+        available_provider_keys=available_cell_provider_keys(cell, view_fields),
+        action_view_entity_id=normalized_action_view_entity_id,
+    )
+    if not binding_validation["ok"]:
+        codes = ", ".join(issue["code"] for issue in binding_validation["issues"] if issue["severity"] == "error")
+        raise ValueError(f"Manual script action binding validation failed: {codes}.")
+
+    action_container = build_manual_script_action_container(
+        script=script,
+        scope=normalized_scope,
+        title=title,
+        tooltip=tooltip,
+        icon_id=icon_id,
+        bindings=bindings,
+        action_view_entity_id=normalized_action_view_entity_id,
+        position=position,
+        default=default,
+        save_before_execute=save_before_execute,
+    )
+    updated, action_location = upsert_manual_script_action(
+        existing,
+        scope=normalized_scope,
+        action_container=action_container,
+        script_id=script_id,
+        tab_index=tab_index,
+        row_index=row_index,
+        cell_index=cell_index,
+        menu_icon_id=menu_icon_id,
+    )
+    ux_contract = analyze_form_surface(updated, strict=enforce_ux_contract)
+    operation = _resource_operation(
+        name="PATCH /api/forms/{id}",
+        kind="form_manual_script_action",
+        method="PATCH",
+        path=f"/api/forms/{form_id}",
+        summary="Upsert a typed manual script form action with verified context and view id bindings.",
+        request={
+            "_id": form_id,
+            "scriptId": script_id,
+            "scope": normalized_scope,
+            "viewId": resolved_view_id,
+            "argumentBindings": bindings,
+            "actionViewEntityId": normalized_action_view_entity_id,
+        },
+    )
+    audit = build_write_audit(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        dry_run=dry_run,
+        write_enabled=_write_enabled(),
+    )
+    response_payload: dict[str, Any] = {
+        "form": _resource_summary(existing),
+        "script": _resource_summary(script),
+        "scope": normalized_scope,
+        "view_id": resolved_view_id,
+        "action_location": action_location,
+        "resolved_argument_bindings": bindings,
+        "resolved_entity_fields": resolved_entities,
+        "binding_validation": binding_validation,
+        "ux_contract": ux_contract,
+        "diff": _resource_diff(existing, updated, ("tabs", "formActionContainers")),
+        "planned_action": action_container,
+    }
+    if dry_run:
+        return controlled_write_result(audit=audit, response=response_payload)
+    if enforce_ux_contract and not ux_contract["ok"]:
+        blocking = ", ".join(ux_contract.get("blocking_issues_by_code", {}))
+        raise ValueError(f"Alterios UX contract blocks form apply: {blocking}")
+    assert_write_allowed(
+        profile=profile,
+        project_id=project_id,
+        operation=operation,
+        write_enabled=_write_enabled(),
+    )
+    saved = client.save_form(updated).as_dict()
+    readback_response = client.form_by_id(form_id).as_dict()
+    readback_body = readback_response.get("body") if isinstance(readback_response, dict) else None
+    readback_action = (
+        find_manual_script_action(readback_body, script_id)
+        if isinstance(readback_body, dict)
+        else None
+    )
+    if not readback_action:
+        raise ValueError("Manual script action was not visible in form readback.")
+    response_payload.update(
+        {
+            "saved": saved,
+            "readback": readback_response,
+            "readback_action": readback_action,
+        }
+    )
     return controlled_write_result(audit=audit, response=response_payload)
 
 

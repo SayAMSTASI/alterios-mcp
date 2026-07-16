@@ -29,6 +29,9 @@ EDIT_FORM_WORDS = {"edit", "update"}
 VIEW_DETAIL_FORM_STEMS = ("просмотр", "карточк")
 VIEW_DETAIL_FORM_WORDS = {"detail", "view"}
 TECHNICAL_LIST_FIELD_PATTERN = re.compile(r"^_id\d*$", re.IGNORECASE)
+UUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+)
 SERVICE_ID_FIELD_NAMES = frozenset(
     {
         "id",
@@ -872,6 +875,13 @@ def _analyze_action_containers(
                     {"title": title, "icon": icon},
                 )
             category = _action_category(action, container)
+            if category == "manual_script":
+                _analyze_manual_script_action(
+                    action,
+                    action_path,
+                    issues,
+                    row_action=row_actions,
+                )
             _analyze_report_or_analytics_opening(action, container, action_path, issues)
             if row_actions and category:
                 known_order.append((category, action_path))
@@ -896,6 +906,81 @@ def _analyze_action_containers(
                 path,
                 {"observed": [category for category, _ in known_order]},
             )
+
+
+def _analyze_manual_script_action(
+    action: dict[str, Any],
+    path: str,
+    issues: list[dict[str, Any]],
+    *,
+    row_action: bool,
+) -> None:
+    script_id = str(
+        action.get("scriptId")
+        or action.get("manualScriptId")
+        or action.get("_id")
+        or ""
+    ).strip()
+    if not UUID_PATTERN.fullmatch(script_id):
+        _add_issue(
+            issues,
+            "warning",
+            "manual_script_id_must_be_uuid",
+            "A manual script form action must reference a saved script UUID.",
+            path,
+            {"script_id": script_id or None},
+        )
+    config = action.get("argumentsConfig")
+    if config is None:
+        return
+    if not isinstance(config, dict):
+        _add_issue(
+            issues,
+            "warning",
+            "manual_script_arguments_config_invalid",
+            "Manual script argumentsConfig must be an object.",
+            f"{path}.argumentsConfig",
+        )
+        return
+    if config.get("type") not in {None, "context"}:
+        _add_issue(
+            issues,
+            "warning",
+            "manual_script_arguments_config_type",
+            "Manual script form actions should use argumentsConfig.type=context.",
+            f"{path}.argumentsConfig.type",
+            {"type": config.get("type")},
+        )
+    raw_bindings = config.get("args") if isinstance(config.get("args"), dict) else config
+    sources: list[str] = []
+    for argument, binding in raw_bindings.items():
+        if argument in {"args", "type", "view_id"}:
+            continue
+        source = None
+        if isinstance(binding, dict):
+            source = binding.get("dataProviderKey") or binding.get("source")
+        elif isinstance(binding, str):
+            source = binding
+        normalized_source = str(source or "").strip()
+        if not normalized_source:
+            _add_issue(
+                issues,
+                "warning",
+                "manual_script_empty_argument_binding",
+                "Manual script argument binding must contain dataProviderKey.",
+                f"{path}.argumentsConfig.args.{argument}",
+                {"argument": str(argument)},
+            )
+        else:
+            sources.append(normalized_source)
+    if row_action and "__entity_id" in sources and not action.get("viewEntityId"):
+        _add_issue(
+            issues,
+            "warning",
+            "manual_script_value_entity_ambiguous",
+            "A row value action using __entity_id must declare viewEntityId.",
+            path,
+        )
 
 
 def _analyze_list_row_action_contract(
@@ -1023,6 +1108,11 @@ def _looks_like_action(value: dict[str, Any]) -> bool:
 
 
 def _action_category(action: dict[str, Any], container: dict[str, Any] | None = None) -> str:
+    action_type = str(action.get("type") or "").strip().lower()
+    if action_type in {"manual_script", "script", "scripts"} or any(
+        key in action for key in ("scriptId", "manualScriptId", "scriptName")
+    ):
+        return "manual_script"
     items = [action]
     if container:
         items.append(container)

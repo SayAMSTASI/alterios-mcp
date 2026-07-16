@@ -8,8 +8,8 @@
 
 Контекст текущего покрытия:
 
-- MCP tools: 75;
-- write-like MCP tools: 35;
+- MCP tools: 104;
+- write-like MCP tools: 41;
 - project-base сценарии уже покрывают content types, fields, content, files,
   views, forms, scripts, BPMN/process/tasks, reports, groups, comments;
 - users, roles, user groups writes и destructive delete имеют typed security
@@ -531,6 +531,19 @@ membership readback и rollback до live execution.
 - проверка active script;
 - проверка expected script name;
 - readback side effects.
+
+Для настройки ручного скрипта в действии формы используется
+`alterios_upsert_form_manual_script_action`. Инструмент:
+
+- поддерживает области `page`, `element`, `value`;
+- принимает сохраненный UUID ручного скрипта, а не имя или runtime service;
+- связывает аргументы с `openId`, `__entity_id`, обычными полями или ID-полями
+  представления;
+- разрешает ID-поле по `entityId`, поэтому `_id`, `_id0`, `_id5` не выбираются
+  по порядковому номеру;
+- добавляет `submit_all` перед скриптом, когда требуются свежие значения формы;
+- размещает действие значения во вложенном меню и проверяет его readback;
+- блокирует пустые bindings и неоднозначный `__entity_id` без `viewEntityId`.
 
 ### 10.4. Процессные действия
 

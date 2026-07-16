@@ -12,8 +12,8 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 101 | Полный callable registry в `src/alterios_mcp/server.py`; профиль `live` публикует 75 tools. |
-| Write-like MCP tools | 35 | `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_create_material_module`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_upsert_script`, `alterios_execute_manual_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_create_process_flow`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_create_report_tab`, `alterios_clone_shared_content_type`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 104 | Полный callable registry в `src/alterios_mcp/server.py`; профиль `live` публикует 78 tools. |
+| Write-like MCP tools | 41 | Сценарные, typed, security и raw-write инструменты по классификации `tool_profiles.py`: `alterios_create_material_module`, `alterios_create_process_flow`, `alterios_create_report_tab`, `alterios_fast_live_write`, `alterios_export_project_icons`, `alterios_ensure_project_icons`, `alterios_ensure_project_icon_library`, `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_plan_content_type_publish`, `alterios_clone_shared_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_form_manual_script_action`, `alterios_upsert_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_execute_manual_script`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_call_write_service`, `alterios_rest_write`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 78 | Read/detail/runtime/write/workflow/file/comment/report/security/content-transfer patterns ниже. |
@@ -43,7 +43,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Sandbox create/update/delete and cleanup are verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 101
+## MCP Tools: 104
 
 | Tool | Вид |
 |---|---|
@@ -99,6 +99,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_patch_form_actions` | Controlled typed form actions patch |
 | `alterios_patch_form_tabs` | Controlled typed form tabs patch |
 | `alterios_patch_form_cell_listeners` | Controlled typed form cell listener patch |
+| `alterios_upsert_form_manual_script_action` | Controlled typed manual script action upsert for page, element, or row value with verified identifier bindings |
 | `alterios_analyze_form_surface` | Form UX/layout/action validation read |
 | `alterios_upsert_script` | Controlled typed script create/update |
 | `alterios_validate_script` | Script validation read |
@@ -127,6 +128,29 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_call_write_service` | Controlled runtime write/service call |
 | `alterios_execute_manual_script` | Controlled manual script execution |
 | `alterios_rest_write` | Controlled generic REST write |
+| `alterios_runtime_info` | Runtime fingerprint, package version, schema version, process and launch diagnostics |
+| `alterios_ux_contract` | Active UX contract metadata and blocking validation rules |
+| `gitea_workboard_config` | Private Gitea workboard configuration summary without secrets |
+| `gitea_workboard_probe` | Gitea repository, issue and project-board connectivity probe |
+| `local_workboard_config` | Local fallback workboard configuration summary |
+| `local_workboard_init` | Local fallback workboard initialization |
+| `local_workboard_create_item` | Local fallback work item creation |
+| `local_workboard_list_items` | Local fallback work item list |
+| `local_workboard_add_agent_report` | Structured agent report in the local fallback workboard |
+| `gitea_list_work_items` | Private Gitea issue list used as the durable work status source |
+| `gitea_sync_standard_labels` | Synchronize standard role, stage and priority labels |
+| `gitea_create_work_item` | Create a private Gitea work item with acceptance criteria and stage |
+| `gitea_create_sprint` | Create a milestone-backed Gitea sprint |
+| `gitea_list_sprint_tasks` | List work items assigned to a Gitea sprint |
+| `gitea_add_agent_report` | Add a structured agent handoff report to a Gitea issue |
+| `gitea_sync_board_by_labels` | Synchronize Gitea project-board columns from durable `stage:*` labels |
+| `gitea_transition_issue_stage` | Move an issue to another stage and synchronize its board card |
+| `alterios_list_project_icons` | Inventory project-local icons before form action configuration |
+| `alterios_resolve_project_icon` | Resolve a semantic icon name to a project-local file UUID |
+| `alterios_export_project_icons` | Export reusable project icons with a manifest |
+| `alterios_ensure_project_icons` | Upload missing reusable icons into the target project |
+| `alterios_ensure_project_icon_library` | Ensure the standard reusable icon set is present in a project |
+| `alterios_validate_printable_render` | Validate printable report render output as PDF or image evidence |
 
 ## Runtime Services: 14
 

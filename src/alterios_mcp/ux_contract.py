@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-UX_CONTRACT_VERSION = "2026-07-16.2"
+UX_CONTRACT_VERSION = "2026-07-16.3"
 
 BLOCKING_FORM_ISSUE_CODES = frozenset(
     {
@@ -15,6 +15,9 @@ BLOCKING_FORM_ISSUE_CODES = frozenset(
         "list_row_action_icon_missing",
         "list_row_actions_must_be_menu",
         "list_row_menu_actions_missing",
+        "manual_script_empty_argument_binding",
+        "manual_script_id_must_be_uuid",
+        "manual_script_value_entity_ambiguous",
         "missing_page_title",
         "non_table_cell_header",
         "report_or_analytics_form_should_open_new_tab",

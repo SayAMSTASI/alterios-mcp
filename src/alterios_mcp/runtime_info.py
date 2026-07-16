@@ -17,7 +17,7 @@ from .ux_contract import UX_CONTRACT_VERSION
 
 
 PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-MCP_TOOL_SCHEMA_VERSION = "2026-07-16.3"
+MCP_TOOL_SCHEMA_VERSION = "2026-07-16.4"
 ALTERIOS_MCP_COMMAND_RE = re.compile(
     r"(?:^|[\\/\s\"'])alterios-mcp(?:\.exe)?(?:$|[\s\"'])|-m\s+alterios_mcp\.server",
     re.IGNORECASE,
