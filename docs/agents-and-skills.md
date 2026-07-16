@@ -21,8 +21,8 @@
 | Agent | Когда подключать | Основные задачи | Входы | Выходы | Пишет код/данные |
 |---|---|---|---|---|---:|
 | Lead Engineer | Всегда, как владелец сессии | Интегрирует вывод агентов, выбирает конечное решение, запускает проверки, коммитит и пушит | Все артефакты агентов, код, live evidence | Проверенный repo state, commit/push, краткий итог | Да |
-| PM Control Loop | В начале этапа и после каждого проверенного среза | Разбить цель на этапы, зафиксировать acceptance criteria, вести статус, риски, блокеры, следующий шаг | `docs/project-status.md`, backlog, текущая цель пользователя | Обновленный статус, stage gate, список следующих задач | Только docs |
-| Business/System Analyst / Аналитик требований | Когда запрос нужно превратить в постановку, ТРЗ, сценарии или developer handoff | Формализовать бизнес-цель, роли, сценарии, модель данных, views/forms/scripts/BPMN/reports, acceptance criteria, open questions и Stage 19 preflight | Запрос пользователя, inventory, `alterios_project_health`, UI/HAR evidence, договор/ТЗ/протокол при наличии | Постановка/ТРЗ, карта объектов, view/form/process/report requirements, acceptance checklist | Только docs |
+| PM Control Loop | В начале этапа и после каждого проверенного среза | Разбить цель на этапы, зафиксировать acceptance criteria, вести статус, риски, блокеры, следующий шаг | Приватная Gitea, backlog, текущая цель пользователя | Обновленный статус, stage gate, список следующих задач | Только private workboard |
+| Business/System Analyst / Аналитик требований | Когда запрос нужно превратить в постановку, ТРЗ, сценарии или developer handoff | Формализовать бизнес-цель, роли, сценарии, модель данных, views/forms/scripts/BPMN/reports, acceptance criteria, open questions и Stage 19 preflight | Запрос пользователя, inventory, `alterios_live_task_preflight`, UI/HAR evidence, договор/ТЗ/протокол при наличии | Постановка/ТРЗ, карта объектов, view/form/process/report requirements, acceptance checklist | Только docs |
 | Project Base Explorer | Перед любыми изменениями project base или расширением покрытия | Read-only инвентаризация проектов, content types, fields, views, forms, scripts, diagrams, reports, files, comments, users/groups, tasks/processes; поиск route/response shape | `profile`, `project_id`, discovery JSON, live API read-only | JSON/MD матрицы, id/name map, route map, gaps | Нет |
 | Data Model Engineer | При типах материалов, полях, связях, источниках данных | Проектировать content types/material types, persisted field types, refs, file fields, calc/spreadsheet/combined/person fields, `contentNameTemplate`, role/source constraints | Inventory, `alterios-field-types`, существующие content types/fields | Спецификация модели, field matrix, safe migration plan | Да, scoped |
 | View Builder | При списках, представлениях, источниках для форм/отчетов | Проектировать views, view entities, joins, view fields, filters, sorts, display names, source fields, current-record context, `dataId/openId` behavior | Content model, view inventory, expected UI rows | View spec, view field matrix, get-data readback plan | Да, scoped |
@@ -45,6 +45,9 @@
 - формулировать критерии приемки до реализации;
 - отделять verified, inferred, blocked и deferred;
 - требовать от каждого агента конкретный output, а не общий пересказ;
+- назначать ровно одного ответственного владельца результата каждого stage;
+- проверять private Gitea issue и handoff-комментарии через
+  `alterios_verify_delivery_evidence`;
 - после интеграции обновлять статус и backlog.
 
 Done:
@@ -53,6 +56,7 @@ Done:
 - acceptance criteria измеримы;
 - статус не скрывает открытые риски;
 - завершенный этап связан с commit hash в следующем статусном срезе.
+- для live apply подтверждены handoffs `analyst`, `implementer`, `verifier`.
 
 ### Business/System Analyst / Аналитик Требований
 
@@ -65,8 +69,9 @@ Done:
   views, forms, scripts, BPMN, reports, groups, icons, users/roles;
 - для представлений фиксировать source content type, `viewEntity`, joins,
   relation field, view fields, filters, sorts, `openId/dataId` и readback;
-- перед live-write через сценарные tools требовать `alterios_project_health`
-  без blocking errors;
+- перед live-write через сценарные tools требовать `alterios_live_task_preflight`
+  со статусом `ready`;
+- не принимать строковые handoff refs без успешного Gitea verification receipt;
 - отдавать профильным агентам scoped handoff, а не общий пересказ задачи.
 
 Done:
@@ -217,7 +222,7 @@ Done:
 - использовать `gost-documentation-builder` как основной ГОСТ/ЕСПД skill и
   `docs/gost-documentation-scribe-agent.md` как локальный Alterios playbook;
 - не начинать финальную редакцию без source map: README, controlled writes,
-  project-status, inventory matrices, UI/HAR evidence, screenshots, договор/ТЗ
+  private status records, inventory matrices, UI/HAR evidence, screenshots, договор/ТЗ
   или шаблон заказчика, если он есть;
 - для инструкции пользователя описывать реальные рабочие сценарии: цель,
   предусловия, шаги, ожидаемый результат, сообщения и ошибки;
@@ -355,13 +360,13 @@ docs, JSON-матрицы, тесты и кодовые области.
 | `alterios-project-base-inventory` | После deep inventory project-base matrix | Project Base Explorer | Профиль, project_id, listandcount, object totals, route/readback evidence |
 | `alterios-business-requirements-analyst` | После появления Stage 19 и документационного workflow | Business/System Analyst | Постановка/ТРЗ, сценарии, view/form/process/report requirements, acceptance criteria |
 | `alterios-field-types` | После live-проверки типов полей и relation joins | Data Model Engineer | Persisted field types, relation settings, short mnames, material descriptions, field/view/form separation |
-| `alterios-form-view-surface` | После `docs/form-surface-inventory.md` и JSON-матрицы | Form Surface Engineer | View links, form tabs/actions, no-gap layout, F-pattern, roles/source/styles |
-| `alterios-ui-icons-and-actions` | После `docs/icon-usage-matrix.json` и UTF-8 icon standard | UI Icons & Actions Reviewer | Google Fonts Icons, size 16, `#4B77D1`, action meaning, iconId validation |
-| `alterios-script-bpmn-flow` | После `docs/script-bpmn-linkage.md` и parser refs | Script/BPMN Flow Integrator | Script types, form actions, BPMN formKey/listeners/script refs, side effects |
+| `alterios-form-view-surface` | После локальной form inventory и JSON-матрицы | Form Surface Engineer | View links, form tabs/actions, no-gap layout, F-pattern, roles/source/styles |
+| `alterios-ui-icons-and-actions` | После локальной icon matrix и UTF-8 icon standard | UI Icons & Actions Reviewer | Google Fonts Icons, size 16, `#4B77D1`, action meaning, iconId validation |
+| `alterios-script-bpmn-flow` | После локальной linkage matrix и parser refs | Script/BPMN Flow Integrator | Script types, form actions, BPMN formKey/listeners/script refs, side effects |
 | `alterios-write-tools` | После typed content/file/view/form/script/BPMN/report tools | Write Tool Engineer | Write-gate, dry-run diff, managed marker, readback |
 | `alterios-stimulsoft-project-db` | После report/source validation tools | Report/Stimulsoft Specialist | Stimulsoft JSON, Project Database datasource, report_full readback, layout checks |
 | `alterios-safety-verifier` | После scanner/test/readback workflow стабилизации | Safety Verifier | Tests, secret redaction, dry-run/write-gate, UI/HAR evidence |
-| `alterios-pm-control-loop` | После стабилизации `project-status` и stage format | PM Control Loop | Stage control, acceptance criteria, risks, next steps |
+| `alterios-pm-control-loop` | После стабилизации private workboard и stage format | PM Control Loop | Stage control, acceptance criteria, risks, next steps |
 
 Business/System Analyst имеет отдельный repo-owned skill
 `alterios-business-requirements-analyst`, потому что он формирует вход для всех

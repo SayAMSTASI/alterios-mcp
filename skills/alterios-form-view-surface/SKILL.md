@@ -28,6 +28,9 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 14. For generated modules, require field filters on displayed fields, hide
     `_id`/`_id0`, and make view/detail `view_data` explicitly read-only with
     output configuration and no input configuration.
+15. Treat the active strict UX contract as the source of truth for page titles,
+    Close/Save order, row action menus, technical columns, embedded filters,
+    report new-tab actions, and report/view Close actions.
 
 ## View Types And Modes
 
@@ -91,6 +94,15 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - On view/detail forms, add an icon-only `Редактировать` action using the edit-document semantic when editing the current record is allowed. Do not add that self-edit action to edit forms.
 - Keep element actions on view/detail and edit forms semantically consistent; the edit form only omits the transition to edit itself.
 - Element actions must be icon-only: in `cellActionContainers`, set `title` to an empty string, put the visible meaning in `tooltip`, and use a project-local `iconId`. Text is allowed inside nested menu items, not on the outer element action.
+- Configure manual scripts through the typed
+  `alterios_upsert_form_manual_script_action` tool. For `valueActionContainers`,
+  keep the script item inside the row menu; for `cellActionContainers`, keep the
+  outer action icon-only.
+- Before binding a manual script argument to `_id`, `_id0`, or another `_idN`,
+  read populated view fields and match the required `entityId`. Never infer the
+  identifier alias from join order or reuse an alias from another view.
+- For row scripts that use `__entity_id`, set `action_view_entity_id`. Otherwise
+  the current entity is ambiguous in joined lists.
 - Exception: approved master-detail action hubs may use short visible labels on `position: "top_center"` action containers, such as `Отбор`, `Журналы`, `Отчеты`, `Вложения`.
 - For menus with multiple print variants, use `arrow_drop_down` on the outer menu and `print` on each nested print item.
 - Analytical and printable forms are opened as separate forms in a new browser tab: `type: "forms"`, `openInNewTab: true`, `openInDialog: false`. The target analytical/print form must include a page action `Закрыть`.

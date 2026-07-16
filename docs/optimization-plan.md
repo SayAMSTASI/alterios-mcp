@@ -127,12 +127,14 @@ read-only live discovery.
 
 ## Этап 18. Inventory optimization
 
-Статус: выполнен в суженном write-preflight объеме.
+Статус: выполнен в write-preflight объеме с TTL и persisted diff cache.
 
 Что сделано:
 
-1. Кеш inventory в `artifacts/inventories/<profile>/<project_id>/`.
-2. Diff scan по последнему snapshot.
+1. Кеш inventory в `artifacts/inventories/<profile>/<project_id>/` с TTL;
+   стандартное значение — 300 секунд.
+2. Автоматический live refresh просроченного snapshot и persisted diff в
+   `latest-diff.json` плюс архив `diffs/`.
 3. Health summary через `alterios-project-health` / `alterios_project_health`:
    - broken forms;
    - broken views/view fields;
@@ -155,3 +157,36 @@ read-only live discovery.
 4. Сделать `alterios_create_process_flow`. Готово.
 5. Stage 17 пропущен по решению пользователя; viewer/render diagnostics остается deferred.
 6. Stage 18 закрыт как read-only write-preflight: cache/diff/project health.
+
+## Этап 19. Fast live write и блокирующий UX-контракт
+
+Статус: выполнен для сценариев создания и массовых side effects.
+
+Что сделано:
+
+1. `alterios_validate_form_contract` добавлен как строгий alias валидатора форм.
+2. `alterios_fast_live_write` объединяет live preflight и сценарный вызов.
+3. Режим остается двухфазным: `dry_run=true` сохраняет `plan_id`, а
+   `dry_run=false` применяет тот же набор аргументов и проверенный план.
+4. Разрешены только `alterios_create_material_module`,
+   `alterios_create_report_tab` и `alterios_create_process_flow`.
+5. Generic REST, security и destructive writes через fast-live недоступны.
+6. Добавлены отдельные fast-live workflows для bulk manual script и BPMN
+   process; оба используют cached health, точный список выбранных ID, plan/apply
+   и построчный readback.
+7. Destructive bulk delete вынесен в отдельный admin-only workflow с
+   `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`, `allow_destructive=true` и проверкой
+   отсутствия каждой удаленной записи.
+8. Process inventory для `alterios_runtime_info(include_processes=true)` теперь
+   использует фильтрованный Windows scan и общий TTL cache с forced refresh.
+
+Архитектурная оптимизация:
+
+1. Выполнено: `server.py` стал точкой сборки меньше 500 строк; registration,
+   scenarios, builders и validators разделены по доменным модулям. Публичные
+   имена, JSON-схемы аргументов и профили зафиксированы golden snapshot.
+2. Отложено: lazy imports будут рассматриваться только после замера startup time.
+3. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
+   каждого нового паттерна остаются отдельным этапом.
+4. Истинный backend incremental scan без полного project read требует надежных
+   `updatedAt`/version-маркеров Alterios для всех проверяемых сущностей.

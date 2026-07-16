@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
-from alterios_mcp import server
+import pytest
+
+from alterios_mcp import project_health, server
 from alterios_mcp.deep_inventory import build_deep_inventory
 from alterios_mcp.project_health import (
     build_health_snapshot,
     build_project_health,
     diff_snapshots,
     load_latest_snapshot,
+    resolve_cache_ttl_seconds,
     save_snapshot,
 )
 
@@ -39,6 +44,19 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
                                             "title": "Run missing script",
                                             "actions": [{"type": "manual_script", "scriptId": "missing-script"}],
                                         },
+                                        {
+                                            "title": "Run with empty binding",
+                                            "actions": [
+                                                {
+                                                    "type": "manual_script",
+                                                    "scriptId": "script-existing",
+                                                    "argumentsConfig": {
+                                                        "type": "context",
+                                                        "args": {"contentId": {}},
+                                                    },
+                                                }
+                                            ],
+                                        },
                                     ],
                                 },
                                 {
@@ -54,7 +72,15 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
             ],
         }
     ]
-    scripts = [{"_id": "script-existing", "name": "Existing", "type": "manual", "body": script_body}]
+    scripts = [
+        {
+            "_id": "script-existing",
+            "name": "Existing",
+            "type": "manual",
+            "body": script_body,
+            "config": {"arguments": [{"key": "contentId"}]},
+        }
+    ]
     diagrams = [
         {
             "_id": "diagram-1",
@@ -74,7 +100,7 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
         scripts=scripts,
         diagrams=diagrams,
         groups=[],
-        profile="artx",
+        profile="secondary",
         project_id="project-1",
         generated_at="2026-07-10T00:00:00Z",
     )
@@ -114,6 +140,7 @@ def test_project_health_detects_prewrite_risks() -> None:
     assert codes["missing_report_ref"] == 1
     assert codes["missing_form_action_target"] == 1
     assert codes["missing_form_script_ref"] == 1
+    assert codes["manual_script_empty_argument_binding"] == 1
     assert codes["missing_bpmn_form_key"] == 1
     assert codes["bpmn_parse_error"] == 1
     assert codes["report_layout_issues"] == 1
@@ -135,13 +162,13 @@ def test_project_health_diff_detects_changed_script() -> None:
 def test_project_health_cache_roundtrip_and_server_tool(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
     written = save_snapshot(_snapshot())
-    loaded = load_latest_snapshot(profile="artx", project_id="project-1")
+    loaded = load_latest_snapshot(profile="secondary", project_id="project-1")
 
     assert loaded is not None
     assert Path(tmp_path, written["latest_path"]).exists()
 
     result = server.alterios_project_health(
-        profile="artx",
+        profile="secondary",
         project_id="project-1",
         refresh=False,
         use_cache=True,
@@ -151,3 +178,68 @@ def test_project_health_cache_roundtrip_and_server_tool(tmp_path, monkeypatch) -
     assert result["source"] == "cache"
     assert result["readonly"] is True
     assert result["summary"]["issue_count"] >= 1
+
+
+def test_project_health_expired_cache_refreshes_live_and_persists_diff(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    save_snapshot(_snapshot(script_body="noop();"))
+    latest = tmp_path / "inventories" / "secondary" / "project-1" / "latest.json"
+    expired_at = time.time() - 600
+    os.utime(latest, (expired_at, expired_at))
+    monkeypatch.setattr(
+        project_health,
+        "collect_live_health_inventory",
+        lambda **kwargs: _snapshot(script_body="updateContent({});"),
+    )
+
+    result = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        cache_ttl_seconds=60,
+    )
+
+    assert result["source"] == "live"
+    assert result["cache"]["fresh"] is False
+    assert result["cache"]["refresh_reason"] == "cache_expired"
+    assert result["diff"]["available"] is True
+    assert result["diff"]["entities"]["scripts"]["changed"] == 1
+    assert Path(tmp_path, result["diff_cache_write"]["latest_path"]).exists()
+
+
+def test_project_health_cache_hit_restores_persisted_diff(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    save_snapshot(_snapshot(script_body="noop();"))
+    monkeypatch.setattr(
+        project_health,
+        "collect_live_health_inventory",
+        lambda **kwargs: _snapshot(script_body="updateContent({});"),
+    )
+    refreshed = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        refresh=True,
+        cache_ttl_seconds=300,
+    )
+
+    cached = project_health.run_project_health(
+        profile="secondary",
+        project_id="project-1",
+        cache_ttl_seconds=300,
+        write_cache=False,
+    )
+
+    assert refreshed["diff"]["changed"] is True
+    assert cached["source"] == "cache"
+    assert cached["cache"]["hit"] is True
+    assert cached["diff_cache"]["hit"] is True
+    assert cached["diff"]["changed"] is True
+    assert cached["summary"]["previous_fingerprint"] == refreshed["summary"]["previous_fingerprint"]
+
+
+def test_project_health_cache_ttl_validation(monkeypatch) -> None:
+    monkeypatch.setenv("ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS", "45")
+
+    assert resolve_cache_ttl_seconds() == 45
+    assert resolve_cache_ttl_seconds(0) == 0
+    with pytest.raises(ValueError, match="non-negative"):
+        resolve_cache_ttl_seconds(-1)

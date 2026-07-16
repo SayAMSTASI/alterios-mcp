@@ -56,6 +56,11 @@ Dangerous execution требует все обычные write gates плюс:
 Dry-run и `alterios_write_safety_preflight` доступны без этих gates, поэтому
 target IDs и route classification можно проверить до выполнения.
 
+Для массового удаления content rows generic `alterios_call_write_service` не
+используется. Применяется `alterios_fast_live_bulk_delete`: точные IDs,
+`expected_count` и `expected_content_type_id` сохраняются в dry-run плане,
+apply сверяет `plan_id`, а readback подтверждает отсутствие каждой записи.
+
 ## Форма audit
 
 Каждая controlled write возвращает:
@@ -125,7 +130,7 @@ rollback/readback plan и отдельной проверки.
 - user-group create/update/delete live-verified с dry-run, dangerous gates,
   live execution, delete readback и cleanup scan;
 - disposable user create/delete live-verified через UI: форма требует `ownerId`,
-  после выбора владельца `ArtX` создается disabled user, delete выполняется из
+  после выбора целевого владельца создается disabled user, delete выполняется из
   row menu, cleanup API readback возвращает `remaining_matches=0`;
 - content type publication flags live-verified через `/api/content-types/save`;
 - cross-project content type transfer имеет route evidence:

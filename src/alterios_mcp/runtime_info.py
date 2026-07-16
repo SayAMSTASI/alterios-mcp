@@ -8,6 +8,9 @@ import re
 import signal
 import subprocess
 import sys
+import threading
+import time
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,12 +20,15 @@ from .ux_contract import UX_CONTRACT_VERSION
 
 
 PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-MCP_TOOL_SCHEMA_VERSION = "2026-07-16.1"
+MCP_TOOL_SCHEMA_VERSION = "2026-07-16.8"
+DEFAULT_PROCESS_CACHE_TTL_SECONDS = 15
 ALTERIOS_MCP_COMMAND_RE = re.compile(
     r"(?:^|[\\/\s\"'])alterios-mcp(?:\.exe)?(?:$|[\s\"'])|-m\s+alterios_mcp\.server",
     re.IGNORECASE,
 )
 RUNTIME_INFO_COMMAND_RE = re.compile(r"alterios-runtime-info|runtime_info", re.IGNORECASE)
+_PROCESS_SNAPSHOT_LOCK = threading.Lock()
+_PROCESS_SNAPSHOT_CACHE: dict[str, Any] = {}
 
 
 def build_runtime_fingerprint(
@@ -76,6 +82,7 @@ def collect_alterios_mcp_processes() -> list[dict[str, Any]]:
         processes.append(
             {
                 "pid": pid,
+                "parent_pid": _coerce_int(row.get("parent_pid")),
                 "name": row.get("name"),
                 "created_at": row.get("created_at"),
                 "command": _redact_process_command(command_line),
@@ -83,6 +90,97 @@ def collect_alterios_mcp_processes() -> list[dict[str, Any]]:
             }
         )
     return sorted(processes, key=_process_sort_key, reverse=True)
+
+
+def collect_alterios_mcp_instances(processes: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Group launcher/python process rows into logical Alterios MCP server instances."""
+    process_list = list(processes if processes is not None else collect_alterios_mcp_processes())
+    by_pid = {process.get("pid"): process for process in process_list if process.get("pid") is not None}
+
+    def root_pid_for(process: dict[str, Any]) -> int | None:
+        pid = _coerce_int(process.get("pid"))
+        current = process
+        seen: set[int] = set()
+        while current.get("parent_pid") in by_pid:
+            parent_pid = int(current["parent_pid"])
+            if parent_pid in seen:
+                break
+            seen.add(parent_pid)
+            current = by_pid[parent_pid]
+        return _coerce_int(current.get("pid")) or pid
+
+    grouped: dict[int | None, list[dict[str, Any]]] = {}
+    for process in process_list:
+        grouped.setdefault(root_pid_for(process), []).append(process)
+
+    instances: list[dict[str, Any]] = []
+    for root_pid, items in grouped.items():
+        sorted_items = sorted(items, key=_process_sort_key, reverse=True)
+        root = by_pid.get(root_pid) or sorted_items[-1]
+        instances.append(
+            {
+                "root_pid": root_pid,
+                "created_at": root.get("created_at"),
+                "process_count": len(sorted_items),
+                "current_process": any(item.get("current_process") for item in sorted_items),
+                "processes": sorted_items,
+            }
+        )
+    return sorted(instances, key=_instance_sort_key, reverse=True)
+
+
+def collect_alterios_mcp_process_snapshot(
+    *,
+    refresh: bool = False,
+    cache_ttl_seconds: int | None = None,
+) -> dict[str, Any]:
+    """Return one TTL-cached process/instance scan shared by runtime checks."""
+    ttl = DEFAULT_PROCESS_CACHE_TTL_SECONDS if cache_ttl_seconds is None else int(cache_ttl_seconds)
+    if ttl < 0:
+        raise ValueError("cache_ttl_seconds must be >= 0.")
+    with _PROCESS_SNAPSHOT_LOCK:
+        now = time.monotonic()
+        captured_at = float(_PROCESS_SNAPSHOT_CACHE.get("captured_at_monotonic") or 0.0)
+        age = max(0.0, now - captured_at) if captured_at else None
+        if not refresh and ttl > 0 and captured_at and age is not None and age <= ttl:
+            cached = deepcopy(_PROCESS_SNAPSHOT_CACHE["snapshot"])
+            cached["cache"] = {
+                "hit": True,
+                "ttl_seconds": ttl,
+                "age_seconds": round(age, 3),
+                "scan_duration_ms": cached.get("cache", {}).get("scan_duration_ms"),
+            }
+            return cached
+
+        started = time.perf_counter()
+        processes = collect_alterios_mcp_processes()
+        instances = collect_alterios_mcp_instances(processes)
+        scan_duration_ms = round((time.perf_counter() - started) * 1000, 1)
+        snapshot = {
+            "processes": processes,
+            "instances": instances,
+            "cache": {
+                "hit": False,
+                "ttl_seconds": ttl,
+                "age_seconds": 0.0,
+                "scan_duration_ms": scan_duration_ms,
+            },
+        }
+        if ttl > 0:
+            _PROCESS_SNAPSHOT_CACHE.clear()
+            _PROCESS_SNAPSHOT_CACHE.update(
+                {
+                    "captured_at_monotonic": time.monotonic(),
+                    "snapshot": deepcopy(snapshot),
+                }
+            )
+        return snapshot
+
+
+def clear_process_snapshot_cache() -> None:
+    """Clear the local process snapshot cache for tests and forced diagnostics."""
+    with _PROCESS_SNAPSHOT_LOCK:
+        _PROCESS_SNAPSHOT_CACHE.clear()
 
 
 def cleanup_alterios_mcp_processes(
@@ -94,17 +192,18 @@ def cleanup_alterios_mcp_processes(
         raise ValueError("keep_newest must be >= 0.")
     processes = collect_alterios_mcp_processes()
     current_pid = os.getpid()
-    kept = processes[:keep_newest]
+    instances = collect_alterios_mcp_instances(processes)
+    kept = instances[:keep_newest]
     candidates = [
-        process
-        for process in processes[keep_newest:]
-        if process.get("pid") is not None and process.get("pid") != current_pid
+        instance
+        for instance in instances[keep_newest:]
+        if instance.get("root_pid") is not None and instance.get("root_pid") != current_pid
     ]
     stopped: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     if not dry_run:
         for process in candidates:
-            pid = int(process["pid"])
+            pid = int(process["root_pid"])
             try:
                 _terminate_process(pid)
                 stopped.append(process)
@@ -114,6 +213,7 @@ def cleanup_alterios_mcp_processes(
         "dry_run": dry_run,
         "keep_newest": keep_newest,
         "process_count": len(processes),
+        "instance_count": len(instances),
         "kept": kept,
         "planned_stop": candidates,
         "stopped": stopped,
@@ -143,8 +243,8 @@ def _process_rows() -> list[dict[str, Any]]:
 
 def _windows_process_rows() -> list[dict[str, Any]]:
     command = (
-        "Get-CimInstance Win32_Process | "
-        "Select-Object ProcessId,Name,CreationDate,CommandLine | "
+        "Get-CimInstance Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe' OR Name='alterios-mcp.exe'\" | "
+        "Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | "
         "ConvertTo-Json -Depth 3 -Compress"
     )
     completed = subprocess.run(
@@ -167,6 +267,7 @@ def _windows_process_rows() -> list[dict[str, Any]]:
         rows.append(
             {
                 "pid": item.get("ProcessId"),
+                "parent_pid": item.get("ParentProcessId"),
                 "name": item.get("Name"),
                 "created_at": item.get("CreationDate"),
                 "command_line": item.get("CommandLine"),
@@ -177,7 +278,7 @@ def _windows_process_rows() -> list[dict[str, Any]]:
 
 def _posix_process_rows() -> list[dict[str, Any]]:
     completed = subprocess.run(
-        ["ps", "-eo", "pid=,comm=,lstart=,args="],
+        ["ps", "-eo", "pid=,ppid=,comm=,lstart=,args="],
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -187,15 +288,16 @@ def _posix_process_rows() -> list[dict[str, Any]]:
     )
     rows: list[dict[str, Any]] = []
     for line in completed.stdout.splitlines():
-        parts = line.strip().split(None, 7)
-        if len(parts) < 8:
+        parts = line.strip().split(None, 8)
+        if len(parts) < 9:
             continue
         rows.append(
             {
                 "pid": parts[0],
-                "name": parts[1],
-                "created_at": " ".join(parts[2:7]),
-                "command_line": parts[7],
+                "parent_pid": parts[1],
+                "name": parts[2],
+                "created_at": " ".join(parts[3:8]),
+                "command_line": parts[8],
             }
         )
     return rows
@@ -229,10 +331,14 @@ def _process_sort_key(process: dict[str, Any]) -> tuple[str, int]:
     return (str(process.get("created_at") or ""), int(process.get("pid") or 0))
 
 
+def _instance_sort_key(instance: dict[str, Any]) -> tuple[str, int]:
+    return (str(instance.get("created_at") or ""), int(instance.get("root_pid") or 0))
+
+
 def _terminate_process(pid: int) -> None:
     if os.name == "nt":
         subprocess.run(
-            ["taskkill", "/PID", str(pid), "/F"],
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -312,12 +418,16 @@ def main() -> None:
     args = parser.parse_args()
     payload = build_runtime_fingerprint()
     if args.processes or args.cleanup_stale:
+        snapshot = collect_alterios_mcp_process_snapshot(refresh=True)
         payload["process_hygiene"] = cleanup_alterios_mcp_processes(
             keep_newest=args.keep_newest,
             dry_run=not args.apply,
         ) if args.cleanup_stale else {
-            "process_count": len(collect_alterios_mcp_processes()),
-            "processes": collect_alterios_mcp_processes(),
+            "process_count": len(snapshot["processes"]),
+            "instance_count": len(snapshot["instances"]),
+            "processes": snapshot["processes"],
+            "instances": snapshot["instances"],
+            "cache": snapshot["cache"],
         }
     print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None))
 

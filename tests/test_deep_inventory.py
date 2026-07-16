@@ -100,6 +100,13 @@ def test_deep_inventory_links_forms_scripts_bpmn_and_icons() -> None:
     assert forms_inventory["totals"]["action_types"]["save_submit"] == 1
     assert linkage["totals"]["form_script_links"] == 1
     assert linkage["form_script_links"][0]["script_match"]["script_id"] == "script-1"
+    assert linkage["form_script_links"][0]["argument_bindings"] == {"contentId": "openId"}
+    assert linkage["form_script_links"][0]["argument_contract"] == {
+        "ok": True,
+        "bindings": {"contentId": "openId"},
+        "declared_arguments": ["contentId"],
+        "issues": [],
+    }
     assert linkage["totals"]["user_task_form_links"] == 1
     assert linkage["user_task_form_links"][0]["form_match"]["form_id"] == "form-main"
     assert linkage["totals"]["service_calls"]["createContent"] == 1
@@ -175,6 +182,55 @@ def test_deep_inventory_flattens_nested_row_menu_actions() -> None:
     assert actions[1]["default"] is True
     assert actions[1]["target_form_id"] == "form-view"
     assert actions[2]["category"] == "delete"
+
+
+def test_deep_inventory_flags_empty_manual_script_argument_binding() -> None:
+    result = build_deep_inventory(
+        forms=[
+            {
+                "_id": "form-1",
+                "name": "Form",
+                "pageTitle": "Form",
+                "tabs": [{"rows": [{"cells": [{"type": "field"}]}]}],
+                "formActionContainers": [
+                    {
+                        "type": "action",
+                        "title": "Run",
+                        "actions": [
+                            {
+                                "_id": "script-1",
+                                "name": "Script",
+                                "type": "manual_script",
+                                "argumentsConfig": {
+                                    "type": "context",
+                                    "args": {"contentId": {}},
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+        scripts=[
+            {
+                "_id": "script-1",
+                "name": "Script",
+                "type": "manual",
+                "active": True,
+                "config": {"arguments": [{"key": "contentId"}]},
+            }
+        ],
+        diagrams=[],
+        groups=[],
+        profile="test",
+        project_id="project-1",
+        generated_at="2026-07-10T00:00:00+00:00",
+    )
+
+    link = result["script_bpmn_linkage"]["form_script_links"][0]
+    assert link["argument_bindings"] == {"contentId": None}
+    assert link["argument_contract"]["ok"] is False
+    assert link["argument_contract"]["issues"][0]["code"] == "manual_script_empty_argument_binding"
 
 
 def test_deep_inventory_does_not_export_script_body_or_api_key() -> None:

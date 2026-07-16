@@ -21,11 +21,16 @@ For scenario apply, do not let code, skills, and the running MCP drift apart:
 
 - read `alterios_runtime_info` and block writes when `stale=true`;
 - preserve the reviewed runtime fingerprint between dry-run and apply;
-- require `delivery_evidence.work_item_ref`, at least one
-  `agent_handoff_refs` entry, and the current `ux_contract_version`;
+- verify `delivery_evidence.work_item_ref` and every `agent_handoff_refs` entry
+  against private Gitea; require structured analyst, implementer, and verifier
+  comments plus the current `ux_contract_version`;
+- reject closed/missing work items, mismatched issue references, incomplete
+  handoff sections, and missing required roles;
 - use `alterios_ux_contract` as the machine-readable source of blocking form
   issue codes;
 - require the same evidence in the saved dry-run plan and apply request.
+- use `ALTERIOS_MCP_TOOL_PROFILE=live` for normal scenario work; restricted
+  profiles must not expose generic REST/script write escape hatches.
 
 For material-module write scenarios, enforce the configured UX contract:
 
@@ -50,6 +55,23 @@ For script write scenarios:
 - keep new `web` and `cron` research scripts inactive until endpoint/schedule behavior is explicitly approved and verified;
 - `library` scripts are linked from consumer scripts through `librariesIds`; use global functions/constants for shared helpers unless live runtime evidence proves a different module format;
 - manual execution uses `/api/scripts/execute-manual` with a saved script UUID, not runtime service names.
+- configure a manual script in a form through
+  `alterios_upsert_form_manual_script_action`, not an unvalidated raw form patch;
+- select `page`, `element`, or `value` scope explicitly. For row values, keep
+  the action in the existing menu or provide the project-local menu icon;
+- pass semantic `argument_entity_ids` for joined records and let the tool
+  resolve the actual populated `_idN` field. Never infer `_idN` from join order;
+- require `action_view_entity_id` when a row action binds `__entity_id` and use
+  `save_before_execute=true` when the script must see freshly saved form data.
+- For selected-row side effects, use `alterios_fast_live_bulk_manual_script` or
+  `alterios_fast_live_bulk_process`; require exact IDs, expected count, cached
+  project health, a reviewed plan, and per-row readback.
+- Never route destructive selected-row work through a generic service tool.
+  Use `alterios_fast_live_bulk_delete` in `full/admin`; require expected content
+  type, matching plan, dangerous environment gate, `allow_destructive=true`,
+  and absence readback for every target. Pass a saved active `manual` delete
+  script UUID that declares one `contentIds` argument; the reviewed plan freezes
+  the script fingerprint and executes it through `/api/scripts/execute-manual`.
 
 For view write scenarios:
 

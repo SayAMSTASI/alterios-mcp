@@ -22,7 +22,7 @@ Use this skill before building or changing Alterios modules when the request is 
    - scripts, BPMN user tasks, script tasks, listeners, services, args, and side effects;
    - reports, Project Database source views, openId/current-record context, layout/render risks;
    - users, groups, roles, menu groups, icons, and action placement.
-6. For any planned live write, require `alterios_project_health` first. Continue only when health has no blocking errors for the affected forms/views/scripts/BPMN/reports.
+6. For any planned live write, require `alterios_live_task_preflight` first. Continue only when it returns `summary.status=ready`; use `alterios_project_health` as the detailed forms/views/scripts/BPMN/reports diagnostic inside or after the preflight.
 7. Hand off scoped work to PM, Data Model, View Builder, Form Surface, Script/BPMN, Report, Write Tool, Documentation Scribe, and Safety Verifier agents.
 
 ## View Requirements

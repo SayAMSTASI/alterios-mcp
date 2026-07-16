@@ -40,17 +40,17 @@ def test_encode_filter_is_stable_url_encoded_json() -> None:
 
 
 def test_discovery_cli_lists_profiles_without_network(monkeypatch, capsys) -> None:
-    monkeypatch.setenv("ALTERIOS_PROFILE", "vniimt")
-    monkeypatch.setenv("ALTERIOS_PROFILES", "vniimt, artx")
-    monkeypatch.setenv("ALTERIOS_VNIIMT_BASE_URL", "https://vniimt.example")
-    monkeypatch.setenv("ALTERIOS_VNIIMT_API_TOKEN", "vniimt-token")
-    monkeypatch.setenv("ALTERIOS_ARTX_BASE_URL", "http://artx.local")
-    monkeypatch.setenv("ALTERIOS_ARTX_API_TOKEN", "artx-token")
+    monkeypatch.setenv("ALTERIOS_PROFILE", "primary")
+    monkeypatch.setenv("ALTERIOS_PROFILES", "primary, secondary")
+    monkeypatch.setenv("ALTERIOS_PRIMARY_BASE_URL", "https://primary.example")
+    monkeypatch.setenv("ALTERIOS_PRIMARY_API_TOKEN", "primary-token")
+    monkeypatch.setenv("ALTERIOS_SECONDARY_BASE_URL", "http://secondary.local")
+    monkeypatch.setenv("ALTERIOS_SECONDARY_API_TOKEN", "secondary-token")
 
-    assert main(["--profiles", "--profile", "artx", "--json"]) == 0
+    assert main(["--profiles", "--profile", "secondary", "--json"]) == 0
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["selected_profile"] == "artx"
-    assert [item["profile"] for item in payload["profiles"]] == ["artx", "vniimt"]
+    assert payload["selected_profile"] == "secondary"
+    assert [item["profile"] for item in payload["profiles"]] == ["secondary", "primary"]
     assert payload["profiles"][0]["selected"] is True
     assert payload["profiles"][0]["config"]["api_token"] == "<set>"

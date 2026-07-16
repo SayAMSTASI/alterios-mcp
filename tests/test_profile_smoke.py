@@ -14,11 +14,11 @@ def test_profile_smoke_counts_projects_and_omits_names_by_default(monkeypatch) -
             "profile_count": 1,
             "profiles": [
                 {
-                    "profile": "artx",
-                    "profile_argument": "artx",
+                    "profile": "secondary",
+                    "profile_argument": "secondary",
                     "selected": True,
                     "config": {
-                        "profile": "artx",
+                        "profile": "secondary",
                         "base_url": "https://lims.example/path",
                         "api_token": "<set>",
                         "project_id": "project-1",
@@ -57,7 +57,7 @@ def test_profile_smoke_counts_projects_and_omits_names_by_default(monkeypatch) -
         },
     )
 
-    matrix = profile_smoke.run_profile_smoke(selected_profile="artx")
+    matrix = profile_smoke.run_profile_smoke(selected_profile="secondary")
 
     assert matrix["summary"]["project_count_total"] == 1
     assert matrix["summary"]["default_project_discovery_ok"] == 1

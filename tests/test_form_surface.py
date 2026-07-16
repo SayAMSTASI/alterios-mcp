@@ -4,14 +4,28 @@ import json
 
 import pytest
 
+from alterios_mcp import server
 from alterios_mcp.form_surface import analyze_form_surface, main
+
+
+def test_validate_form_contract_tool_is_strict_alias() -> None:
+    form = {"name": "Records", "tabs": []}
+
+    analyzed = server.alterios_analyze_form_surface(form=form)
+    validated = server.alterios_validate_form_contract(form=form)
+
+    assert analyzed["surface"]["validation_profile"] == "default"
+    assert analyzed["surface"]["ok"] is True
+    assert validated["surface"]["validation_profile"] == "contract"
+    assert validated["surface"]["ok"] is False
+    assert validated["surface"]["blocking_issues_by_code"] == {"missing_page_title": 1}
 
 
 def test_form_surface_accepts_clean_view_row() -> None:
     form = {
         "_id": "form-1",
-        "name": "MCP Practice",
-        "pageTitle": "MCP Practice",
+        "name": "Sample Module",
+        "pageTitle": "Sample Module",
         "tabs": [
             {
                 "title": "List",
@@ -721,7 +735,7 @@ def test_form_surface_contract_profile_blocks_confirmed_warning_codes() -> None:
                                 "type": "view_data",
                                 "styles": {"width": "100%"},
                                 "header": {"title": "Details"},
-                                "params": {"viewId": "view-1"},
+                                "params": {"viewId": "view-1", "openId": True},
                                 "displaying": {
                                     "fields": {
                                         "title": {
@@ -750,7 +764,7 @@ def test_form_surface_contract_profile_blocks_confirmed_warning_codes() -> None:
                                     "title": "Rows",
                                     "styles": {"textAlign": "left", "fontWeight": "400"},
                                 },
-                                "params": {"viewId": "view-2"},
+                                "params": {"viewId": "view-2", "openId": True},
                                 "displaying": {"fields": {"title": {"hidden": False}}},
                             }
                         ]
@@ -886,6 +900,11 @@ def test_form_surface_allows_editable_view_data_on_submit_enabled_edit_form() ->
         ],
         "formActionContainers": [
             {
+                "title": "Close",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            },
+            {
                 "title": "Save",
                 "iconId": "save",
                 "actions": [{"type": "data_managing", "dataManagingType": "submit_all"}],
@@ -897,6 +916,446 @@ def test_form_surface_allows_editable_view_data_on_submit_enabled_edit_form() ->
 
     assert result["ok"] is True
     assert "view_detail_view_data_must_be_readonly" not in result["issues_by_code"]
+
+
+def test_form_surface_contract_blocks_embedded_view_without_filter_or_context() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"embedded_view_missing_filter_or_context": 1}
+
+
+def test_form_surface_contract_accepts_field_filter_and_hidden_technical_ids() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {
+                                    "fields": {
+                                        "title": {
+                                            "hidden": False,
+                                            "filter": {"mode": "standard", "enabled": True},
+                                        },
+                                        "_id": {"hidden": True},
+                                        "contentId": {"hidden": "true"},
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["ok"] is True
+    assert "embedded_view_missing_filter_or_context" not in result["issues_by_code"]
+    assert "technical_list_field_must_be_hidden" not in result["issues_by_code"]
+
+
+def test_form_surface_contract_blocks_visible_technical_list_fields() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {
+                                    "fields": {
+                                        "title": {"hidden": False},
+                                        "_id": {},
+                                        "_id0": {"hidden": False},
+                                        "contentId": {"hidden": False},
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"technical_list_field_must_be_hidden": 3}
+
+
+def test_form_surface_contract_blocks_direct_list_row_actions() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "action",
+                                        "title": "Edit",
+                                        "iconId": "edit",
+                                        "actions": [{"type": "forms"}],
+                                    },
+                                    {
+                                        "type": "action",
+                                        "title": "View",
+                                        "iconId": "preview",
+                                        "actions": [{"type": "forms"}],
+                                    },
+                                    {
+                                        "type": "action",
+                                        "title": "Delete",
+                                        "iconId": "delete",
+                                        "actions": [{"type": "delete_contents"}],
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"list_row_actions_must_be_menu": 1}
+
+
+def test_form_surface_contract_blocks_incomplete_list_row_menu() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "iconId": "more_vert",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "View",
+                                                "iconId": "preview",
+                                                "default": True,
+                                                "actions": [{"type": "forms"}],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"list_row_menu_actions_missing": 1}
+
+
+def test_form_surface_contract_blocks_row_menu_without_default_view() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "iconId": "more_vert",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Edit",
+                                                "iconId": "edit",
+                                                "actions": [{"type": "forms"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "View",
+                                                "iconId": "preview",
+                                                "actions": [{"type": "forms"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "Delete",
+                                                "iconId": "delete",
+                                                "actions": [{"type": "delete_contents"}],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"row_menu_default_view_missing": 1}
+
+
+def test_form_surface_contract_blocks_list_row_action_without_icon() -> None:
+    form = {
+        "name": "Records",
+        "pageTitle": "Records",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "valueActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "iconId": "more_vert",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Edit",
+                                                "actions": [{"type": "forms"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "View",
+                                                "iconId": "preview",
+                                                "default": True,
+                                                "actions": [{"type": "forms"}],
+                                            },
+                                            {
+                                                "type": "action",
+                                                "title": "Delete",
+                                                "iconId": "delete",
+                                                "actions": [{"type": "delete_contents"}],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"list_row_action_icon_missing": 1}
+
+
+def test_form_surface_contract_blocks_report_form_action_not_opened_in_new_tab() -> None:
+    form = {
+        "name": "Direction panel",
+        "pageTitle": "Direction panel",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "cellActionContainers": [
+                                    {
+                                        "type": "menu",
+                                        "title": "",
+                                        "tooltip": "Reports",
+                                        "iconId": "arrow_drop_down",
+                                        "actions": [],
+                                        "containers": [
+                                            {
+                                                "type": "action",
+                                                "title": "Report",
+                                                "iconId": "print",
+                                                "actions": [
+                                                    {
+                                                        "name": "Printable report",
+                                                        "type": "forms",
+                                                        "openInDialog": True,
+                                                        "openInNewTab": False,
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "formActionContainers": [
+            {
+                "title": "Close",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"report_or_analytics_form_should_open_new_tab": 1}
+
+
+def test_form_surface_contract_blocks_report_target_without_close() -> None:
+    form = {
+        "name": "Printable record",
+        "pageTitle": "Printable record",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "report",
+                                "styles": {"width": "100%"},
+                                "params": {"reportId": "report-1", "openId": True},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"report_or_analytics_target_missing_close": 1}
+
+
+def test_form_surface_contract_blocks_missing_page_title() -> None:
+    form = {"name": "Records", "tabs": []}
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"missing_page_title": 1}
+
+
+def test_form_surface_contract_blocks_add_edit_page_action_order() -> None:
+    form = {
+        "name": "Редактировать запись",
+        "pageTitle": "Редактировать запись",
+        "tabs": [],
+        "formActionContainers": [
+            {
+                "title": "Сохранить",
+                "iconId": "save",
+                "actions": [{"type": "data_managing", "dataManagingType": "submit_all"}],
+            },
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            },
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"add_edit_page_action_order": 1}
+
+
+def test_form_surface_contract_blocks_view_detail_without_close() -> None:
+    form = {
+        "name": "Просмотр записи",
+        "pageTitle": "Просмотр записи",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["blocking_issues_by_code"] == {"view_detail_close_action_missing": 1}
 
 
 @pytest.mark.parametrize("flag", ["--strict", "--contract"])
@@ -924,3 +1383,56 @@ def test_form_surface_cli_contract_flags_return_nonzero_for_contract_violation(t
     contract_output = json.loads(capsys.readouterr().out)
     assert contract_output["validation_profile"] == "contract"
     assert contract_output["blocking_issues_by_code"] == {"close_action_missing_redirect_back": 1}
+def test_strict_contract_blocks_invalid_manual_script_value_action() -> None:
+    result = analyze_form_surface(
+        {
+            "_id": "form-1",
+            "name": "Rows",
+            "pageTitle": "Rows",
+            "tabs": [
+                {
+                    "rows": [
+                        {
+                            "cells": [
+                                {
+                                    "type": "view_data_list",
+                                    "params": {"viewId": "view-1"},
+                                    "styles": {"width": "100%"},
+                                    "displaying": {"fields": {"name": {}}},
+                                    "valueActionContainers": [
+                                        {
+                                            "type": "menu",
+                                            "iconId": "menu-icon",
+                                            "containers": [
+                                                {
+                                                    "type": "action",
+                                                    "title": "Run",
+                                                    "iconId": "script-icon",
+                                                    "actions": [
+                                                        {
+                                                            "_id": "not-a-uuid",
+                                                            "name": "Script",
+                                                            "type": "manual_script",
+                                                            "argumentsConfig": {
+                                                                "type": "context",
+                                                                "args": {"contentId": {}},
+                                                            },
+                                                        }
+                                                    ],
+                                                }
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+        },
+        strict=True,
+    )
+
+    assert result["ok"] is False
+    assert result["blocking_issues_by_code"]["manual_script_id_must_be_uuid"] == 1
+    assert result["blocking_issues_by_code"]["manual_script_empty_argument_binding"] == 1

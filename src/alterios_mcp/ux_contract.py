@@ -3,15 +3,29 @@ from __future__ import annotations
 from typing import Any
 
 
-UX_CONTRACT_VERSION = "2026-07-16.1"
+UX_CONTRACT_VERSION = "2026-07-16.3"
 
 BLOCKING_FORM_ISSUE_CODES = frozenset(
     {
+        "add_edit_page_action_order",
         "close_action_missing_redirect_back",
         "element_action_title_must_be_tooltip",
+        "embedded_view_missing_filter_or_context",
         "field_footnote_requires_date",
+        "list_row_action_icon_missing",
+        "list_row_actions_must_be_menu",
+        "list_row_menu_actions_missing",
+        "manual_script_empty_argument_binding",
+        "manual_script_id_must_be_uuid",
+        "manual_script_value_entity_ambiguous",
+        "missing_page_title",
         "non_table_cell_header",
+        "report_or_analytics_form_should_open_new_tab",
+        "report_or_analytics_target_missing_close",
+        "row_menu_default_view_missing",
         "table_cell_header_style",
+        "technical_list_field_must_be_hidden",
+        "view_detail_close_action_missing",
         "view_detail_view_data_must_be_readonly",
     }
 )

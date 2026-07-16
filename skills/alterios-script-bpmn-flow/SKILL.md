@@ -19,6 +19,19 @@ Use this skill when behavior crosses forms, scripts, BPMN, tasks, and data chang
 8. For `cron`, verify `config.cron` as a six-part string: `second minute hour day month week`. Keep experimental cron scripts inactive until the schedule and side effects are approved.
 9. For `library`, verify the consumer script has `librariesIds` and that runtime-visible helpers are written as global functions/constants unless UI/API evidence proves another module format.
 10. For `web`, verify endpoint exposure separately before treating the script as callable from outside the project.
+11. For form manual-script actions, distinguish `formActionContainers` (page),
+    `cellActionContainers` (element), and `valueActionContainers` (row value).
+    Do not copy the same identifier binding between these scopes without view
+    and UI readback.
+12. Resolve joined-record identifiers from populated view fields. `_id`, `_id0`,
+    `_id5`, and similar keys are real view-field `mname` values for specific
+    `entityId` values, not stable ordinal conventions.
+13. Prefer `alterios_upsert_form_manual_script_action` over raw form JSON. Pass
+    `argument_entity_ids` when the script needs an entity from a joined view;
+    let the tool resolve the corresponding `_idN` provider key.
+14. For selected rows, use `alterios_fast_live_bulk_manual_script` or
+    `alterios_fast_live_bulk_process`. Do not loop generic MCP calls manually:
+    the workflow must freeze target IDs in a plan and journal partial failures.
 
 ## Safety
 
@@ -30,6 +43,19 @@ Use this skill when behavior crosses forms, scripts, BPMN, tasks, and data chang
 ## Args Checklist
 
 - `manual_script` action: saved script UUID, action args, current record context, save order if fresh data is required.
+- Manual form action contract: `argumentsConfig.type=context` and
+  `argumentsConfig.args.<argument>.dataProviderKey=<provider>`.
+- `__entity_id`: current action entity; for a row value action it requires an
+  explicit `action_view_entity_id` so the target row entity is unambiguous.
+- `openId`: route/open-form record context. It is not interchangeable with a
+  related row identifier.
+- `_id`/`_idN`: a populated view-field mname. Resolve it by `entityId` before
+  writing the action and keep the technical column hidden from users.
+- If the script needs a newly saved record, keep the action sequence
+  `submit_all -> manual_script -> routing/redirect`.
+- Verify that the script is `type=manual`, active, and that the binding keys are
+  compatible with `script.config.arguments`. Extra or omitted declared keys are
+  review warnings; an empty binding or missing view provider is blocking.
 - Saved script metadata: `type`, `active`, `config.cron`, `config.arguments`, `librariesIds`, `share`, body marker, and expected side effects.
 - UI `start_process` action: diagram/process target, content/current record context, form params, expected userTask/formKey.
 - Runtime `startProcess` service: service-call payload inside script code, cataloged risk, and service readback.

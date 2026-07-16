@@ -26,7 +26,20 @@
 - PID и время старта текущего процесса;
 - признак `stale`;
 - список локальных процессов, похожих на `alterios-mcp`;
-- количество дубликатов.
+- `instance_count`: количество логических MCP-серверов после группировки
+  Windows launcher/python child;
+- количество дубликатов MCP instances.
+
+На Windows один нормальный MCP запуск может отображаться несколькими
+OS-процессами: `alterios-mcp.exe` launcher и дочерний `python.exe`. Для live-gate
+важен не сырой `process_count`, а `instance_count` и `duplicate_instance_count`.
+
+MCP-вызов `alterios_runtime_info(include_processes=true)` использует общий
+process snapshot с TTL 15 секунд. Повторные runtime/preflight проверки внутри
+TTL не запускают новый Windows CIM scan. Для принудительной диагностики
+передайте `refresh_processes=true`; TTL меняется через
+`process_cache_ttl_seconds`. Если нужен только итоговый счетчик без списков
+процессов, передайте `include_process_details=false`.
 
 ## Очистить старые процессы
 
@@ -54,16 +67,51 @@
 .\.venv\Scripts\alterios-replay-smoke.exe --json
 ```
 
+## Быстрый live-preflight
+
+Для обычной бизнесовой разработки запускайте MCP с
+`ALTERIOS_MCP_TOOL_PROFILE=live`. Активный реестр проверяйте через
+`alterios_tool_profile`; смена профиля требует перезапуска процесса.
+
+Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
+дубликаты MCP instances, project health, replay smoke и наличие приватной
+delivery evidence в единый результат `ready/blocked`:
+
+```powershell
+.\.venv\Scripts\python.exe -m alterios_mcp.live_task_preflight `
+  --profile <profile> `
+  --project-id <project-id> `
+  --scenario-tool alterios_create_material_module `
+  --work-item-ref <private-task-ref> `
+  --agent-handoff-ref <private-handoff-ref> `
+  --pretty
+```
+
+Для типового записывающего сценария используйте `alterios_fast_live_write`.
+Он объединяет preflight и сценарный dry-run/apply, но сохраняет обязательную
+двухфазность: первый вызов возвращает `plan_id`, второй применяет тот же план.
+Полный replay smoke по умолчанию не повторяется на каждой операции; его нужно
+запускать после обновления MCP или явно включать через `include_replay_smoke=true`.
+
+Project health использует только свежий cache. Стандартный TTL равен 300
+секундам и настраивается через `ALTERIOS_MCP_HEALTH_CACHE_TTL_SECONDS` либо
+`health_cache_ttl_seconds`. Просроченный snapshot используется как база diff,
+после чего выполняется live refresh.
+
 ## Правило для live-записи
 
 Для сценарных write-tools `alterios_create_material_module`,
 `alterios_create_report_tab` и `alterios_create_process_flow` перед apply нужен
-свежий `alterios_runtime_info`:
+успешный `alterios_live_task_preflight`:
 
 - `stale=false`;
 - `matches_expected=true`, если передан expected fingerprint;
-- `duplicate_process_count=0`;
-- `ux_contract_version` соответствует активному `alterios_ux_contract`.
+- `duplicate_instance_count=0`;
+- `ux_contract_version` соответствует активному `alterios_ux_contract`;
+- `project_health` не содержит blockers;
+- private Gitea issue существует и открыт;
+- handoff-комментарии аналитика, исполнителя и тестировщика прошли
+  `alterios_verify_delivery_evidence`.
 
 Если эти условия не выполнены, сначала очистите runtime и только потом
 повторяйте dry-run/apply.
