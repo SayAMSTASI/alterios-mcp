@@ -1,130 +1,307 @@
 # Обнаружение UI/HAR-сценариев Alterios
 
-Этап 5 фиксирует, как веб-интерфейс Alterios реально обращается к backend до
-добавления новых typed write tools. Первый готовый слой - локальный анализатор
-HAR или JSON-снимков сетевых вызовов. Это read-only инструмент: он сам не
-открывает браузер, не вызывает Alterios и не выполняет запись.
+Этап 5 фиксирует, как веб-интерфейс Alterios реально обращает…19953 tokens truncated…рмы настроек во frontend не найдено. |
+| `gantt` | experimental/v2 | live-проверен | `defaultView`, `date1`, `date2`, `plannedDate1`, `plannedDate2`, `title`, `resource`, `completion`, `showDate`, `showDuration`, `showPlannedDate`, `showResource`, `showCompletion`, `engineVersion` | Перед сохранением требовать `defaultView`, `date1.field`, `date2.field`; после сохранения проверять `get-data`. |
+| `leaflet` | experimental/v2 | UI/live-проверен | `geoFields`, `markerIcons`, `tileLayers`, `featureLayers`, `defaultMarkerSource`, `minZoom`, `maxZoom`, `engineVersion` | Сначала создать view и поля, затем сохранить `geoFields` по view-field `mname` без `field_`; `markerIcons` обязателен; для маркеров нужны GeoJSON `Feature` значения. |
+| `calendar` | experimental/v2 | UI/live-проверен | `title`, `startDate`, `endDate`, `bgColor`, `engineVersion` | Для UI-preview обязательны `title` и `startDate`; `endDate` и `bgColor` опциональны, но проверены. |
+| `table` | classic/legacy | live-проверен как исключение | settings пустой или без `engineVersion` | Создавать только при явном `allow_legacy_mode=true` и документированном evidence. |
 
-## Команда
+## Правила режимов
 
-```powershell
-python -m alterios_mcp.ui_flow .\capture.har `
-  --profile vniimt `
-  --project-id <project-id> `
-  --scenario content-form-open `
-  --json > artifacts\alterios-mcp\ui-flow-content-form-open.json
+1. Базовый режим для новых представлений - experimental/v2:
+
+```json
+{
+  "settings": {
+    "engineVersion": "v2"
+  }
+}
 ```
 
-Установленный console entrypoint делает то же самое:
+2. Если settings пустой или без `engineVersion`, MCP считает это legacy/classic.
+3. Legacy/classic нельзя создавать случайно. Для typed write нужен явный флаг
+   `allow_legacy_mode=true`.
+4. Если часть UI действительно работает только в classic/standard режиме, сначала
+   нужно получить read-only/UI/HAR evidence, затем записывать как documented exception.
+5. После изменения view одного успешного save недостаточно: обязательны populated
+   view fields и `get-data` или `get-data-simplified`.
 
-```powershell
-alterios-ui-flow .\capture.har --scenario content-form-open --json
+## Настройки форматов
+
+### Table
+
+- Минимум: `settings.engineVersion = "v2"`.
+- Для UI-save/preview в текущем frontend также нужен `settings.title` как
+  фактический `viewField.mname`, например `title_field_mname`. Mustache-шаблон
+  вида `{{field}} - {{field2}}` в этом поле дает ошибку шаблона заголовка.
+- Для joined views сначала читать реальные `viewField.mname`.
+- Для пользовательских заголовков v2 table/list/joined views задавать
+  человекочитаемый `viewField.alias`: форма берет заголовки из view field
+  alias, а не только из `displaying.fields.title`.
+- Технические `_id`, helper relation fields и пустые сервисные поля скрывать в
+  пользовательском списке.
+
+### Reference
+
+- Минимум: `settings.engineVersion = "v2"`.
+- Используется в `ref source=view`.
+- Для справочника выводить человекочитаемые поля, а не технический id.
+
+### Grid
+
+- `desc` может использоваться для описания карточки, но в form surface его
+  нужно проверять через UI: в подтвержденном проходе mname в `desc` выводился
+  как буквальный текст. Если синтаксис не подтвержден, лучше убрать `desc`,
+  чем показывать техническое имя поля пользователю.
+- `iconField` можно использовать, если иконка хранится в поле.
+- `iconWidth` и `iconHeight` задают размер иконки.
+- Данные проверяются через `get-data`; `get-data-simplified` возвращает строки без
+  headers/settings.
+
+### List
+
+- Отдельная config-форма во frontend не найдена.
+- Минимум: `settings.engineVersion = "v2"`.
+- Подходит для компактного вывода, где строка раскрывает набор полей.
+
+### Gantt
+
+Обязательные настройки:
+
+```json
+{
+  "defaultView": "month",
+  "date1": { "field": "<start-date-view-field-mname>", "offset": 0 },
+  "date2": { "field": "<end-date-view-field-mname>", "offset": 0 }
+}
 ```
 
-## Поддерживаемые входные данные
+Дополнительные настройки:
 
-- browser HAR exports с `log.entries`;
-- обычные JSON-списки событий с `method`, `url`, опциональными `headers`,
-  `body`, `status` и `response_body`;
-- один JSON-объект события для малых smoke-check.
+- `plannedDate1`, `plannedDate2` - плановые даты;
+- `title` - поле заголовка задачи;
+- `resource` - поле ресурса;
+- `completion` - поле процента/статуса выполнения;
+- `showDate`, `showDuration`, `showPlannedDate`, `showResource`, `showCompletion`.
 
-В результат попадают только маршруты `/api/...`. Статические assets и другой
-шум браузера считаются отброшенными non-API events.
+Допустимые `defaultView`: `day`, `week`, `month`, `quarter`, `year`.
 
-## Контракт результата
+### Leaflet
 
-Анализатор пишет один JSON-объект:
+Рабочий порядок:
 
-- `context` - профиль, project id, сценарий и путь к исходному файлу;
-- `flows` - упорядоченные route evidence: method, path, query keys,
-  sanitized URL, status, content type, classification, target id placeholders,
-  форма request body и форма response;
-- `summary` - число read route, write-gated route, неизвестных write-like
-  route и успешных write-like route;
-- `redaction_report` - счетчики скрытых headers, fields, query values,
-  пропущенных bodies, отброшенных non-API events и стабильных placeholders.
+1. Создать view с `format = "leaflet"` и `engineVersion = "v2"`.
+2. Привязать entity и view fields, включая persisted field типа `geo`.
+3. Прочитать populated view fields.
+4. Сохранить `settings.geoFields[]` по view-field `mname`.
+5. Проверить `get-data`.
 
-Целевые идентификаторы заменяются на стабильные placeholders вида `<id:1>`,
-чтобы сценарий оставался трассируемым без сохранения production ID.
+Минимальный рабочий фрагмент:
 
-## Правила классификации
+```json
+{
+  "geoFields": [
+    {
+      "name": "<geo-view-field-mname>",
+      "layer": null,
+      "visibleByDefault": true,
+      "markerIcons": "default"
+    }
+  ],
+  "defaultMarkerSource": "default",
+  "tileLayers": [],
+  "featureLayers": [],
+  "minZoom": 1,
+  "maxZoom": 17,
+  "engineVersion": "v2"
+}
+```
 
-Классификатор fail-closed для мутирующих HTTP-методов.
+`markerIcons` обязателен. Допустимые значения: `default`, `img`, `field`.
 
-Подтвержденные read-only routes:
+Для отображения маркеров значение persisted `geo` поля должно быть массивом
+GeoJSON `Feature`, например:
 
-- `GET|POST /api/*/listandcount`;
-- `GET /api/contents...`;
-- `POST /api/views/v2/get-data`;
-- `POST /api/views/v2/get-data-simplified`;
-- `GET /api/file/list`;
-- `GET /api/v1/comments`;
-- generic `GET`, `HEAD` и `OPTIONS`.
+```json
+[
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [37.6173, 55.7558]
+    },
+    "properties": {
+      "name": "Format probe 1"
+    }
+  }
+]
+```
 
-Write-gated routes:
+Bare geometry вида `{ "type": "Point", "coordinates": [...] }` сохраняется, но
+не дает маркеры в UI-preview.
 
-- `POST|PATCH|PUT /api/contents/save`;
-- `POST /api/file/upload/field`;
-- `POST /api/v1/comments`;
-- `POST /api/scripts/execute-manual`;
-- мутирующие маршруты `/api/tasks`, `/api/processes` и `/api/diagrams`;
-- мутирующие admin/config routes под `/api/forms`, `/api/views`,
-  `/api/scripts`, `/api/reports`, `/api/helps`, `/api/view-fields` и
-  `/api/view-entities`;
-- любой неизвестный `POST`, `PUT`, `PATCH` или `DELETE`.
+### Calendar
 
-`DELETE /api/tasks/complete` классифицируется как workflow side effect, а не
-как обычное удаление, потому что он продвигает задачу или процесс оператора.
+Frontend config/output использует:
 
-## Правила редактирования секретов
+- `settings.title` - обязательный шаблон заголовка события;
+- `settings.startDate` - обязательное поле даты начала;
+- `settings.endDate` - поле даты окончания;
+- `settings.bgColor` - поле цвета события.
 
-Анализатор удаляет или заменяет:
+UI-проход показал, что при заполненном `settings.title` календарь сохраняет
+`startDate`, `endDate`, `bgColor` и `engineVersion`. Preview отображает месячную
+сетку и события на датах тестовых строк. Если `title` пустой, UI-save возвращает
+валидацию `Ошибка / Проверьте поля формы`.
 
-- `Authorization`, `Cookie`, `Set-Cookie`, `x-api-key` и proxy auth headers;
-- query/body keys со словами token, password, secret, api key,
-  authorization;
-- UI content values: `fields`, comments, rich text, names, titles, filenames
-  и свободный текст;
-- multipart upload bodies.
+## UI evidence по форматам
 
-Он сохраняет порядок route, method/path, имена query keys, структуру body,
-форму response, status code, content type, classification и стабильные
-placeholders.
+11 июля 2026 выполнен UI-проход по sandbox-представлениям:
 
-## Обязательные сценарии
+| Формат | Страница настройки | Preview |
+|---|---|---|
+| `table` | Формат "Таблица", experimental mode, `mergeRows` | Таблица с 2 строками и полями title/description/date/resource/color/geo. |
+| `reference` | Формат "Ссылка на материал", experimental mode | Standalone preview сохраняется без ошибки, но строки не выводятся; формат предназначен как источник selector/ref. |
+| `grid` | Формат "Сетка", `desc`, `iconField`, `iconWidth`, `iconHeight` | Плиточный вывод с тестовыми строками. |
+| `list` | Формат "Список", отдельной config-формы нет | Раскрываемый список с тестовыми строками. |
+| `gantt` | Формат "Диаграмма Гантта", date1/date2, planned dates, title, resource, defaultView | Таблица задач и временная шкала с `Format probe 1/2`. |
+| `leaflet` | Формат "Карта", min/max zoom, layers, default marker source, geo fields | Карта отображается; при GeoJSON Feature значениях видны 2 маркера и 2 interactive layers. |
+| `calendar` | Формат "Календарь", title, start/end date, background color | Месячная сетка с событиями `Format probe 1/2`. |
 
-Каждый сценарий сначала снимается в scratch/test project:
+Дополнительно подготовлена эталонная пользовательская форма со вкладками:
 
-1. Открыть список и форму content без сохранения.
-2. Сохранить одну scratch content record и прочитать ее обратно.
-3. Загрузить маленький тестовый файл через file field и прочитать metadata.
-4. Добавить и удалить scratch comment.
-5. Выполнить form action, который вызывает manual script в test context.
-6. Завершить или маршрутизировать scratch workflow task с before/after
-   readback по task/process.
-7. Проверить disposable user create/delete только в sandbox, с immediate
-   cleanup и API readback.
-8. Проверить cross-project content type transfer только при наличии
-   согласованного target sandbox project.
+- `table`: таблица с русскими alias заголовков и скрытыми техническими полями;
+- `grid`: плитки без утечки mname из `desc`;
+- `list`: раскрываемый список со строками;
+- `gantt`: таблица/шкала Ганта;
+- `calendar`: месячная сетка с событиями;
+- `leaflet`: карта с контролами и маркерами;
+- `relation join`: joined table с читаемым статусом и скрытыми `_id`/`_id0`;
+- `reference`: help-вкладка, потому что `reference` подтвержден как
+  `ref source=view`, а не как самостоятельный пользовательский список.
 
-Raw HAR остается приватным. В репозиторий можно коммитить только sanitized
-JSON, если он нужен как evidence. Для read-only scenarios
-`successful_write_like_route_count` должен быть `0`; для write-сценария он
-должен совпадать с заранее одобренным действием.
+Правило для MCP: если цель - пользовательская форма, проверять именно
+form-viewer UI по каждой вкладке. Успешные `get-data`, preview или save view
+недостаточны, потому что form surface может иначе трактовать alias, `desc`,
+technical columns и reference-format.
 
-## Вход для typed write tool
+Screenshots и runtime evidence должны храниться только локально и не входят в Git.
 
-Production-oriented typed write строится только по sanitized evidence и должен
-содержать:
+## Поля типов материалов
 
-- preflight read целевого объекта;
-- явные `profile` и `project_id`;
-- content type и field allowlist;
-- dry-run diff;
-- controlled write gate;
-- readback verification после выполнения.
+| Тип поля | Live-проверка | Настройки и вывод |
+|---|---|---|
+| `text` | создано и прочитано | Базовый текст для кода/названия; нужен понятный label и подсказка. |
+| `number` | создано и прочитано | Числа читаются в table view; точность задавать в `settings` по задаче. |
+| `date` | создано и прочитано | Единственный тип, для которого разрешена постоянная нижняя сноска в форме. |
+| `boolean` | создано и прочитано | Использовать для признаков; в списке скрывать, если не помогает решению пользователя. |
+| `list` single | создано | Для статусов/типов обработки; значения должны быть читаемыми. |
+| `list` multiple | создано | Проверять отображение отдельно: наличия поля во view недостаточно. |
+| `ref source=view` | создано и использовано | Подходит для выбора из отфильтрованного справочного представления. |
+| `ref source=basic` | создано | Подходит для прямой связи с типом материала, но читаемый вывод требует настройки view или join. |
+| `file` | создано | Для вложений; в list view обычно скрывать, на форме давать понятный блок "Файлы". |
+| `person` | создано и записано | Хранит структурированный объект ФИО (`surname/name/patronymic`), но table `populatedValue` может вернуть `null`; для списков и отчетов нужна отдельная проверка UI/form или нормализованное текстовое/связанное поле. |
+| `geo` | создано и использовано | Использовать для `leaflet`; после добавления во view читать реальный view-field `mname`; для маркеров хранить GeoJSON `Feature`. |
 
-Текущий in-app browser connector не отдает raw HAR/network stream напрямую.
-Когда HAR недоступен, evidence фиксируется как UI-visible flow + route snippets
-из frontend bundle + API readback. True HAR в таком случае нужно экспортировать
-из DevTools или отдельного сетевого capture.
+## Связи и relation views
+
+Проверенный рабочий паттерн:
+
+1. Создать справочник и reference view.
+2. Создать основной тип материала с `ref`-полем.
+3. Для `ref source=view` указать source view и content type источника.
+4. Для пользовательского списка не выводить технический id как основной смысл.
+5. Если нужно показать атрибут связанной записи, создать joined table view.
+6. Join строить по фактическим view-field mname:
+   - слева mname `ref`-поля;
+   - справа `_id` связанной сущности, если backend добавил alias `_id0`, использовать именно его.
+7. Проверить и `get-data`, и `get-data-simplified`.
+
+### Проверенный сценарий `ref source=view` к сотруднику
+
+11 июля 2026 в sandbox дополнительно проверен сценарий связи на пользовательский
+справочник сотрудников:
+
+1. В основной тип материала добавлено поле `ref` с `source=view`,
+   `views=[reference-view]`, `entityContentType=<employee-content-type>`,
+   `widget=autocomplete`, `valueCount=1`.
+2. Значение сохраняется как id связанной записи. В обычном `table` view это поле
+   возвращает id, а не ФИО.
+3. Для пользовательского вывода создан отдельный experimental/v2 `table` view с
+   двумя сущностями: основная запись и связанная сущность "Сотрудники".
+4. В основную сущность явно добавлены source fields: код, наименование и поле
+   связи. В связанную сущность явно добавлены `_id` и читаемое поле ФИО.
+5. Join работает по фактическим view-field mname: слева mname `ref`-поля,
+   справа `_id` связанной сущности.
+6. `get-data-simplified` и UI-preview подтвердили: строка основной записи
+   показывает читаемое ФИО связанного сотрудника.
+
+Вывод для MCP: `ref source=view` отвечает за выбор и хранение связи, а читаемое
+отображение связанной записи в списке или отчете нужно проектировать отдельно
+через reference/source fields или joined view. Простое добавление поля в content
+type не добавляет его в view автоматически.
+
+Важное ограничение: длинные автоматически сгенерированные mname могут приводить
+к SQL-неоднозначности из-за усечения имени колонки. Для типов материалов, где
+планируются связи и joined views, нужно заранее задавать короткий `fieldNamePrefix`
+и короткие suffix.
+
+Если у content type задан `fieldNamePrefix`, в create-field нужно передавать
+короткий suffix, а не уже полностью сгенерированный mname. Иначе backend может
+добавить префикс повторно.
+
+## View-field contract
+
+Для системных атрибутов есть различие между add и save:
+
+```json
+{
+  "entityId": "<view-entity-id>",
+  "attribute": "_id"
+}
+```
+
+```json
+{
+  "id": "<view-field-id>",
+  "entityId": "<view-entity-id>",
+  "contentTypeId": "<entity-content-type-id>",
+  "contentAttribute": "_id",
+  "settings": {}
+}
+```
+
+MCP должен удалять null selector keys из save payload и не пытаться сохранять
+`_id` как обычное content field mname.
+
+Для source fields:
+
+- обычное поле типа материала добавляется во view через `contentTypeFieldId`;
+- системный `_id` добавляется через `attribute="_id"`;
+- после добавления обязательно читать `view_fields_populated`, потому что
+  backend может сгенерировать mname или alias не так, как ожидалось;
+- view считается готовым только после `get-data`/`get-data-simplified`, а для
+  пользовательского интерфейса - после UI-preview без ошибок валидации.
+
+## Правила для будущих сценариев
+
+- Тип материала всегда получает описание, назначение и пользовательскую подсказку.
+- Новые представления создаются в experimental/v2, кроме явно доказанных исключений.
+- Для связей заранее проектируются короткие mname.
+- Для `ref source=view` всегда фиксировать: target content type, reference view,
+  source/display fields, join/readable-output strategy и acceptance через
+  `view_fields_populated` плюс `get-data`.
+- `settings.title` в table/reference/list UI задавать mname одного view field,
+  а не шаблон с `{{...}}`.
+- Видимое имя связанной записи проверяется через view data, а не по факту сохранения поля.
+- Встроенная форма/list surface должна иметь field-based filter или `dataId: [openId]`.
+- В list view скрываются технические, пустые и неинформативные столбцы.
+- Bottom helper text под полем используется только для `date`.
+- После изменения представления обязательны readback populated fields и smoke через view data.
+
+## Открытые пункты
+
+- Нужна отдельная серия по advanced `calc`, `spreadsheet`, `comb`, `address`,
+  `bank`, `legal_entity`, `person` с UI-проверкой редактора.
+- Запущенный MCP-процесс нужно перезапускать после изменения schema/tools, иначе
+  live tool output может идти по старой схеме и старому redaction.

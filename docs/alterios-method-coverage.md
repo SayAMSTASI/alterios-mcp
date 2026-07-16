@@ -5,12 +5,8 @@
 1. сколько методов и маршрутов сейчас явно учитывает `alterios-mcp`;
 2. какие виды обращений покрыты, а какие еще требуют live/HAR-подтверждения.
 
-Контекст текущего покрытия:
-
-- профиль: `artx`;
-- проект: `<sandbox-project-id>`;
-- основной sandbox: `MCP Practice`;
-- дата ревизии: 2026-07-15.
+Матрица описывает переиспользуемую поверхность MCP. Project-specific counts,
+profiles, identifiers and live evidence are intentionally excluded.
 
 ## Сводка По Количеству
 
@@ -44,7 +40,7 @@ browser/HAR capture и sandbox write-практику.
 | Workflow/process/task | Да | `POST /api/diagrams`, `POST /api/processes`, `GET /api/tasks/`, `DELETE /api/tasks/complete` | Dedicated sandbox BPMN created; process started; user task completed; process readback completed. |
 | Files | Да | `POST /api/file/upload/field`, `GET /api/file/list` | File-field created; multipart upload executed; content value patched; file metadata readback verified. |
 | Comments/logs/audit | Частично | `GET/POST /api/v1/comments`, `writeLog` | Comment read/write and `comments_list` UI live verified; `writeLog` remains cataloged as runtime service. |
-| Users/groups/security | Частично | users, user groups, groups, roles | Groups live write; role and user-group create/update/delete live-verified in ART X sandbox; disposable user create/delete UI/API-verified; production security writes remain dangerous-gated. |
+| Users/groups/security | Частично | users, user groups, groups, roles | Sandbox create/update/delete and cleanup are verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
 ## MCP Tools: 75
@@ -127,86 +123,6 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_execute_manual_script` | Controlled manual script execution |
 | `alterios_rest_write` | Controlled generic REST write |
 
-## 2026-07-10 Reinventory Note
-
-The 2026-07-10 reinventory initially found 23 MCP tools and only 4 write-like
-tools. The typed-write expansion added content/file, view/form, script,
-BPMN/process/task, report tools, Stimulsoft layout validation, and form-surface validation, bringing the surface to 43 tools and 18
-write-like tools. The next write-first expansion added typed content-type,
-field, content-create, group, and help tools, bringing the surface to 50 tools
-and 23 write-like tools. The security/destructive gate pass added
-`alterios_write_safety_preflight`, bringing the surface to 51 tools while
-keeping write-like tools at 23. The security/form/bulk expansion added typed
-read and write wrappers for users, user groups, roles, delete flows, form cell
-listeners, selected-content bulk updates, and content-type publish planning,
-bringing the surface to 66 tools and 31 write-like tools. The UI/HAR evidence
-pass added `alterios_clone_shared_content_type`, bringing the surface to 67
-tools and 32 write-like tools. The write workflow optimization pass added
-three read-only plan/journal tools, bringing the surface to 70 tools while
-keeping 32 write-like tools. The first scenario-tool pass added
-`alterios_create_material_module`, bringing the surface to 71 tools and 33
-write-like tools. The report-tab scenario pass added
-`alterios_create_report_tab`, bringing the surface to 72 tools and 34
-write-like tools. The process-flow scenario pass added
-`alterios_create_process_flow`, bringing the surface to 73 tools and 35
-write-like tools. The replay-smoke pass added read-only `alterios_replay_smoke`,
-bringing the surface to 74 tools while keeping 35 write-like tools. The
-project-health pass added read-only `alterios_project_health`, bringing the
-surface to 75 tools while keeping 35 write-like tools.
-
-Live ART X practice proves that Alterios accepts write routes for content,
-files, views, forms, scripts, BPMN/process/tasks, comments, and reports. That
-does **not** mean the MCP operator surface is complete. Today 35 tools are
-write-like, and 2 of them are still broad generic escape hatches:
-
-- `alterios_add_comment` is typed but only covers comments;
-- `alterios_upsert_content_type`, `alterios_upsert_field`,
-  `alterios_create_content`, `alterios_upsert_group`, and
-  `alterios_upsert_help` now cover the metadata/data create layer that used to
-  require generic REST calls;
-- `alterios_update_content_fields` and `alterios_file_upload_to_field` now cover
-  the first typed content/file slice;
-- `alterios_bulk_update_selected_content_fields` covers the first typed
-  multiple-selection slice for field updates on selected content rows;
-- `alterios_upsert_view`, `alterios_upsert_view_entity`,
-  `alterios_upsert_view_field`, `alterios_upsert_form`,
-  `alterios_patch_form_actions`, `alterios_patch_form_tabs`, and
-  `alterios_patch_form_cell_listeners` now cover the first typed view/form
-  slice including targeted listener patching;
-- `alterios_create_material_module` composes content type, fields, view,
-  view entity, view fields, add/edit/list forms, menu group, `plan_id`
-  enforcement, and final readback into one сценарный write-tool;
-- `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`,
-  `alterios_delete_user`, `alterios_delete_user_group`, and
-  `alterios_delete_role` cover the first typed security/destructive admin
-  slice with dangerous gates. Role and user-group create/update/delete now have
-  live sandbox evidence; disposable user create/delete now has UI/API evidence,
-  including required `ownerId`, row-menu delete, and cleanup readback;
-- `alterios_upsert_script` and `alterios_execute_manual_script` now cover saved
-  script upsert plus manual UUID execution;
-- `alterios_upsert_bpmn_diagram`, `alterios_start_process`,
-  `alterios_list_process_tasks`, `alterios_complete_task`, and
-  `alterios_validate_process_result` now cover the first typed workflow slice;
-- `alterios_upsert_report`, `alterios_patch_report_template`, and
-  `alterios_validate_report_project_base` now cover report save/readback plus
-  Project Database source validation;
-- `alterios_create_report_tab` composes source view smoke, Project Database
-  report template, form tab patch, `params.openId=true`, `dataId` context
-  readback, static layout validation, and saved `plan_id` enforcement;
-- `alterios_create_process_flow` composes task form, script refs, BPMN XML,
-  `camunda:formKey`, diagram readback, optional process start/task smoke, and
-  saved `plan_id` enforcement;
-- `alterios_call_write_service` and `alterios_rest_write` are broad escape
-  hatches, not production-grade entity tools.
-
-Следующая работа по покрытию должна фокусироваться на оставшихся нетиповых поверхностях:
-
-1. a dedicated target sandbox project for live cross-project
-   `POST /api/content-types/clone` execution and cleanup/readback;
-2. true raw HAR export for user create/delete and content-type clone if raw
-   network artifacts are required beyond UI/route/API evidence;
-3. rendered Stimulsoft proof for report layouts where visual acceptance matters.
-
 ## Runtime Services: 14
 
 | Risk | Count | Services |
@@ -226,10 +142,10 @@ Runtime service names are not manual script UUIDs. If the configured endpoint is
 Statuses:
 
 - `live_read` - live read verified through API.
-- `live_write` - write executed in ART X sandbox and read back.
+- `live_write` - write executed in an approved private sandbox and read back.
 - `live_ui` - browser-visible behavior verified.
 - `cataloged` - known from code/docs/static scan, not yet exercised in the
-  current sandbox.
+  approved private sandbox.
 - `needs_har` - needs browser/HAR capture before typed write.
 - `typed_guarded` - has a typed tool, dry-run audit, gates, and no-network tests;
   live execution remains sandbox-only until evidence is collected.
