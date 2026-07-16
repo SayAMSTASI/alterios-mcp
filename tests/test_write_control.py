@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from alterios_mcp import server
+from alterios_mcp.scenarios import reports as report_scenarios
 from alterios_mcp.client import redact_sensitive
 from alterios_mcp.write_control import (
     ControlledWriteError,
@@ -2912,7 +2913,29 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
             self.reports[str(item["_id"])] = item
             return FakeResponse({"_id": item["_id"], "saved": True})
 
-    with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
+    native_build_count = 0
+
+    def changing_native_template(**kwargs):
+        nonlocal native_build_count
+        native_build_count += 1
+        template = report_scenarios._project_database_printable_template(
+            report_name=kwargs["report_name"],
+            marker=kwargs["marker"],
+            source_view_id=kwargs["source_view_id"],
+            source_view_name=kwargs["source_view_name"],
+            columns=kwargs["columns"],
+        )
+        template["NativeBuildNonce"] = f"build-{native_build_count}"
+        return template
+
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True),
+        patch.object(
+            report_scenarios,
+            "_project_database_native_printable_template",
+            side_effect=changing_native_template,
+        ),
+    ):
         dry_run_client = FakeReportTabClient()
         with patch.object(server, "_client", return_value=dry_run_client):
             dry_run = server.alterios_create_report_tab(
@@ -2934,6 +2957,11 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
             clear=True,
         ),
         patch.object(server, "_client", return_value=apply_client),
+        patch.object(
+            report_scenarios,
+            "_project_database_native_printable_template",
+            side_effect=changing_native_template,
+        ),
     ):
         result = server.alterios_create_report_tab(
             "view-1",
@@ -2955,6 +2983,8 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     template = apply_client.reports["report-1"]["template"]
     assert apply_client.reports["report-1"]["type"] == "report"
     assert template["Pages"]["0"]["Ident"] == "StiPage"
+    assert template["NativeBuildNonce"] == "build-1"
+    assert native_build_count == 1
     data_band = template["Pages"]["0"]["Components"]["2"]
     assert data_band["DataSourceName"] == "data"
     assert [item["Text"]["Value"] for item in data_band["Components"].values()] == ["{data.name}", "{data.count}"]
