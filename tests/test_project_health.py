@@ -44,6 +44,19 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
                                             "title": "Run missing script",
                                             "actions": [{"type": "manual_script", "scriptId": "missing-script"}],
                                         },
+                                        {
+                                            "title": "Run with empty binding",
+                                            "actions": [
+                                                {
+                                                    "type": "manual_script",
+                                                    "scriptId": "script-existing",
+                                                    "argumentsConfig": {
+                                                        "type": "context",
+                                                        "args": {"contentId": {}},
+                                                    },
+                                                }
+                                            ],
+                                        },
                                     ],
                                 },
                                 {
@@ -59,7 +72,15 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
             ],
         }
     ]
-    scripts = [{"_id": "script-existing", "name": "Existing", "type": "manual", "body": script_body}]
+    scripts = [
+        {
+            "_id": "script-existing",
+            "name": "Existing",
+            "type": "manual",
+            "body": script_body,
+            "config": {"arguments": [{"key": "contentId"}]},
+        }
+    ]
     diagrams = [
         {
             "_id": "diagram-1",
@@ -119,6 +140,7 @@ def test_project_health_detects_prewrite_risks() -> None:
     assert codes["missing_report_ref"] == 1
     assert codes["missing_form_action_target"] == 1
     assert codes["missing_form_script_ref"] == 1
+    assert codes["manual_script_empty_argument_binding"] == 1
     assert codes["missing_bpmn_form_key"] == 1
     assert codes["bpmn_parse_error"] == 1
     assert codes["report_layout_issues"] == 1

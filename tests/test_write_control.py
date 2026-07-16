@@ -2046,6 +2046,115 @@ def test_form_cell_listener_patch_dry_run_updates_only_target_cell_without_real_
     assert patched_tabs[0]["rows"][0]["cells"][1]["emitting"]["listeners"] == [{"type": "keep"}]
 
 
+def test_form_manual_script_value_action_resolves_entity_id_and_reads_back() -> None:
+    form_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    script_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    icon_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    menu_icon_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    entity_id = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+
+    class FakeResponse:
+        def __init__(self, body: object) -> None:
+            self.body = body
+
+        def as_dict(self) -> dict[str, object]:
+            return {"status_code": 200, "body": self.body}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.form = {
+                "_id": form_id,
+                "name": "Managed list",
+                "pageTitle": "Managed list",
+                "description": "Codex-managed form",
+                "formActionContainers": [],
+                "tabs": [
+                    {
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "view_data_list",
+                                        "params": {"viewId": "view-1"},
+                                        "displaying": {
+                                            "fields": {
+                                                "_id": {"hidden": True},
+                                                "_id0": {"hidden": True},
+                                                "name": {},
+                                            }
+                                        },
+                                        "styles": {"width": "100%"},
+                                        "valueActionContainers": [],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+            }
+
+        def form_by_id(self, requested_id: str) -> FakeResponse:
+            assert requested_id == form_id
+            return FakeResponse(self.form)
+
+        def script_by_id(self, requested_id: str) -> FakeResponse:
+            assert requested_id == script_id
+            return FakeResponse(
+                {
+                    "_id": script_id,
+                    "name": "Update row",
+                    "type": "manual",
+                    "active": True,
+                    "config": {"arguments": [{"key": "contentId"}]},
+                }
+            )
+
+        def view_fields_populated(self, view_id: str) -> FakeResponse:
+            assert view_id == "view-1"
+            return FakeResponse(
+                [
+                    {"_id": "field-main", "entityId": "entity-main", "mname": "_id", "type": "attribute"},
+                    {"_id": "field-row", "entityId": entity_id, "mname": "_id0", "type": "attribute"},
+                    {"_id": "field-name", "entityId": entity_id, "mname": "name", "type": "field"},
+                ]
+            )
+
+        def save_form(self, payload: dict[str, object]) -> FakeResponse:
+            self.form = payload
+            return FakeResponse({"_id": form_id})
+
+    client = FakeClient()
+    with (
+        patch.dict("os.environ", {"ALTERIOS_MCP_ALLOW_WRITE": "1"}, clear=True),
+        patch.object(server, "_client", return_value=client),
+    ):
+        result = server.alterios_upsert_form_manual_script_action(
+            form_id,
+            script_id,
+            "value",
+            "Update",
+            icon_id,
+            argument_entity_ids={"contentId": entity_id},
+            tab_index=0,
+            row_index=0,
+            cell_index=0,
+            menu_icon_id=menu_icon_id,
+            dry_run=False,
+            profile="primary",
+            project_id="project-1",
+        )
+
+    assert result["dry_run"] is False
+    assert result["audit"]["operation"]["kind"] == "form_manual_script_action"
+    assert result["response"]["resolved_argument_bindings"] == {"contentId": "_id0"}
+    assert result["response"]["binding_validation"]["ok"] is True
+    assert result["response"]["readback_action"]["scope"] == "value"
+    assert result["response"]["readback_action"]["arguments_config"] == {
+        "args": {"contentId": {"dataProviderKey": "_id0"}},
+        "type": "context",
+    }
+
+
 def test_bulk_update_selected_content_fields_dry_run_returns_per_row_diff_without_real_network() -> None:
     class FakeResponse:
         def __init__(self, body: object) -> None:

@@ -13,6 +13,49 @@ script UUID. Их нельзя отправлять в `/api/scripts/execute-man
 MCP client отклоняет non-UUID runtime service names, если configured endpoint
 указывает на `/api/scripts/execute-manual`.
 
+## Ручной скрипт как действие формы
+
+Ручной скрипт в форме хранится как действие `manual_script`, где `_id` - UUID
+сохраненного скрипта, а `argumentsConfig` связывает аргументы скрипта с
+провайдерами данных формы:
+
+```json
+{
+  "_id": "<script UUID>",
+  "name": "Обработка записи",
+  "type": "manual_script",
+  "argumentsConfig": {
+    "type": "context",
+    "args": {
+      "contentId": {"dataProviderKey": "__entity_id"}
+    }
+  }
+}
+```
+
+Поверхности действий различаются:
+
+- `formActionContainers` - действие страницы;
+- `cellActionContainers` - действие элемента формы;
+- `valueActionContainers` - действие значения/строки списка, обычно вложенное
+  в `type=menu`;
+- `__entity_id` - текущая сущность действия;
+- `openId` - идентификатор из маршрута открытой формы;
+- `_id`, `_id0`, `_id5` - реальные `mname` ID-полей сущностей представления;
+- обычный `field_*`/mname - значение поля формы или представления.
+
+Нельзя выбирать `_idN` по номеру или переносить его между представлениями.
+Нужно прочитать populated view fields, найти поле `type=attribute` требуемого
+`entityId` и использовать его `mname`. Для этого предназначен
+`alterios_upsert_form_manual_script_action`: `argument_entity_ids` задает
+смысловую сущность, а MCP разрешает ее ID-поле автоматически.
+
+Перед применением tool проверяет UUID, `type=manual`, active state, пустые
+привязки, наличие provider key в ячейке/представлении и совместимость с
+`script.config.arguments`. После записи действие повторно читается из формы.
+Если скрипт зависит от только что сохраненных полей или ID новой записи,
+используется порядок `submit_all -> manual_script -> routing`.
+
 ## Уровни риска
 
 | Risk level | Значение |

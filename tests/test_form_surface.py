@@ -1383,3 +1383,56 @@ def test_form_surface_cli_contract_flags_return_nonzero_for_contract_violation(t
     contract_output = json.loads(capsys.readouterr().out)
     assert contract_output["validation_profile"] == "contract"
     assert contract_output["blocking_issues_by_code"] == {"close_action_missing_redirect_back": 1}
+def test_strict_contract_blocks_invalid_manual_script_value_action() -> None:
+    result = analyze_form_surface(
+        {
+            "_id": "form-1",
+            "name": "Rows",
+            "pageTitle": "Rows",
+            "tabs": [
+                {
+                    "rows": [
+                        {
+                            "cells": [
+                                {
+                                    "type": "view_data_list",
+                                    "params": {"viewId": "view-1"},
+                                    "styles": {"width": "100%"},
+                                    "displaying": {"fields": {"name": {}}},
+                                    "valueActionContainers": [
+                                        {
+                                            "type": "menu",
+                                            "iconId": "menu-icon",
+                                            "containers": [
+                                                {
+                                                    "type": "action",
+                                                    "title": "Run",
+                                                    "iconId": "script-icon",
+                                                    "actions": [
+                                                        {
+                                                            "_id": "not-a-uuid",
+                                                            "name": "Script",
+                                                            "type": "manual_script",
+                                                            "argumentsConfig": {
+                                                                "type": "context",
+                                                                "args": {"contentId": {}},
+                                                            },
+                                                        }
+                                                    ],
+                                                }
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+        },
+        strict=True,
+    )
+
+    assert result["ok"] is False
+    assert result["blocking_issues_by_code"]["manual_script_id_must_be_uuid"] == 1
+    assert result["blocking_issues_by_code"]["manual_script_empty_argument_binding"] == 1

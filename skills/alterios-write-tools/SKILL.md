@@ -55,6 +55,14 @@ For script write scenarios:
 - keep new `web` and `cron` research scripts inactive until endpoint/schedule behavior is explicitly approved and verified;
 - `library` scripts are linked from consumer scripts through `librariesIds`; use global functions/constants for shared helpers unless live runtime evidence proves a different module format;
 - manual execution uses `/api/scripts/execute-manual` with a saved script UUID, not runtime service names.
+- configure a manual script in a form through
+  `alterios_upsert_form_manual_script_action`, not an unvalidated raw form patch;
+- select `page`, `element`, or `value` scope explicitly. For row values, keep
+  the action in the existing menu or provide the project-local menu icon;
+- pass semantic `argument_entity_ids` for joined records and let the tool
+  resolve the actual populated `_idN` field. Never infer `_idN` from join order;
+- require `action_view_entity_id` when a row action binds `__entity_id` and use
+  `save_before_execute=true` when the script must see freshly saved form data.
 
 For view write scenarios:
 

@@ -232,14 +232,25 @@ def build_script_bpmn_linkage(
     script_rows = [_summarize_script(script) for script in scripts]
     script_index = _script_index(scripts)
     form_index = _form_index(forms)
-    form_script_links = [
-        {
-            **action,
-            "script_match": _match_script_ref(action.get("target_script_id") or action.get("target_script_name"), script_index),
-        }
-        for action in form_actions
-        if action.get("category") in {"manual_script", "script"} or action.get("target_script_id") or action.get("target_script_name")
-    ]
+    form_script_links = []
+    for action in form_actions:
+        if not (
+            action.get("category") in {"manual_script", "script"}
+            or action.get("target_script_id")
+            or action.get("target_script_name")
+        ):
+            continue
+        script_match = _match_script_ref(
+            action.get("target_script_id") or action.get("target_script_name"),
+            script_index,
+        )
+        form_script_links.append(
+            {
+                **action,
+                "script_match": script_match,
+                "argument_contract": _manual_script_argument_contract(action, script_match),
+            }
+        )
 
     diagram_rows: list[dict[str, Any]] = []
     all_bpmn_nodes: list[dict[str, Any]] = []
@@ -551,6 +562,7 @@ def _action_rows(
             args = action.get("args")
         if args is None:
             args = action.get("params")
+        argument_bindings = _normalized_argument_bindings(args)
         rows.append(
             {
                 "form_id": form_id,
@@ -578,7 +590,15 @@ def _action_rows(
                 "target_report_id": _target_report_id(action),
                 "target_diagram_id": action.get("diagramId") or action.get("diagram_id"),
                 "argument_shape": _shape(args),
-                "argument_keys": sorted(args.keys()) if isinstance(args, dict) else [],
+                "argument_keys": sorted(argument_bindings),
+                "argument_bindings": argument_bindings,
+                "argument_sources": sorted(
+                    {
+                        source
+                        for source in argument_bindings.values()
+                        if source
+                    }
+                ),
             }
         )
     return rows
@@ -738,8 +758,86 @@ def _script_index(scripts: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     for script in scripts:
         for key in (script.get("_id"), script.get("name")):
             if key:
-                index[str(key)] = {"script_id": script.get("_id"), "script_name": script.get("name"), "script_type": script.get("type")}
+                index[str(key)] = {
+                    "script_id": script.get("_id"),
+                    "script_name": script.get("name"),
+                    "script_type": script.get("type"),
+                    "active": script.get("active"),
+                    "declared_arguments": sorted(_script_declared_arguments(script)),
+                }
     return index
+
+
+def _script_declared_arguments(script: dict[str, Any]) -> set[str]:
+    config = _dict(script.get("config"))
+    arguments = config.get("arguments")
+    if isinstance(arguments, dict):
+        return {str(key) for key in arguments if str(key).strip()}
+    if isinstance(arguments, list):
+        return {
+            str(item.get("key"))
+            for item in arguments
+            if isinstance(item, dict) and str(item.get("key") or "").strip()
+        }
+    return set()
+
+
+def _normalized_argument_bindings(value: Any) -> dict[str, str | None]:
+    if not isinstance(value, dict):
+        return {}
+    raw = value.get("args") if isinstance(value.get("args"), dict) else value
+    bindings: dict[str, str | None] = {}
+    for argument, config in raw.items():
+        source = None
+        if isinstance(config, dict):
+            source = config.get("dataProviderKey") or config.get("source")
+        elif isinstance(config, str):
+            source = config
+        bindings[str(argument)] = str(source) if source else None
+    return bindings
+
+
+def _manual_script_argument_contract(
+    action: dict[str, Any],
+    script_match: dict[str, Any] | None,
+) -> dict[str, Any]:
+    bindings = action.get("argument_bindings")
+    bindings = bindings if isinstance(bindings, dict) else {}
+    bound = set(bindings)
+    declared = set((script_match or {}).get("declared_arguments") or [])
+    issues: list[dict[str, Any]] = []
+    for argument, source in sorted(bindings.items()):
+        if not source:
+            issues.append(
+                {
+                    "severity": "error",
+                    "code": "manual_script_empty_argument_binding",
+                    "argument": argument,
+                }
+            )
+    for argument in sorted(declared - bound):
+        issues.append(
+            {
+                "severity": "warning",
+                "code": "manual_script_declared_argument_not_bound",
+                "argument": argument,
+            }
+        )
+    for argument in sorted(bound - declared):
+        if declared:
+            issues.append(
+                {
+                    "severity": "warning",
+                    "code": "manual_script_bound_argument_not_declared",
+                    "argument": argument,
+                }
+            )
+    return {
+        "ok": not any(issue["severity"] == "error" for issue in issues),
+        "bindings": bindings,
+        "declared_arguments": sorted(declared),
+        "issues": issues,
+    }
 
 
 def _form_index(forms: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
