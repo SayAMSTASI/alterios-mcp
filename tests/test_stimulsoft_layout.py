@@ -111,3 +111,26 @@ def test_layout_analyzer_flags_page_overflow() -> None:
     result = analyze_stimulsoft_layout(template)
 
     assert result["issues_by_code"]["page_width_overflow"] == 1
+
+
+def test_layout_analyzer_treats_print_bands_as_vertical_flow() -> None:
+    template = {
+        "Pages": {
+            "0": {
+                "Ident": "StiPage",
+                "Width": 19,
+                "Height": 27.7,
+                "Components": {
+                    "0": {"Ident": "StiReportTitleBand", "Name": "Title", "ClientRectangle": "0,0,19,1.4"},
+                    "1": {"Ident": "StiPageHeaderBand", "Name": "Header", "ClientRectangle": "0,0,19,0.8"},
+                    "2": {"Ident": "StiDataBand", "Name": "Data", "ClientRectangle": "0,0,19,0.8"},
+                    "3": {"Ident": "StiPageFooterBand", "Name": "Footer", "ClientRectangle": "0,0,19,0.6"},
+                },
+            }
+        }
+    }
+
+    result = analyze_stimulsoft_layout(template)
+
+    assert result["ok"] is True
+    assert "component_overlap" not in result["issues_by_code"]

@@ -1,0 +1,28 @@
+{
+  "version": "2026-07-16.1",
+  "blocking_form_issue_codes": [
+    "close_action_missing_redirect_back",
+    "element_action_title_must_be_tooltip",
+    "field_footnote_requires_date",
+    "non_table_cell_header",
+    "table_cell_header_style",
+    "view_detail_view_data_must_be_readonly"
+  ],
+  "scenario_apply_requires": [
+    "plan_id",
+    "work_item_ref",
+    "agent_handoff_refs",
+    "ux_contract_version",
+    "fresh_runtime_fingerprint"
+  ],
+  "printable_report_default": {
+    "report_type": "report",
+    "page_ident": "StiPage",
+    "required_bands": [
+      "StiReportTitleBand",
+      "StiPageHeaderBand",
+      "StiDataBand",
+      "StiPageFooterBand"
+    ]
+  }
+}

@@ -17,6 +17,16 @@ Use this skill when a repeated Alterios operation should become a typed MCP tool
 6. Return redacted audit details and perform readback.
 7. Add tests for happy path, blocked write, validation errors, target mismatch, and redaction.
 
+For scenario apply, do not let code, skills, and the running MCP drift apart:
+
+- read `alterios_runtime_info` and block writes when `stale=true`;
+- preserve the reviewed runtime fingerprint between dry-run and apply;
+- require `delivery_evidence.work_item_ref`, at least one
+  `agent_handoff_refs` entry, and the current `ux_contract_version`;
+- use `alterios_ux_contract` as the machine-readable source of blocking form
+  issue codes;
+- require the same evidence in the saved dry-run plan and apply request.
+
 For material-module write scenarios, enforce the configured UX contract:
 
 - content type/material type must include a meaningful description and user hint/tooltip;
@@ -26,7 +36,12 @@ For material-module write scenarios, enforce the configured UX contract:
 - list views must hide non-informative technical/service columns;
 - forms must use human-readable user-facing titles, tab names, and page names.
 
-Existing report write coverage includes `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`; use these before adding another report write tool.
+Existing report coverage includes `alterios_upsert_report`,
+`alterios_patch_report_template`, `alterios_validate_report_project_base`,
+`alterios_validate_stimulsoft_layout`, and
+`alterios_validate_printable_render`. A report-tab scenario defaults to a
+printable `type=report`; use `report_type=dashboard` only for an explicitly
+requested analytical dashboard.
 
 For script write scenarios:
 

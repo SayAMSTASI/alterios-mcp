@@ -23,6 +23,11 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 12. When the user asks for a sample form or a user-facing view format, open the
     form-viewer UI and click every tab; `get-data` and standalone view preview
     are not enough.
+13. Run the form analyzer in strict/contract mode before apply. Treat every
+    blocking issue from `alterios_ux_contract` as a failed stage gate.
+14. For generated modules, require field filters on displayed fields, hide
+    `_id`/`_id0`, and make view/detail `view_data` explicitly read-only with
+    output configuration and no input configuration.
 
 ## View Types And Modes
 

@@ -17,9 +17,17 @@ Use this skill when report output depends on Alterios project-base data or when 
 6. Run static layout checks for overlap, page overflow, and dynamic-height risk.
 7. If the user needs UI/render proof, verify in browser or exported/rendered output; do not stop at JSON readback.
 8. For Project Database dashboard tables, prefer templates saved through the Stimulsoft runtime/native builder so the saved JSON contains `ConnectionStringEncrypted`, `StiCustomDatabase`, `StiCustomSource`, and explicit table columns. Manually assembled JSON can render headers while returning blank rows in the Alterios viewer.
+9. For printable output, require `type=report`, `StiPage`, title/header/data/footer
+   bands, `{data.field}` expressions, and technical-column suppression.
+10. Run `alterios_validate_printable_render` with sample rows. Acceptance needs
+    a real PDF signature, positive page count, artifact size, and SHA-256; JSON
+    structure alone is not render evidence.
 
 Prefer existing typed tools before adding anything new: `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_validate_report_project_base`, and `alterios_validate_stimulsoft_layout`.
-Current known risk: embedded report viewer visual proof can remain open even when API/template/readback checks pass; keep that risk visible until UI/render/export proof exists.
+The local PDF smoke proves Stimulsoft rendering and export. Embedded Alterios
+viewer behavior still needs UI smoke when the report is installed into a live
+form because browser integration and Project Database loading are separate
+acceptance surfaces.
 
 ## Layout Rules
 

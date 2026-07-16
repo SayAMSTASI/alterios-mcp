@@ -53,8 +53,10 @@ from .local_workboard import (
     list_local_work_items,
 )
 from .profile_smoke import run_profile_smoke
+from .printable_render import render_printable_pdf
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
+from .runtime_info import MCP_TOOL_SCHEMA_VERSION, build_runtime_fingerprint
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
@@ -67,6 +69,7 @@ from .write_control import (
     is_dangerous_write_risk,
 )
 from .write_plan import artifact_root, assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
+from .ux_contract import BLOCKING_FORM_ISSUE_CODES, UX_CONTRACT_VERSION
 
 mcp = FastMCP("alterios")
 
@@ -83,6 +86,41 @@ def _write_enabled() -> bool:
 
 def _dangerous_write_enabled() -> bool:
     return os.environ.get("ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE") == "1"
+
+
+def _runtime_fingerprint() -> dict[str, Any]:
+    tool_count = len(re.findall(r"^@mcp\.tool\(\)", Path(__file__).read_text(encoding="utf-8"), flags=re.MULTILINE))
+    return build_runtime_fingerprint(tool_count=tool_count)
+
+
+def _assert_runtime_gate(expected_runtime_fingerprint: str | None = None) -> dict[str, Any]:
+    runtime = _runtime_fingerprint()
+    if runtime.get("stale"):
+        raise ValueError("Alterios MCP runtime is stale: restart Codex/MCP before applying writes.")
+    expected = (expected_runtime_fingerprint or os.environ.get("ALTERIOS_MCP_EXPECTED_RUNTIME_FINGERPRINT") or "").strip()
+    if expected and runtime.get("fingerprint") != expected:
+        raise ValueError("Alterios MCP runtime fingerprint does not match the reviewed runtime.")
+    return runtime
+
+
+def _assert_delivery_evidence(delivery_evidence: dict[str, Any] | None) -> dict[str, Any]:
+    evidence = dict(delivery_evidence or {})
+    work_item_ref = str(evidence.get("work_item_ref") or "").strip()
+    handoffs = evidence.get("agent_handoff_refs")
+    contract_version = str(evidence.get("ux_contract_version") or "").strip()
+    if not work_item_ref:
+        raise ValueError("delivery_evidence.work_item_ref is required for scenario apply.")
+    if not isinstance(handoffs, list) or not [item for item in handoffs if str(item).strip()]:
+        raise ValueError("delivery_evidence.agent_handoff_refs must contain at least one handoff reference.")
+    if contract_version != UX_CONTRACT_VERSION:
+        raise ValueError(
+            f"delivery_evidence.ux_contract_version must be {UX_CONTRACT_VERSION!r}."
+        )
+    return {
+        "work_item_ref": work_item_ref,
+        "agent_handoff_refs": [str(item).strip() for item in handoffs if str(item).strip()],
+        "ux_contract_version": contract_version,
+    }
 
 
 def _write_service_operation(function: str, args: dict[str, Any]) -> WriteOperation:
@@ -1708,6 +1746,18 @@ def _report_has_dashboard_page(report: Any) -> bool:
     return isinstance(page, dict) and page.get("Ident") == "StiDashboard"
 
 
+def _report_has_printable_page(report: Any) -> bool:
+    template = _report_template_payload(report)
+    if not isinstance(template, dict):
+        return False
+    pages = template.get("Pages") or {}
+    page_values = pages.values() if isinstance(pages, dict) else pages if isinstance(pages, list) else []
+    return any(
+        isinstance(page, dict) and page.get("Ident") == "StiPage"
+        for page in page_values
+    )
+
+
 def _report_template_has_marker(report: Any, marker: str | None = None) -> bool:
     template = _report_template_payload(report)
     return isinstance(template, dict) and template.get("CodexMarker") == (marker or None)
@@ -1782,6 +1832,47 @@ def _dashboard_table_summaries(template: dict[str, Any] | None) -> list[dict[str
     return tables
 
 
+def _printable_band_summary(template: dict[str, Any] | None) -> dict[str, Any]:
+    idents = [
+        str(value.get("Ident") or "")
+        for value in _walk_values(template)
+        if isinstance(value, dict) and str(value.get("Ident") or "").endswith("Band")
+    ] if isinstance(template, dict) else []
+    data_expressions: list[str] = []
+    if isinstance(template, dict):
+        for value in _walk_values(template):
+            if not isinstance(value, dict) or value.get("Ident") != "StiText":
+                continue
+            text_value = value.get("Text")
+            if isinstance(text_value, dict):
+                text_value = text_value.get("Value")
+            if isinstance(text_value, str) and "{data." in text_value:
+                data_expressions.append(text_value)
+    return {
+        "bands": sorted(set(idents)),
+        "has_report_title": "StiReportTitleBand" in idents,
+        "has_page_header": "StiPageHeaderBand" in idents,
+        "has_data_band": "StiDataBand" in idents,
+        "has_page_footer": "StiPageFooterBand" in idents,
+        "data_expressions": data_expressions,
+    }
+
+
+def _printable_smoke_rows(template: dict[str, Any], count: int = 3) -> list[dict[str, Any]]:
+    expressions = _printable_band_summary(template)["data_expressions"]
+    fields = []
+    for expression in expressions:
+        match = re.fullmatch(r"\{data\.([^{}]+)\}", expression)
+        if match and match.group(1) not in fields:
+            fields.append(match.group(1))
+    if not fields:
+        raise ValueError("Printable report has no {data.field} expressions for render validation.")
+    return [
+        {field: f"Smoke {row_index + 1}: {field}" for field in fields}
+        for row_index in range(max(1, count))
+    ]
+
+
 def _report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
     if MANAGED_MARKER in str(existing.get("description") or ""):
         return True
@@ -1800,14 +1891,17 @@ def _report_project_base_validation(
     template = _report_template_payload(report)
     marker = template.get("CodexMarker") if isinstance(template, dict) else None
     table_summaries = _dashboard_table_summaries(template)
+    printable = _printable_band_summary(template)
     return {
         "has_template": isinstance(template, dict),
         "has_dashboard_page": _report_has_dashboard_page(report),
+        "has_printable_page": _report_has_printable_page(report),
         "has_project_database": _has_project_database(template),
         "has_encrypted_project_database_connection": _has_encrypted_project_database_connection(template),
         "table_component_count": len(table_summaries),
         "table_has_columns": any(item["column_count"] > 0 for item in table_summaries),
         "table_columns": table_summaries,
+        "printable": printable,
         "marker": marker,
         "marker_matches": expected_marker is None or marker == expected_marker,
         "view_name_matches": expected_view_name is None or _contains_text(template, expected_view_name),
@@ -1859,6 +1953,7 @@ def _material_module_operation(
     menu_icon_id: str | None,
     close_icon_id: str | None,
     save_icon_id: str | None,
+    delivery_evidence: dict[str, Any] | None,
     allow_unmanaged_update: bool,
 ) -> WriteOperation:
     request = {
@@ -1887,6 +1982,7 @@ def _material_module_operation(
             "save": save_icon_id,
         },
         "allowUnmanagedUpdate": allow_unmanaged_update,
+        "deliveryEvidence": delivery_evidence,
     }
     return _resource_operation(
         name="SCENARIO create_material_module",
@@ -2017,16 +2113,33 @@ def _material_row_styles() -> dict[str, Any]:
 
 def _material_content_display_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
     return {
-        field["mname"]: {"order": int(field.get("order", index)), "title": field["name"]}
+        field["mname"]: {
+            "order": int(field.get("order", index)),
+            "title": field["name"],
+            "filter": {"mode": "standard", "enabled": True},
+        }
         for index, field in enumerate(fields)
     }
 
 
-def _material_view_display_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
+def _material_view_display_fields(
+    fields: list[dict[str, Any]],
+    *,
+    read_only: bool = False,
+) -> dict[str, Any]:
     display: dict[str, Any] = {"_id": {"order": 0, "hidden": True}, "_id0": {"order": 0, "hidden": True}}
     for index, field in enumerate(fields, start=1):
         field_order = int(field.get("order", index - 1)) + 1
-        display[field["view_mname"]] = {"order": field_order, "hidden": False, "title": field["name"]}
+        config: dict[str, Any] = {
+            "order": field_order,
+            "hidden": False,
+            "title": field["name"],
+            "filter": {"mode": "standard", "enabled": True},
+        }
+        if read_only:
+            config["inputConfig"] = None
+            config["outputConfig"] = {"outputType": "default"}
+        display[field["view_mname"]] = config
     return display
 
 
@@ -2068,7 +2181,12 @@ def _material_view_data_row(module_name: str, view_id: str, fields: list[dict[st
                 "editing": {"enabled": bool(editable)},
                 "emitting": {},
                 "reporting": {"reports": []},
-                "displaying": {"fields": _material_view_display_fields(fields), "header": {}, "editForm": {}},
+                "displaying": {
+                    "list": {"pageSizeOptions": [], "showLineNumbers": False},
+                    "fields": _material_view_display_fields(fields, read_only=not editable),
+                    "header": {},
+                    "editForm": {},
+                },
                 "cellActionContainers": [],
             }
         ],
@@ -2355,7 +2473,7 @@ def _material_view_data_list_row(
                 "reporting": {"reports": []},
                 "displaying": {
                     "list": {"pageSizeOptions": []},
-                    "fields": _material_view_display_fields(fields),
+                    "fields": _material_view_display_fields(fields, read_only=True),
                     "header": {},
                     "editForm": {},
                 },
@@ -2517,6 +2635,11 @@ def _material_module_plan_preview(
         "view": {
             "name": names["view"],
             "view_id": view_id,
+            "format": "table",
+            "settings": {
+                "engineVersion": "v2",
+                "title": fields[0]["view_mname"],
+            },
             "entity": {
                 "name": names["content_type"],
                 "type": "content",
@@ -2635,6 +2758,7 @@ def _report_tab_operation(
     open_id: bool,
     fullscreen_mode: bool,
     replace_existing_tab: bool,
+    delivery_evidence: dict[str, Any] | None,
     allow_unmanaged_update: bool,
 ) -> WriteOperation:
     request = {
@@ -2652,6 +2776,7 @@ def _report_tab_operation(
         "openId": open_id,
         "fullscreenMode": fullscreen_mode,
         "replaceExistingTab": replace_existing_tab,
+        "deliveryEvidence": delivery_evidence,
         "allowUnmanagedUpdate": allow_unmanaged_update,
     }
     return _resource_operation(
@@ -2807,6 +2932,175 @@ def _project_database_dashboard_template(
     }
 
 
+def _project_database_printable_template(
+    *,
+    report_name: str,
+    marker: str,
+    source_view_id: str,
+    source_view_name: str,
+    columns: list[dict[str, str]],
+) -> dict[str, Any]:
+    visible_columns = _visible_report_columns(columns)
+    widths = _printable_column_widths(visible_columns)
+    connection = json.dumps(
+        {"type": "view-data-v2", "filter": {"viewId": source_view_id}},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    column_items = {
+        str(index): {
+            "Name": column["name"],
+            "NameInSource": column["name"],
+            "Alias": column["alias"],
+            "Type": column["type"],
+        }
+        for index, column in enumerate(visible_columns)
+    }
+    header_components: dict[str, dict[str, Any]] = {}
+    data_components: dict[str, dict[str, Any]] = {}
+    left = 0.0
+    for index, (column, width) in enumerate(zip(visible_columns, widths, strict=True)):
+        rectangle = f"{left:.3f},0,{width:.3f},0.8"
+        common = {
+            "ClientRectangle": rectangle,
+            "Border": "All;;;;;;;solid:Black",
+            "VertAlignment": "Center",
+            "CanGrow": True,
+            "WordWrap": True,
+        }
+        header_components[str(index)] = {
+            "Ident": "StiText",
+            "Name": f"Header_{index + 1}",
+            **common,
+            "Text": {"Value": column["alias"]},
+            "HorAlignment": "Center",
+            "Font": ";9;Bold;",
+            "Brush": "solid:245,247,250",
+            "TextBrush": "solid:Black",
+        }
+        data_components[str(index)] = {
+            "Ident": "StiText",
+            "Name": f"Data_{index + 1}",
+            **common,
+            "Text": {"Value": f"{{data.{column['name']}}}"},
+            "Font": ";9;;",
+            "GrowToHeight": True,
+            "TextBrush": "solid:Black",
+        }
+        left += width
+    return {
+        "CodexMarker": marker,
+        "ReportName": report_name,
+        "ReportAlias": report_name,
+        "ReportUnit": "Centimeters",
+        "Alterios": {
+            "sourceViewId": source_view_id,
+            "sourceViewName": source_view_name,
+            "templateKind": "printable_project_database",
+        },
+        "Dictionary": {
+            "Databases": {
+                "0": {
+                    "Ident": "StiCustomDatabase",
+                    "Name": source_view_name,
+                    "Alias": "Project Database",
+                    "CastToColumnType": "CastToColumnType",
+                    "ServiceName": "Project Database",
+                    "ConnectionString": connection,
+                }
+            },
+            "DataSources": {
+                "0": {
+                    "Ident": "StiCustomSource",
+                    "Name": "data",
+                    "Alias": source_view_name,
+                    "NameInSource": source_view_name,
+                    "ServiceName": "Project Database",
+                    "SqlCommand": "data",
+                    "Columns": column_items,
+                }
+            },
+        },
+        "Pages": {
+            "0": {
+                "Ident": "StiPage",
+                "Name": "PrintableRegistry",
+                "Width": 19,
+                "Height": 27.7,
+                "Components": {
+                    "0": {
+                        "Ident": "StiReportTitleBand",
+                        "Name": "ReportTitle",
+                        "ClientRectangle": "0,0,19,1.4",
+                        "CanGrow": True,
+                        "Components": {
+                            "0": {
+                                "Ident": "StiText",
+                                "Name": "ReportTitleText",
+                                "ClientRectangle": "0,0,19,1.2",
+                                "Text": {"Value": report_name},
+                                "HorAlignment": "Center",
+                                "VertAlignment": "Center",
+                                "Font": ";16;Bold;",
+                                "TextBrush": "solid:Black",
+                            }
+                        },
+                    },
+                    "1": {
+                        "Ident": "StiPageHeaderBand",
+                        "Name": "PageHeader",
+                        "ClientRectangle": "0,0,19,0.8",
+                        "CanGrow": True,
+                        "Components": header_components,
+                    },
+                    "2": {
+                        "Ident": "StiDataBand",
+                        "Name": "DataBand",
+                        "ClientRectangle": "0,0,19,0.8",
+                        "CanGrow": True,
+                        "CanBreak": True,
+                        "DataSourceName": "data",
+                        "Components": data_components,
+                    },
+                    "3": {
+                        "Ident": "StiPageFooterBand",
+                        "Name": "PageFooter",
+                        "ClientRectangle": "0,0,19,0.6",
+                        "Components": {
+                            "0": {
+                                "Ident": "StiText",
+                                "Name": "PageNumber",
+                                "ClientRectangle": "0,0,19,0.6",
+                                "Text": {"Value": "Страница {PageNumber} из {TotalPageCount}"},
+                                "HorAlignment": "Right",
+                                "VertAlignment": "Center",
+                                "Font": ";8;;",
+                                "TextBrush": "solid:Black",
+                            }
+                        },
+                    },
+                },
+            }
+        },
+    }
+
+
+def _printable_column_widths(columns: list[dict[str, str]], total_width: float = 19.0) -> list[float]:
+    if not columns:
+        return []
+    weights = []
+    for column in columns:
+        text = f"{column.get('name', '')} {column.get('alias', '')}".lower()
+        weight = 2.0 if any(token in text for token in ("description", "comment", "описан", "комментар")) else 1.0
+        if column.get("type") in {"System.Decimal", "System.Boolean", "System.DateTime"}:
+            weight = min(weight, 0.85)
+        weights.append(weight)
+    unit = total_width / sum(weights)
+    widths = [round(weight * unit, 3) for weight in weights]
+    widths[-1] = round(total_width - sum(widths[:-1]), 3)
+    return widths
+
+
 def _project_database_native_dashboard_template(
     *,
     report_name: str,
@@ -2818,6 +3112,40 @@ def _project_database_native_dashboard_template(
 ) -> dict[str, Any]:
     visible_columns = _visible_report_columns(columns)
     template = _project_database_dashboard_template(
+        report_name=report_name,
+        marker=marker,
+        source_view_id=source_view_id,
+        source_view_name=source_view_name,
+        columns=visible_columns,
+    )
+    try:
+        return _stimulsoft_native_project_database_template(
+            template=template,
+            report_name=report_name,
+            marker=marker,
+            source_view_id=source_view_id,
+            source_view_name=source_view_name,
+            columns=visible_columns,
+            base_url=base_url,
+        )
+    except Exception as exc:
+        alterios = template.setdefault("Alterios", {})
+        if isinstance(alterios, dict):
+            alterios["nativeTemplateBuildError"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+        return template
+
+
+def _project_database_native_printable_template(
+    *,
+    report_name: str,
+    marker: str,
+    source_view_id: str,
+    source_view_name: str,
+    columns: list[dict[str, str]],
+    base_url: str,
+) -> dict[str, Any]:
+    visible_columns = _visible_report_columns(columns)
+    template = _project_database_printable_template(
         report_name=report_name,
         marker=marker,
         source_view_id=source_view_id,
@@ -2853,7 +3181,7 @@ def _stimulsoft_native_project_database_template(
 ) -> dict[str, Any]:
     node_path = _find_node()
     scripts_dir = _ensure_stimulsoft_assets(base_url)
-    helper_path = Path(tempfile.gettempdir()) / "alterios-mcp-stimulsoft" / "build_project_database_dashboard.js"
+    helper_path = Path(tempfile.gettempdir()) / "alterios-mcp-stimulsoft" / "build_project_database_template.js"
     helper_path.parent.mkdir(parents=True, exist_ok=True)
     helper_path.write_text(_STIMULSOFT_PROJECT_DATABASE_DASHBOARD_HELPER, encoding="utf-8")
     completed = subprocess.run(
@@ -2962,7 +3290,9 @@ saved.Alterios = {
   ...(input.template.Alterios || {}),
   sourceViewId: input.viewId,
   sourceViewName: input.viewName,
-  templateKind: "report_tab_project_database_native_dashboard",
+  templateKind: input.template.Alterios?.templateKind === "printable_project_database"
+    ? "native_printable_project_database"
+    : "report_tab_project_database_native_dashboard",
 };
 process.stdout.write(JSON.stringify(saved));
 """
@@ -3098,6 +3428,7 @@ def _process_flow_operation(
     complete_task: bool,
     expected_user_task_name: str,
     expected_task_form_id: str | None,
+    delivery_evidence: dict[str, Any] | None,
     allow_unmanaged_update: bool,
 ) -> WriteOperation:
     request = {
@@ -3114,6 +3445,7 @@ def _process_flow_operation(
         "expectedUserTaskName": expected_user_task_name,
         "expectedTaskFormId": expected_task_form_id,
         "allowUnmanagedUpdate": allow_unmanaged_update,
+        "deliveryEvidence": delivery_evidence,
     }
     return _resource_operation(
         name="SCENARIO create_process_flow",
@@ -3358,6 +3690,33 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
         "missing_for_project_call": config.missing_for_project_call(),
         "missing_for_script_call": config.missing_for_script_call(),
         "write_enabled": _write_enabled(),
+    }
+
+
+@mcp.tool()
+def alterios_runtime_info(expected_fingerprint: str | None = None) -> dict[str, Any]:
+    """Return the active MCP source/skills/tool-schema fingerprint and stale-process status."""
+    runtime = _runtime_fingerprint()
+    expected = (expected_fingerprint or "").strip()
+    runtime["expected_fingerprint"] = expected or None
+    runtime["matches_expected"] = not expected or runtime["fingerprint"] == expected
+    runtime["ok"] = not runtime["stale"] and runtime["matches_expected"]
+    return runtime
+
+
+@mcp.tool()
+def alterios_ux_contract() -> dict[str, Any]:
+    """Return the active machine-readable Alterios UX contract."""
+    return {
+        "readonly": True,
+        "version": UX_CONTRACT_VERSION,
+        "blocking_form_issue_codes": sorted(BLOCKING_FORM_ISSUE_CODES),
+        "scenario_apply_requires": [
+            "work_item_ref",
+            "agent_handoff_refs",
+            "ux_contract_version",
+            "fresh_runtime_fingerprint",
+        ],
     }
 
 
@@ -6243,6 +6602,7 @@ def alterios_upsert_form(
     tabs: list[dict[str, Any]] | None = None,
     form_action_containers: list[dict[str, Any]] | None = None,
     description: str | None = None,
+    enforce_ux_contract: bool = False,
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
     profile: str | None = None,
@@ -6269,13 +6629,14 @@ def alterios_upsert_form(
             else (existing or {}).get("formActionContainers") or []
         ),
     }
+    ux_contract = analyze_form_surface(payload, strict=enforce_ux_contract)
     operation = _resource_operation(
         name=("PATCH /api/forms/{id}" if existing else "POST /api/forms"),
         kind="form",
         method="PATCH" if existing else "POST",
         path=f"/api/forms/{existing.get('_id')}" if existing else "/api/forms",
         summary="Create or update an Alterios form with managed-object guard and readback.",
-        request={"_id": payload.get("_id"), "name": name},
+        request={"_id": payload.get("_id"), "name": name, "enforceUxContract": enforce_ux_contract},
     )
     audit = build_write_audit(
         profile=profile,
@@ -6288,9 +6649,13 @@ def alterios_upsert_form(
         "preflight": _resource_summary(existing),
         "diff": _resource_diff(existing, payload, ("name", "pageTitle", "description", "tabs", "formActionContainers")),
         "planned_payload": strip_alterios_metadata(payload),
+        "ux_contract": ux_contract,
     }
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
+    if enforce_ux_contract and not ux_contract["ok"]:
+        blocking = ", ".join(ux_contract.get("blocking_issues_by_code", {}))
+        raise ValueError(f"Alterios UX contract blocks form apply: {blocking}")
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
     saved = client.save_form(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
@@ -6323,6 +6688,8 @@ def alterios_create_material_module(
     menu_icon_id: str | None = "menu",
     close_icon_id: str | None = "keyboard_return",
     save_icon_id: str | None = "save",
+    delivery_evidence: dict[str, Any] | None = None,
+    expected_runtime_fingerprint: str | None = None,
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
     plan_id: str | None = None,
@@ -6361,6 +6728,7 @@ def alterios_create_material_module(
         menu_icon_id=menu_icon_id,
         close_icon_id=close_icon_id,
         save_icon_id=save_icon_id,
+        delivery_evidence=delivery_evidence,
         allow_unmanaged_update=allow_unmanaged_update,
     )
     audit = build_write_audit(
@@ -6417,6 +6785,8 @@ def alterios_create_material_module(
 
     if not plan_id:
         raise ValueError("plan_id is required when dry_run=false for alterios_create_material_module.")
+    verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
+    runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
     assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
 
@@ -6510,6 +6880,8 @@ def alterios_create_material_module(
     view_result = alterios_upsert_view(
         resolved_names["view"],
         view_id=view_id,
+        format="table",
+        settings={"engineVersion": "v2"},
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6581,6 +6953,25 @@ def alterios_create_material_module(
         )
         steps.append({"step": "view_field", "field_id": field["_id"], "result": view_field_result})
 
+    view_settings_result = alterios_upsert_view(
+        resolved_names["view"],
+        view_id=view_id,
+        format="table",
+        settings={"engineVersion": "v2", "title": saved_fields[0]["view_mname"]},
+        allow_unmanaged_update=True,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    steps.append(
+        {
+            "step": "view_settings",
+            "id": view_id,
+            "settings": {"engineVersion": "v2", "title": saved_fields[0]["view_mname"]},
+            "result": view_settings_result,
+        }
+    )
+
     add_tabs = [
         {
             "name": None,
@@ -6593,6 +6984,7 @@ def alterios_create_material_module(
         page_title=resolved_names["add_page_title"],
         tabs=add_tabs,
         form_action_containers=_material_edit_form_actions(close_icon_id=close_icon_id, save_icon_id=save_icon_id),
+        enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6619,6 +7011,7 @@ def alterios_create_material_module(
         page_title=resolved_names["edit_page_title"],
         tabs=edit_tabs,
         form_action_containers=_material_edit_form_actions(close_icon_id=close_icon_id, save_icon_id=save_icon_id),
+        enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6652,6 +7045,7 @@ def alterios_create_material_module(
         page_title=resolved_names["view_page_title"],
         tabs=view_tabs,
         form_action_containers=[_material_close_action_container(close_icon_id)],
+        enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6693,6 +7087,7 @@ def alterios_create_material_module(
         page_title=resolved_names["list_page_title"],
         tabs=list_tabs,
         form_action_containers=[],
+        enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6759,6 +7154,8 @@ def alterios_create_material_module(
             },
             "steps": steps,
             "readback": readback,
+            "delivery_evidence": verified_delivery_evidence,
+            "runtime_gate": runtime_gate,
         }
     )
     return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
@@ -7350,6 +7747,8 @@ def alterios_create_process_flow(
     start_process_smoke: bool = True,
     complete_task: bool = False,
     expected_task_count_min: int | None = 1,
+    delivery_evidence: dict[str, Any] | None = None,
+    expected_runtime_fingerprint: str | None = None,
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
     plan_id: str | None = None,
@@ -7460,6 +7859,7 @@ def alterios_create_process_flow(
         complete_task=complete_task,
         expected_user_task_name=normalized_user_task_name,
         expected_task_form_id=planned_task_form_id,
+        delivery_evidence=delivery_evidence,
         allow_unmanaged_update=allow_unmanaged_update,
     )
     audit = build_write_audit(
@@ -7509,6 +7909,8 @@ def alterios_create_process_flow(
 
     if not plan_id:
         raise ValueError("plan_id is required when dry_run=false for alterios_create_process_flow.")
+    verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
+    runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
     assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
 
@@ -7519,6 +7921,7 @@ def alterios_create_process_flow(
         tabs=planned_tabs,
         form_action_containers=planned_actions,
         description=task_form_description or f"{MANAGED_MARKER}: alterios-mcp process task form.",
+        enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -7630,6 +8033,8 @@ def alterios_create_process_flow(
             "process_smoke": process_smoke,
         }
     )
+    response_payload["delivery_evidence"] = verified_delivery_evidence
+    response_payload["runtime_gate"] = runtime_gate
     return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
 
@@ -7782,6 +8187,55 @@ def alterios_validate_stimulsoft_layout(
 
 
 @mcp.tool()
+def alterios_validate_printable_render(
+    report_id: str | None = None,
+    template: str | dict[str, Any] | None = None,
+    sample_rows: list[dict[str, Any]] | None = None,
+    output_path: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Render a printable Stimulsoft report in Chromium and export PDF evidence."""
+    if not report_id and template is None:
+        raise ValueError("Pass report_id or template.")
+    client = _client(profile, project_id)
+    report = client.report_by_id(report_id).body if report_id else None
+    if report_id and not isinstance(report, dict):
+        raise ValueError("Report readback returned unexpected payload.")
+    source: Any = report if report_id else {"template": template}
+    normalized = _report_template_payload(source)
+    if not isinstance(normalized, dict):
+        raise ValueError("Report has no parseable Stimulsoft template.")
+    if not _report_has_printable_page({"template": normalized}):
+        raise ValueError("Printable render validation requires at least one StiPage.")
+    layout = analyze_stimulsoft_layout(normalized)
+    if not layout.get("ok"):
+        raise ValueError("Printable report layout has blocking errors; fix them before render validation.")
+    rows = sample_rows or _printable_smoke_rows(normalized)
+    if not all(isinstance(row, dict) for row in rows):
+        raise ValueError("sample_rows must contain JSON objects.")
+    scripts_dir = _ensure_stimulsoft_assets(client.config.base_url)
+    target = output_path or str(
+        artifact_root()
+        / "report-renders"
+        / f"{report_id or 'template'}-{int(time.time())}.pdf"
+    )
+    render = render_printable_pdf(
+        normalized,
+        rows=rows,
+        reports_script=scripts_dir / "stimulsoft.reports.pack.js",
+        output_path=target,
+    )
+    return {
+        "readonly": True,
+        "report": _resource_summary(report) if isinstance(report, dict) else None,
+        "layout": layout,
+        "sample_row_count": len(rows),
+        "render": render,
+    }
+
+
+@mcp.tool()
 def alterios_create_report_tab(
     source_view_id: str,
     target_form_id: str,
@@ -7789,7 +8243,7 @@ def alterios_create_report_tab(
     report_id: str | None = None,
     tab_name: str = "Отчет",
     cell_name: str | None = None,
-    report_type: str = "dashboard",
+    report_type: str = "report",
     template: str | dict[str, Any] | None = None,
     marker: str | None = None,
     expected_source_view_name: str | None = None,
@@ -7798,6 +8252,8 @@ def alterios_create_report_tab(
     open_id: bool = True,
     fullscreen_mode: bool = False,
     replace_existing_tab: bool = True,
+    delivery_evidence: dict[str, Any] | None = None,
+    expected_runtime_fingerprint: str | None = None,
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
     plan_id: str | None = None,
@@ -7810,7 +8266,10 @@ def alterios_create_report_tab(
     normalized_report_name = report_name.strip()
     normalized_tab_name = tab_name.strip()
     normalized_cell_name = (cell_name or tab_name).strip()
-    normalized_report_type = report_type.strip() or "dashboard"
+    requested_report_type = report_type.strip().lower() or "report"
+    if requested_report_type not in {"report", "printable", "dashboard"}:
+        raise ValueError("report_type must be 'report'/'printable' or 'dashboard'.")
+    normalized_report_type = "report" if requested_report_type == "printable" else requested_report_type
     if not normalized_view_id:
         raise ValueError("source_view_id must not be empty.")
     if not normalized_form_id:
@@ -7855,14 +8314,26 @@ def alterios_create_report_tab(
     report_columns = _project_database_columns(view_fields)
     client_config = getattr(client, "config", None)
     base_url = str(getattr(client_config, "base_url", "") or "")
-    template_payload: str | dict[str, Any] = template if template is not None else _project_database_native_dashboard_template(
-        report_name=normalized_report_name,
-        marker=resolved_marker,
-        source_view_id=normalized_view_id,
-        source_view_name=source_view_name,
-        columns=report_columns,
-        base_url=base_url,
-    )
+    if template is not None:
+        template_payload: str | dict[str, Any] = template
+    elif normalized_report_type == "report":
+        template_payload = _project_database_native_printable_template(
+            report_name=normalized_report_name,
+            marker=resolved_marker,
+            source_view_id=normalized_view_id,
+            source_view_name=source_view_name,
+            columns=report_columns,
+            base_url=base_url,
+        )
+    else:
+        template_payload = _project_database_native_dashboard_template(
+            report_name=normalized_report_name,
+            marker=resolved_marker,
+            source_view_id=normalized_view_id,
+            source_view_name=source_view_name,
+            columns=report_columns,
+            base_url=base_url,
+        )
 
     operation = _report_tab_operation(
         source_view_id=normalized_view_id,
@@ -7879,6 +8350,7 @@ def alterios_create_report_tab(
         open_id=open_id,
         fullscreen_mode=fullscreen_mode,
         replace_existing_tab=replace_existing_tab,
+        delivery_evidence=delivery_evidence,
         allow_unmanaged_update=allow_unmanaged_update,
     )
     audit = build_write_audit(
@@ -7945,6 +8417,8 @@ def alterios_create_report_tab(
 
     if not plan_id:
         raise ValueError("plan_id is required when dry_run=false for alterios_create_report_tab.")
+    verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
+    runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
     assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
 
@@ -7990,6 +8464,15 @@ def alterios_create_report_tab(
         expected_view_name=source_view_name,
         expected_marker=resolved_marker,
     )
+    report_validation["kind_matches_report_type"] = (
+        report_validation["has_printable_page"]
+        if normalized_report_type == "report"
+        else report_validation["has_dashboard_page"]
+    )
+    if not report_validation["kind_matches_report_type"]:
+        raise ValueError(
+            f"Saved report template kind does not match report_type={normalized_report_type!r}."
+        )
     report_tab_cell = _find_report_tab_cell(form_readback, tab_name=normalized_tab_name, report_id=resolved_report_id)
     if not report_tab_cell:
         raise ValueError("Report tab cell was not visible on form readback.")
@@ -8017,6 +8500,8 @@ def alterios_create_report_tab(
                 "report_tab_cell": report_tab_cell,
                 "validation": readback_validation,
             },
+            "delivery_evidence": verified_delivery_evidence,
+            "runtime_gate": runtime_gate,
         }
     )
     return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)

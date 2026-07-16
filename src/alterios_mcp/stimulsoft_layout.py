@@ -249,6 +249,8 @@ def find_overlaps(components: list[ComponentRef], *, overlap_tolerance: float) -
         for right in components[index + 1 :]:
             if right.rect is None:
                 continue
+            if is_flow_band(left) and is_flow_band(right):
+                continue
             intersection = left.rect.intersection_area(right.rect)
             if intersection <= EPSILON:
                 continue
@@ -272,6 +274,10 @@ def find_overlaps(components: list[ComponentRef], *, overlap_tolerance: float) -
                 )
             )
     return issues
+
+
+def is_flow_band(component: ComponentRef) -> bool:
+    return component.ident.startswith("Sti") and component.ident.endswith("Band")
 
 
 def find_dynamic_height_risks(components: list[ComponentRef]) -> list[LayoutIssue]:

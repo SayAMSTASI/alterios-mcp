@@ -17,6 +17,13 @@ from alterios_mcp.write_control import (
 )
 
 
+DELIVERY_EVIDENCE = {
+    "work_item_ref": "gitea:#2",
+    "agent_handoff_refs": ["gitea:#2/comment/analyst"],
+    "ux_contract_version": server.UX_CONTRACT_VERSION,
+}
+
+
 def test_write_audit_requires_explicit_profile_and_project() -> None:
     operation = WriteOperation(
         name="PUT /api/reports",
@@ -2215,6 +2222,7 @@ def test_create_material_module_execution_rejects_changed_plan_options_without_r
             "Материалы",
             "mat",
             fields,
+            delivery_evidence=DELIVERY_EVIDENCE,
             profile="vniimt",
             project_id="project-1",
         )
@@ -2233,6 +2241,7 @@ def test_create_material_module_execution_rejects_changed_plan_options_without_r
             "mat",
             fields,
             icon_id="folder",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -2427,6 +2436,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
                 "mat",
                 fields,
                 content_name_template="{{mat_name}}",
+                delivery_evidence=DELIVERY_EVIDENCE,
                 profile="vniimt",
                 project_id="project-1",
             )
@@ -2445,6 +2455,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             "mat",
             fields,
             content_name_template="{{mat_name}}",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -2593,9 +2604,11 @@ def test_create_report_tab_dry_run_stores_plan_without_real_network(tmp_path) ->
     assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
     database = result["response"]["planned"]["report"]["template"]["Dictionary"]["Databases"]["0"]
     assert database["ServiceName"] == "Project Database"
-    table = result["response"]["planned"]["report"]["template"]["Pages"]["0"]["Components"]["1"]
-    assert table["Columns"]["0"]["Expression"] == "data.name"
-    assert table["Columns"]["0"]["Label"] == "Наименование"
+    template = result["response"]["planned"]["report"]["template"]
+    assert result["response"]["planned"]["report"]["type"] == "report"
+    assert template["Pages"]["0"]["Ident"] == "StiPage"
+    assert template["Pages"]["0"]["Components"]["2"]["DataSourceName"] == "data"
+    assert template["Pages"]["0"]["Components"]["2"]["Components"]["0"]["Text"]["Value"] == "{data.name}"
     assert result["response"]["context_readback"]["validation"]["data_id_matches_expected"] is True
     assert result["response"]["planned"]["form_tabs"][0]["rows"][0]["cells"][0]["params"]["openId"] is True
     assert result["plan"]["plan_id"].startswith("wp_")
@@ -2635,6 +2648,7 @@ def test_create_report_tab_execution_rejects_changed_plan_options_without_real_n
             "form-1",
             "Материалы. Отчет",
             tab_name="Отчет",
+            delivery_evidence=DELIVERY_EVIDENCE,
             profile="vniimt",
             project_id="project-1",
         )
@@ -2653,6 +2667,7 @@ def test_create_report_tab_execution_rejects_changed_plan_options_without_real_n
             "form-1",
             "Материалы. Отчет",
             tab_name="Другой отчет",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -2739,6 +2754,7 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
                 "Материалы. Отчет",
                 tab_name="Отчет",
                 context_content_id="content-1",
+                delivery_evidence=DELIVERY_EVIDENCE,
                 profile="vniimt",
                 project_id="project-1",
             )
@@ -2758,6 +2774,7 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
             "Материалы. Отчет",
             tab_name="Отчет",
             context_content_id="content-1",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -2768,8 +2785,12 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     assert result["audit"]["operation"]["kind"] == "scenario_report_tab"
     assert result["response"]["ids"] == {"report_id": "report-1", "form_id": "form-1", "source_view_id": "view-1"}
     assert apply_client.reports["report-1"]["template"]["Dictionary"]["DataSources"]["0"]["NameInSource"] == "Материалы. Список"
-    table = apply_client.reports["report-1"]["template"]["Pages"]["0"]["Components"]["1"]
-    assert [item["Expression"] for item in table["Columns"].values()] == ["data.name", "data.count"]
+    template = apply_client.reports["report-1"]["template"]
+    assert apply_client.reports["report-1"]["type"] == "report"
+    assert template["Pages"]["0"]["Ident"] == "StiPage"
+    data_band = template["Pages"]["0"]["Components"]["2"]
+    assert data_band["DataSourceName"] == "data"
+    assert [item["Text"]["Value"] for item in data_band["Components"].values()] == ["{data.name}", "{data.count}"]
     tab = apply_client.forms["form-1"]["tabs"][1]
     assert tab["name"] == "Отчет"
     cell = tab["rows"][0]["cells"][0]
@@ -2777,11 +2798,26 @@ def test_create_report_tab_execution_creates_report_and_form_tab_without_real_ne
     assert cell["params"] == {"reportId": "report-1", "fullscreenMode": False, "openId": True}
     validation = result["response"]["readback"]["validation"]
     assert validation["report_project_database"]["has_project_database"] is True
+    assert validation["report_project_database"]["has_printable_page"] is True
+    assert validation["report_project_database"]["kind_matches_report_type"] is True
     assert validation["report_project_database"]["view_name_matches"] is True
     assert validation["form_tab_open_id"] is True
     assert validation["context"]["data_id_row_count"] == 1
     assert validation["render_evidence"]["status"] == "not_collected"
     assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_project_database_dashboard_builder_remains_explicit_and_separate() -> None:
+    template = server._project_database_dashboard_template(
+        report_name="Аналитика",
+        marker="Codex-managed",
+        source_view_id="view-1",
+        source_view_name="Материалы",
+        columns=[{"name": "name", "alias": "Наименование", "type": "System.String"}],
+    )
+
+    assert template["Pages"]["0"]["Ident"] == "StiDashboard"
+    assert template["Pages"]["0"]["Components"]["1"]["Columns"]["0"]["Expression"] == "data.name"
 
 
 def test_create_process_flow_dry_run_stores_plan_without_real_network(tmp_path) -> None:
@@ -2871,6 +2907,7 @@ def test_create_process_flow_execution_rejects_changed_plan_options_without_real
             "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°",
             "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
             content_type_id="ct-1",
+            delivery_evidence=DELIVERY_EVIDENCE,
             profile="vniimt",
             project_id="project-1",
         )
@@ -2889,6 +2926,7 @@ def test_create_process_flow_execution_rejects_changed_plan_options_without_real
             "РџСЂРѕС†РµСЃСЃ РјР°С‚РµСЂРёР°Р»Р°. Р—Р°РґР°С‡Р°",
             content_type_id="ct-1",
             user_task_name="Changed task",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",
@@ -3015,6 +3053,7 @@ def test_create_process_flow_execution_creates_form_diagram_and_starts_process_w
                 content_type_id="ct-1",
                 user_task_name="Review",
                 content_id="content-1",
+                delivery_evidence=DELIVERY_EVIDENCE,
                 profile="vniimt",
                 project_id="project-1",
             )
@@ -3034,6 +3073,7 @@ def test_create_process_flow_execution_creates_form_diagram_and_starts_process_w
             content_type_id="ct-1",
             user_task_name="Review",
             content_id="content-1",
+            delivery_evidence=DELIVERY_EVIDENCE,
             dry_run=False,
             plan_id=dry_run["plan"]["plan_id"],
             profile="vniimt",

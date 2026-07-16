@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from alterios_mcp.form_surface import analyze_form_surface
+import json
+
+import pytest
+
+from alterios_mcp.form_surface import analyze_form_surface, main
 
 
 def test_form_surface_accepts_clean_view_row() -> None:
@@ -702,3 +706,221 @@ def test_form_surface_accepts_print_or_analytics_form_opened_in_new_tab() -> Non
     result = analyze_form_surface(form)
 
     assert "report_or_analytics_form_should_open_new_tab" not in result["issues_by_code"]
+
+
+def test_form_surface_contract_profile_blocks_confirmed_warning_codes() -> None:
+    form = {
+        "name": "Contract violations",
+        "pageTitle": "Contract violations",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "header": {"title": "Details"},
+                                "params": {"viewId": "view-1"},
+                                "displaying": {
+                                    "fields": {
+                                        "title": {
+                                            "hidden": False,
+                                            "bottomText": "Persistent helper text",
+                                        }
+                                    }
+                                },
+                                "editing": {},
+                                "cellActionContainers": [
+                                    {
+                                        "title": "Files",
+                                        "iconId": "attach_file",
+                                        "actions": [{"type": "forms"}],
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data_list",
+                                "styles": {"width": "100%"},
+                                "header": {
+                                    "title": "Rows",
+                                    "styles": {"textAlign": "left", "fontWeight": "400"},
+                                },
+                                "params": {"viewId": "view-2"},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                            }
+                        ]
+                    },
+                ]
+            }
+        ],
+    }
+
+    default_result = analyze_form_surface(form, field_type_map={"title": "text"})
+    contract_result = analyze_form_surface(form, field_type_map={"title": "text"}, strict=True)
+
+    assert default_result["ok"] is True
+    assert default_result["validation_profile"] == "default"
+    assert default_result["blocking_issue_count"] == 0
+    assert contract_result["ok"] is False
+    assert contract_result["validation_profile"] == "contract"
+    assert contract_result["blocking_issue_count"] == 4
+    assert contract_result["blocking_issues_by_code"] == {
+        "element_action_title_must_be_tooltip": 1,
+        "field_footnote_requires_date": 1,
+        "non_table_cell_header": 1,
+        "table_cell_header_style": 1,
+    }
+
+
+def test_form_surface_contract_profile_blocks_close_without_redirect_back() -> None:
+    form = {
+        "name": "Details",
+        "pageTitle": "Details",
+        "tabs": [],
+        "formActionContainers": [
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect"}],
+            }
+        ],
+    }
+
+    default_result = analyze_form_surface(form)
+    contract_result = analyze_form_surface(form, strict=True)
+
+    assert default_result["ok"] is True
+    assert default_result["issues_by_code"]["close_action_missing_redirect_back"] == 1
+    assert contract_result["ok"] is False
+    assert contract_result["blocking_issues_by_code"] == {"close_action_missing_redirect_back": 1}
+
+
+def test_form_surface_accepts_close_with_redirect_back_in_contract_profile() -> None:
+    form = {
+        "name": "Details",
+        "pageTitle": "Details",
+        "tabs": [],
+        "formActionContainers": [
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["ok"] is True
+    assert "close_action_missing_redirect_back" not in result["issues_by_code"]
+
+
+def test_form_surface_contract_profile_blocks_editable_view_detail_surface() -> None:
+    form = {
+        "name": "Question",
+        "pageTitle": "Question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "editing": {"enabled": True},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "formActionContainers": [
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect_back"}],
+            }
+        ],
+    }
+
+    default_result = analyze_form_surface(form)
+    contract_result = analyze_form_surface(form, strict=True)
+
+    assert default_result["ok"] is True
+    assert default_result["issues_by_code"]["view_detail_view_data_must_be_readonly"] == 1
+    issue = next(
+        issue for issue in contract_result["issues"] if issue["code"] == "view_detail_view_data_must_be_readonly"
+    )
+    assert contract_result["ok"] is False
+    assert issue["path"] == "tabs[0].rows[0].cells[0].editing.enabled"
+    assert issue["details"] == {"editing_enabled": True, "surface": "view/detail"}
+
+
+def test_form_surface_allows_editable_view_data_on_submit_enabled_edit_form() -> None:
+    form = {
+        "name": "Edit question",
+        "pageTitle": "Edit question",
+        "tabs": [
+            {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "type": "view_data",
+                                "styles": {"width": "100%"},
+                                "params": {"viewId": "view-1", "openId": True},
+                                "displaying": {"fields": {"title": {"hidden": False}}},
+                                "editing": {"enabled": True},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "formActionContainers": [
+            {
+                "title": "Save",
+                "iconId": "save",
+                "actions": [{"type": "data_managing", "dataManagingType": "submit_all"}],
+            }
+        ],
+    }
+
+    result = analyze_form_surface(form, strict=True)
+
+    assert result["ok"] is True
+    assert "view_detail_view_data_must_be_readonly" not in result["issues_by_code"]
+
+
+@pytest.mark.parametrize("flag", ["--strict", "--contract"])
+def test_form_surface_cli_contract_flags_return_nonzero_for_contract_violation(tmp_path, capsys, flag: str) -> None:
+    form = {
+        "name": "Details",
+        "pageTitle": "Details",
+        "tabs": [],
+        "formActionContainers": [
+            {
+                "title": "Закрыть",
+                "iconId": "close",
+                "actions": [{"type": "routing", "routingType": "redirect"}],
+            }
+        ],
+    }
+    json_path = tmp_path / "form.json"
+    json_path.write_text(json.dumps(form, ensure_ascii=False), encoding="utf-8")
+
+    assert main([str(json_path)]) == 0
+    default_output = json.loads(capsys.readouterr().out)
+    assert default_output["validation_profile"] == "default"
+
+    assert main([str(json_path), flag]) == 1
+    contract_output = json.loads(capsys.readouterr().out)
+    assert contract_output["validation_profile"] == "contract"
+    assert contract_output["blocking_issues_by_code"] == {"close_action_missing_redirect_back": 1}

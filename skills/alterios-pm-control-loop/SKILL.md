@@ -17,6 +17,12 @@ Use this skill to keep multi-agent Alterios MCP work visible, scoped, and tied t
 6. Update `docs/project-status.md` after a meaningful mergeable slice.
 7. Keep roadmap changes separate from current status updates.
 8. For read-only planning or discovery that has not run yet, return a PM handoff instead of marking repo status `Done`.
+9. Before a scenario apply, require a private work item reference and published
+   agent handoff references in `delivery_evidence`; local narrative is not a
+   substitute for traceable evidence.
+10. Move a task to Done only after runtime freshness, UX-contract, automated
+    tests, report PDF evidence where applicable, git push, and readback evidence
+    are recorded.
 
 ## Handoff Format
 

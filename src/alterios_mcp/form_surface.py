@@ -5,6 +5,8 @@ import json
 from collections import Counter
 from typing import Any
 
+from .ux_contract import UX_CONTRACT_VERSION, apply_form_contract
+
 VIEW_CELL_TYPES = {"view_data", "view_data_list"}
 DATA_CELL_TYPES = VIEW_CELL_TYPES | {"content", "report", "comments_list", "edit_task"}
 EXPECTED_ROW_ACTION_ORDER = {"edit": 0, "view": 1, "delete": 2}
@@ -49,9 +51,12 @@ FIELD_TYPE_KEYS = {
     "inputType",
     "input_type",
 }
-
-
-def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | None = None) -> dict[str, Any]:
+def analyze_form_surface(
+    form: dict[str, Any],
+    field_type_map: dict[str, str] | None = None,
+    *,
+    strict: bool = False,
+) -> dict[str, Any]:
     """Analyze Alterios form JSON for view/form UX and action guardrails."""
     issues: list[dict[str, Any]] = []
     inventory: dict[str, Any] = {
@@ -90,6 +95,7 @@ def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | 
     page_titles: list[str] = []
     headers: list[str] = []
     field_footnotes: list[dict[str, Any]] = []
+    view_data_cells: list[tuple[dict[str, Any], str]] = []
 
     _collect_role_keys(form, role_keys)
     _collect_titles(form, page_titles, headers)
@@ -119,6 +125,8 @@ def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | 
                 inventory["cell_count"] += 1
                 cell_type = str(cell.get("type") or "unknown")
                 cell_types[cell_type] += 1
+                if cell_type == "view_data":
+                    view_data_cells.append((cell, cell_path))
                 _collect_style_keys(cell.get("styles"), style_keys)
                 _collect_data_source(cell, cell_path, data_sources)
                 _analyze_cell(cell, cell_path, issues, field_type_map or {}, field_footnotes)
@@ -133,6 +141,8 @@ def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | 
 
     top_actions = form.get("formActionContainers")
     _analyze_action_containers(top_actions, "formActionContainers", issues, action_icons)
+    _analyze_close_action_routing(top_actions, "formActionContainers", issues)
+    _analyze_view_detail_editing(form, view_data_cells, issues)
 
     inventory["cell_types"] = dict(sorted(cell_types.items()))
     inventory["style_keys"] = dict(sorted(style_keys.items()))
@@ -145,11 +155,17 @@ def analyze_form_surface(form: dict[str, Any], field_type_map: dict[str, str] | 
     inventory["headers"] = sorted(set(headers))
     inventory["field_footnotes"] = field_footnotes
 
+    issues = apply_form_contract(issues, strict=strict)
     issue_counts = Counter(issue["code"] for issue in issues)
     severity_counts = Counter(issue["severity"] for issue in issues)
-    blocking_severities = {"error"}
+    blocking_issues = [issue for issue in issues if issue["severity"] == "error"]
+    blocking_issue_counts = Counter(issue["code"] for issue in blocking_issues)
     return {
-        "ok": not any(issue["severity"] in blocking_severities for issue in issues),
+        "ok": not blocking_issues,
+        "validation_profile": "contract" if strict else "default",
+        "contract_version": UX_CONTRACT_VERSION,
+        "blocking_issue_count": len(blocking_issues),
+        "blocking_issues_by_code": dict(sorted(blocking_issue_counts.items())),
         "issue_count": len(issues),
         "issues_by_code": dict(sorted(issue_counts.items())),
         "issues_by_severity": dict(sorted(severity_counts.items())),
@@ -430,6 +446,82 @@ def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues
                 "fontWeight": styles.get("fontWeight") or styles.get("font-weight"),
             },
         )
+
+
+def _analyze_close_action_routing(containers: Any, path: str, issues: list[dict[str, Any]]) -> None:
+    if not isinstance(containers, list):
+        return
+    for index, container in enumerate(containers):
+        if not isinstance(container, dict):
+            continue
+        container_path = f"{path}[{index}]"
+        close_path = container_path if _is_close_action(container) else ""
+        actions = container.get("actions")
+        if isinstance(actions, list):
+            for action_index, action in enumerate(actions):
+                if isinstance(action, dict) and _is_close_action(action):
+                    close_path = f"{container_path}.actions[{action_index}]"
+                    break
+        if close_path and not _contains_redirect_back(container):
+            _add_issue(
+                issues,
+                "warning",
+                "close_action_missing_redirect_back",
+                "The Close action must contain routingType=redirect_back.",
+                close_path,
+            )
+
+
+def _is_close_action(action: dict[str, Any]) -> bool:
+    for key in ("title", "name", "tooltip"):
+        label = str(action.get(key) or "").strip().casefold().rstrip(".:")
+        if label in {"закрыть", "close"}:
+            return True
+    return False
+
+
+def _contains_redirect_back(value: Any) -> bool:
+    if isinstance(value, dict):
+        if str(value.get("routingType") or "").strip().casefold() == "redirect_back":
+            return True
+        return any(_contains_redirect_back(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_redirect_back(child) for child in value)
+    return False
+
+
+def _analyze_view_detail_editing(
+    form: dict[str, Any],
+    view_data_cells: list[tuple[dict[str, Any], str]],
+    issues: list[dict[str, Any]],
+) -> None:
+    if _form_has_submit_action(form.get("formActionContainers")):
+        return
+    for cell, path in view_data_cells:
+        editing = _dict_or_empty(cell.get("editing"))
+        if editing.get("enabled") is True:
+            _add_issue(
+                issues,
+                "warning",
+                "view_detail_view_data_must_be_readonly",
+                "A view/detail surface must not explicitly enable view_data editing; use a submit-enabled edit form.",
+                f"{path}.editing.enabled",
+                {"editing_enabled": True, "surface": "view/detail"},
+            )
+
+
+def _form_has_submit_action(value: Any) -> bool:
+    if isinstance(value, dict):
+        action_type = str(value.get("type") or "").strip().casefold()
+        data_managing_type = str(value.get("dataManagingType") or "").strip().casefold()
+        if action_type in {"save", "submit"}:
+            return True
+        if data_managing_type in {"save", "save_all", "submit", "submit_all"}:
+            return True
+        return any(_form_has_submit_action(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_form_has_submit_action(child) for child in value)
+    return False
 
 
 def _has_flexible_width(cell: dict[str, Any]) -> bool:
@@ -758,11 +850,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Analyze Alterios form JSON for UX/layout/action guardrails.")
     parser.add_argument("json_path", help="Path to a form JSON file.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
+    parser.add_argument(
+        "--strict",
+        "--contract",
+        dest="strict",
+        action="store_true",
+        help="Block confirmed Alterios contract violations in addition to errors.",
+    )
     args = parser.parse_args(argv)
 
     with open(args.json_path, "r", encoding="utf-8") as fh:
         form = json.load(fh)
-    result = analyze_form_surface(form)
+    result = analyze_form_surface(form, strict=args.strict)
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ok"] else 1
 

@@ -66,6 +66,8 @@ MCP умеет собирать состав проекта:
   источники данных, роли, стили и действия;
 - `alterios-stimulsoft-layout-check` - статическая проверка Stimulsoft layout
   на пересечения, выход за страницу и риски динамической высоты;
+- `alterios-runtime-info` - fingerprint запущенного MCP: commit, путь к
+  исходникам, PID, время старта, версии схемы tools/UX-контракта и hashes skills;
 - `alterios-profile-smoke` - матрица профилей и project-route smoke.
 - `alterios-replay-smoke` - локальная/read-only проверка MCP после обновления:
   tool registry, write gates, dry-run `plan_id`, form-surface, Stimulsoft layout
@@ -116,7 +118,9 @@ Dry-run write tools сохраняют проверяемый `plan_id` в `arti
 а execution events пишутся в `artifacts/write-journal`; generic
 `alterios_rest_write`, `alterios_create_material_module` и
 `alterios_create_report_tab`, `alterios_create_process_flow` при
-`dry_run=false` требуют совпадающий `plan_id`.
+`dry_run=false` требуют совпадающий `plan_id`. Сценарные apply также требуют
+`delivery_evidence` со ссылкой на Gitea-задачу, ссылками на handoff агентов и
+активной версией UX-контракта. Устаревший runtime блокирует запись до перезапуска.
 
 ### Формы и пользовательский UI
 
@@ -162,9 +166,15 @@ task-form, script refs, BPMN/formKey и сохраняет `plan_id`; apply по
 - проверка связи отчета с представлением;
 - проверка current-record контекста через `dataId: [openId]`;
 - статическая проверка геометрии Stimulsoft-компонентов;
+- рендер печатного шаблона в Chromium и PDF-evidence через
+  `alterios_validate_printable_render`;
+- печатный `type=report` с `StiPage` и bands по умолчанию; dashboard создается
+  только при явном `report_type=dashboard`;
 - правила размещения элементов, чтобы они не съезжались в печатной форме.
 
 Подробный playbook: [docs/stimulsoft-report-layout-and-analytics.md](docs/stimulsoft-report-layout-and-analytics.md).
+Машиночитаемые правила: [docs/ux-contract.json](docs/ux-contract.json),
+описание контракта: [docs/ux-contract.md](docs/ux-contract.md).
 
 ### Агенты и skills
 
@@ -596,7 +606,6 @@ targeted tests, `git diff --check` и secret scan.
 2. При необходимости экспортировать true HAR из DevTools для уже снятых
    UI-сценариев; текущий in-app browser connector дал UI/route/API evidence,
    но не raw HAR stream.
-3. Расширить Stimulsoft-проверку до render/PDF/image comparison, когда будет
-   доступен надежный экспорт или renderer.
+3. Расширить подтвержденный render/PDF smoke до эталонного image comparison.
 4. Довести release packaging и changelog process, если репозиторий готовится к
    tagged release.
