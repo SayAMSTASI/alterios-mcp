@@ -74,7 +74,7 @@ def _deep_inventory(*, script_body: str = "noop();") -> dict:
         scripts=scripts,
         diagrams=diagrams,
         groups=[],
-        profile="artx",
+        profile="secondary",
         project_id="project-1",
         generated_at="2026-07-10T00:00:00Z",
     )
@@ -135,13 +135,13 @@ def test_project_health_diff_detects_changed_script() -> None:
 def test_project_health_cache_roundtrip_and_server_tool(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
     written = save_snapshot(_snapshot())
-    loaded = load_latest_snapshot(profile="artx", project_id="project-1")
+    loaded = load_latest_snapshot(profile="secondary", project_id="project-1")
 
     assert loaded is not None
     assert Path(tmp_path, written["latest_path"]).exists()
 
     result = server.alterios_project_health(
-        profile="artx",
+        profile="secondary",
         project_id="project-1",
         refresh=False,
         use_cache=True,

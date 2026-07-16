@@ -144,7 +144,7 @@
 ```python
 alterios_analyze_form_surface(
     form_id="<form-id>",
-    profile="artx",
+    profile="secondary",
     project_id="<project-id>",
 )
 ```

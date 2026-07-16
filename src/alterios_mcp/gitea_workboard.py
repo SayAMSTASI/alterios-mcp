@@ -156,6 +156,21 @@ class GiteaClient:
             params["q"] = query
         return self._request("GET", f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues", params=params)
 
+    def get_issue(self, issue_number: int) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "GET",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues/{issue_number}",
+        )
+
+    def list_issue_comments(self, issue_number: int) -> GiteaResponse:
+        self._require_repo_config()
+        return self._request(
+            "GET",
+            f"/api/v1/repos/{_path(self.config.owner)}/{_path(self.config.repo)}/issues/{issue_number}/comments",
+            params={"limit": 100},
+        )
+
     def list_labels(self, *, limit: int = 200) -> GiteaResponse:
         self._require_repo_config()
         return self._request(
@@ -1063,6 +1078,7 @@ def agent_report_body(
     role: str,
     scope: str,
     findings: str,
+    inputs: str = "",
     artifacts: str = "",
     verification: str = "",
     risks: str = "",
@@ -1070,13 +1086,14 @@ def agent_report_body(
 ) -> str:
     return "\n".join(
         [
-            f"Роль: {role}",
+            f"Agent: {role}",
             f"Scope: {scope}",
-            f"Что сделано: {findings}",
-            f"Артефакты: {artifacts}",
-            f"Проверка: {verification}",
-            f"Риски: {risks}",
-            f"Следующий шаг: {next_step}",
+            f"Inputs: {inputs or 'work item and scoped handoff'}",
+            f"Findings: {findings}",
+            f"Artifacts: {artifacts or 'none'}",
+            f"Verification: {verification or 'not run'}",
+            f"Risks: {risks or 'none'}",
+            f"Next: {next_step or 'none'}",
         ]
     ).strip()
 

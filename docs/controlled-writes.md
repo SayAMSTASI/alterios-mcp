@@ -125,7 +125,7 @@ rollback/readback plan и отдельной проверки.
 - user-group create/update/delete live-verified с dry-run, dangerous gates,
   live execution, delete readback и cleanup scan;
 - disposable user create/delete live-verified через UI: форма требует `ownerId`,
-  после выбора владельца `ArtX` создается disabled user, delete выполняется из
+  после выбора целевого владельца создается disabled user, delete выполняется из
   row menu, cleanup API readback возвращает `remaining_matches=0`;
 - content type publication flags live-verified через `/api/content-types/save`;
 - cross-project content type transfer имеет route evidence:

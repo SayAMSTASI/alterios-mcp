@@ -28,6 +28,9 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 14. For generated modules, require field filters on displayed fields, hide
     `_id`/`_id0`, and make view/detail `view_data` explicitly read-only with
     output configuration and no input configuration.
+15. Treat the active strict UX contract as the source of truth for page titles,
+    Close/Save order, row action menus, technical columns, embedded filters,
+    report new-tab actions, and report/view Close actions.
 
 ## View Types And Modes
 

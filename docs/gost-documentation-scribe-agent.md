@@ -42,10 +42,10 @@
 Писарь не начинает финальную редакцию без источников:
 
 - `README.md`, `docs/controlled-writes.md`, `docs/roadmap.md`,
-  `docs/project-status.md`;
+  приватной Gitea-задачи или локального статуса проекта;
 - матрицы форм, скриптов, BPMN, отчетов и иконок из `docs/`;
 - результаты `alterios_config`, profile smoke, read-only inventory;
-- проверенные сценарии из `scripts/artx_practice_metadata.py`;
+- проверенные сценарии из локальных project artifacts;
 - UI/HAR evidence и скриншоты, если документ описывает пользовательские шаги;
 - требования договора, ТЗ, протоколы или шаблон заказчика, если они есть.
 
@@ -107,4 +107,3 @@ Verification:
 Risks:
 Next:
 ```
-

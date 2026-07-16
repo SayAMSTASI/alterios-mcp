@@ -42,6 +42,11 @@ Lead Engineer отвечает за итоговое состояние репо
 - risks или blocked items;
 - commit hash после завершения.
 
+У каждого этапа ровно один accountable owner. Перед live apply задача также
+должна иметь проверенные private Gitea handoffs от аналитика, исполнителя и
+тестировщика. Проверку выполняет `alterios_verify_delivery_evidence`; receipt
+прикладывается к delivery evidence и итоговому статусу.
+
 Задача не считается `Done`, пока code/docs не закоммичены и нужные проверки не
 прошли, либо статус явно не говорит, что именно не удалось проверить.
 

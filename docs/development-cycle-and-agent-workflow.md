@@ -771,12 +771,25 @@ Git:
 
 Статус `done` нельзя ставить без ответственного, артефакта и проверки.
 
+Перед live apply PM обязан получить read-only receipt от
+`alterios_verify_delivery_evidence`. В одной открытой private Gitea-задаче
+должны существовать структурированные handoffs ролей `analyst`, `implementer`
+и `verifier`. Каждая передача содержит `Agent`, `Scope`, `Inputs`, `Findings`,
+`Artifacts`, `Verification`, `Risks`, `Next`. Наличие только локального текста
+или непроверенной ссылки не закрывает stage gate.
+
 ## 11. Практический режим ускорения
 
 Чтобы быстрее пилить функционал, приоритет отдается сценарным tools и
 повторяемым командам:
 
-- `alterios_project_health` перед live structural write;
+- `ALTERIOS_MCP_TOOL_PROFILE=live` как основной реестр для бизнесовых задач;
+- `ALTERIOS_MCP_TOOL_PROFILE=discovery` для read-only исследования;
+- `admin` для typed security/admin, `full` только для разработки MCP и
+  исследования неизвестных routes;
+- `alterios_live_task_preflight` перед любой live-задачей, чтобы одним шагом
+  проверить профиль/проект, runtime freshness, delivery evidence, health и replay;
+- `alterios_project_health` как детальная диагностика forms/views/scripts/BPMN/reports;
 - `alterios_create_material_module` для типового модуля материалов;
 - `alterios_create_report_tab` для report tab;
 - `alterios_create_process_flow` для BPMN/process flow;

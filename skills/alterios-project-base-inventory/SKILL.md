@@ -20,8 +20,8 @@ Use this skill before designing or changing an Alterios project surface. Keep it
 Prefer existing tools and CLIs from this repo:
 
 ```powershell
-.\.venv\Scripts\alterios-discover.exe --profile artx --project-id <project_id> --json
-.\.venv\Scripts\alterios-deep-inventory.exe --profile artx --project-id <project_id> --out-dir artifacts\inventories\artx\<project_id>
+.\.venv\Scripts\alterios-discover.exe --profile secondary --project-id <project_id> --json
+.\.venv\Scripts\alterios-deep-inventory.exe --profile secondary --project-id <project_id> --out-dir artifacts\inventories\secondary\<project_id>
 ```
 
 Use MCP tools for targeted reads when available; use generic REST reads only to fill a documented route gap.

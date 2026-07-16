@@ -14,15 +14,19 @@ Use this skill to keep multi-agent Alterios MCP work visible, scoped, and tied t
 3. State acceptance criteria before implementation.
 4. Track status as Done, In Progress, Next, Blocked, Deferred, or Risk.
 5. Require artifacts and verification commands from every agent.
-6. Update `docs/project-status.md` after a meaningful mergeable slice.
+6. Update the private Gitea work item or local project status after a meaningful mergeable slice.
 7. Keep roadmap changes separate from current status updates.
 8. For read-only planning or discovery that has not run yet, return a PM handoff instead of marking repo status `Done`.
-9. Before a scenario apply, require a private work item reference and published
-   agent handoff references in `delivery_evidence`; local narrative is not a
-   substitute for traceable evidence.
+9. Before a scenario apply, call `alterios_verify_delivery_evidence` and require
+   one open private Gitea work item plus verified handoffs from `analyst`,
+   `implementer`, and `verifier`; local narrative is not a substitute.
 10. Move a task to Done only after runtime freshness, UX-contract, automated
-    tests, report PDF evidence where applicable, git push, and readback evidence
-    are recorded.
+   tests, report PDF evidence where applicable, git push, and readback evidence
+   are recorded.
+11. Assign exactly one accountable owner to every stage. Supporting agents may
+    contribute, but the owner accepts the artifact and verification result.
+12. Use the active MCP `live` tool profile for normal delivery; use `full` only
+    for MCP development or documented route research.
 
 ## Handoff Format
 
