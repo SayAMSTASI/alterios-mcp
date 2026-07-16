@@ -130,6 +130,7 @@ def test_live_task_preflight_blocks_duplicate_mcp_processes(monkeypatch) -> None
     assert result["summary"]["ok"] is False
     assert "duplicate_mcp_processes" in {item["code"] for item in result["blockers"]}
     assert result["checks"][1]["process_hygiene"]["duplicate_process_count"] == 1
+    assert result["checks"][1]["process_hygiene"]["duplicate_instance_count"] == 1
 
 
 def test_live_task_preflight_cli_and_server_tool_use_safe_readonly_defaults(monkeypatch, capsys) -> None:

@@ -57,7 +57,12 @@ from .profile_smoke import run_profile_smoke
 from .printable_render import render_printable_pdf
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
-from .runtime_info import MCP_TOOL_SCHEMA_VERSION, build_runtime_fingerprint
+from .runtime_info import (
+    MCP_TOOL_SCHEMA_VERSION,
+    build_runtime_fingerprint,
+    collect_alterios_mcp_instances,
+    collect_alterios_mcp_processes,
+)
 from .services import get_service, list_services, service_to_dict
 from .stimulsoft_layout import analyze_stimulsoft_layout
 from .write_control import (
@@ -3695,13 +3700,27 @@ def alterios_config(profile: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
-def alterios_runtime_info(expected_fingerprint: str | None = None) -> dict[str, Any]:
+def alterios_runtime_info(expected_fingerprint: str | None = None, include_processes: bool = True) -> dict[str, Any]:
     """Return the active MCP source/skills/tool-schema fingerprint and stale-process status."""
     runtime = _runtime_fingerprint()
     expected = (expected_fingerprint or "").strip()
     runtime["expected_fingerprint"] = expected or None
     runtime["matches_expected"] = not expected or runtime["fingerprint"] == expected
+    if include_processes:
+        processes = collect_alterios_mcp_processes()
+        instances = collect_alterios_mcp_instances(processes)
+        runtime["process_hygiene"] = {
+            "process_count": len(processes),
+            "instance_count": len(instances),
+            "duplicate_instance_count": max(0, len(instances) - 1),
+            "duplicate_process_count": max(0, len(instances) - 1),
+            "processes": processes,
+            "instances": instances,
+            "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
+        }
     runtime["ok"] = not runtime["stale"] and runtime["matches_expected"]
+    if include_processes and runtime["process_hygiene"]["duplicate_process_count"]:
+        runtime["ok"] = False
     return runtime
 
 

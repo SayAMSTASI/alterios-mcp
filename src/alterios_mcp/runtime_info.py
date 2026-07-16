@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import signal
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -16,6 +18,11 @@ from .ux_contract import UX_CONTRACT_VERSION
 
 PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 MCP_TOOL_SCHEMA_VERSION = "2026-07-16.1"
+ALTERIOS_MCP_COMMAND_RE = re.compile(
+    r"(?:^|[\\/\s\"'])alterios-mcp(?:\.exe)?(?:$|[\s\"'])|-m\s+alterios_mcp\.server",
+    re.IGNORECASE,
+)
+RUNTIME_INFO_COMMAND_RE = re.compile(r"alterios-runtime-info|runtime_info", re.IGNORECASE)
 
 
 def build_runtime_fingerprint(
@@ -56,6 +63,105 @@ def build_runtime_fingerprint(
     }
 
 
+def collect_alterios_mcp_processes() -> list[dict[str, Any]]:
+    """Return local OS processes that look like running Alterios MCP servers."""
+    rows = _process_rows()
+    current_pid = os.getpid()
+    processes: list[dict[str, Any]] = []
+    for row in rows:
+        command_line = str(row.get("command_line") or "")
+        if not _is_alterios_mcp_command(command_line):
+            continue
+        pid = _coerce_int(row.get("pid"))
+        processes.append(
+            {
+                "pid": pid,
+                "parent_pid": _coerce_int(row.get("parent_pid")),
+                "name": row.get("name"),
+                "created_at": row.get("created_at"),
+                "command": _redact_process_command(command_line),
+                "current_process": pid == current_pid if pid is not None else False,
+            }
+        )
+    return sorted(processes, key=_process_sort_key, reverse=True)
+
+
+def collect_alterios_mcp_instances(processes: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Group launcher/python process rows into logical Alterios MCP server instances."""
+    process_list = list(processes if processes is not None else collect_alterios_mcp_processes())
+    by_pid = {process.get("pid"): process for process in process_list if process.get("pid") is not None}
+
+    def root_pid_for(process: dict[str, Any]) -> int | None:
+        pid = _coerce_int(process.get("pid"))
+        current = process
+        seen: set[int] = set()
+        while current.get("parent_pid") in by_pid:
+            parent_pid = int(current["parent_pid"])
+            if parent_pid in seen:
+                break
+            seen.add(parent_pid)
+            current = by_pid[parent_pid]
+        return _coerce_int(current.get("pid")) or pid
+
+    grouped: dict[int | None, list[dict[str, Any]]] = {}
+    for process in process_list:
+        grouped.setdefault(root_pid_for(process), []).append(process)
+
+    instances: list[dict[str, Any]] = []
+    for root_pid, items in grouped.items():
+        sorted_items = sorted(items, key=_process_sort_key, reverse=True)
+        root = by_pid.get(root_pid) or sorted_items[-1]
+        instances.append(
+            {
+                "root_pid": root_pid,
+                "created_at": root.get("created_at"),
+                "process_count": len(sorted_items),
+                "current_process": any(item.get("current_process") for item in sorted_items),
+                "processes": sorted_items,
+            }
+        )
+    return sorted(instances, key=_instance_sort_key, reverse=True)
+
+
+def cleanup_alterios_mcp_processes(
+    *,
+    keep_newest: int = 1,
+    dry_run: bool = True,
+) -> dict[str, Any]:
+    if keep_newest < 0:
+        raise ValueError("keep_newest must be >= 0.")
+    processes = collect_alterios_mcp_processes()
+    current_pid = os.getpid()
+    instances = collect_alterios_mcp_instances(processes)
+    kept = instances[:keep_newest]
+    candidates = [
+        instance
+        for instance in instances[keep_newest:]
+        if instance.get("root_pid") is not None and instance.get("root_pid") != current_pid
+    ]
+    stopped: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    if not dry_run:
+        for process in candidates:
+            pid = int(process["root_pid"])
+            try:
+                _terminate_process(pid)
+                stopped.append(process)
+            except (OSError, subprocess.SubprocessError) as exc:
+                errors.append({"pid": pid, "error": str(exc)})
+    return {
+        "dry_run": dry_run,
+        "keep_newest": keep_newest,
+        "process_count": len(processes),
+        "instance_count": len(instances),
+        "kept": kept,
+        "planned_stop": candidates,
+        "stopped": stopped,
+        "errors": errors,
+        "ok": not errors,
+    }
+
+
 def _capture_identity(root: Path) -> dict[str, Any]:
     repo_root = root.parent.parent
     return {
@@ -67,6 +173,121 @@ def _capture_identity(root: Path) -> dict[str, Any]:
         "skills_hash": _tree_hash(repo_root / "skills"),
         "git": _git_state(repo_root),
     }
+
+
+def _process_rows() -> list[dict[str, Any]]:
+    if os.name == "nt":
+        return _windows_process_rows()
+    return _posix_process_rows()
+
+
+def _windows_process_rows() -> list[dict[str, Any]]:
+    command = (
+        "Get-CimInstance Win32_Process | "
+        "Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | "
+        "ConvertTo-Json -Depth 3 -Compress"
+    )
+    completed = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", command],
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        timeout=15,
+        check=True,
+    )
+    if not completed.stdout.strip():
+        return []
+    payload = json.loads(completed.stdout)
+    items = payload if isinstance(payload, list) else [payload]
+    rows = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            {
+                "pid": item.get("ProcessId"),
+                "parent_pid": item.get("ParentProcessId"),
+                "name": item.get("Name"),
+                "created_at": item.get("CreationDate"),
+                "command_line": item.get("CommandLine"),
+            }
+        )
+    return rows
+
+
+def _posix_process_rows() -> list[dict[str, Any]]:
+    completed = subprocess.run(
+        ["ps", "-eo", "pid=,ppid=,comm=,lstart=,args="],
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        timeout=15,
+        check=True,
+    )
+    rows: list[dict[str, Any]] = []
+    for line in completed.stdout.splitlines():
+        parts = line.strip().split(None, 8)
+        if len(parts) < 9:
+            continue
+        rows.append(
+            {
+                "pid": parts[0],
+                "parent_pid": parts[1],
+                "name": parts[2],
+                "created_at": " ".join(parts[3:8]),
+                "command_line": parts[8],
+            }
+        )
+    return rows
+
+
+def _is_alterios_mcp_command(command_line: str) -> bool:
+    if not command_line:
+        return False
+    if RUNTIME_INFO_COMMAND_RE.search(command_line):
+        return False
+    return bool(ALTERIOS_MCP_COMMAND_RE.search(command_line))
+
+
+def _redact_process_command(command_line: str) -> str:
+    redacted = re.sub(
+        r"(?i)(token|password|secret|api[_-]?key|cookie|authorization)=([^\s]+)",
+        r"\1=<redacted>",
+        command_line,
+    )
+    return redacted[:500]
+
+
+def _coerce_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _process_sort_key(process: dict[str, Any]) -> tuple[str, int]:
+    return (str(process.get("created_at") or ""), int(process.get("pid") or 0))
+
+
+def _instance_sort_key(instance: dict[str, Any]) -> tuple[str, int]:
+    return (str(instance.get("created_at") or ""), int(instance.get("root_pid") or 0))
+
+
+def _terminate_process(pid: int) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=10,
+            check=True,
+        )
+        return
+    os.kill(pid, signal.SIGTERM)
 
 
 def _sha256_file(path: Path) -> str:
@@ -122,8 +343,31 @@ _LOADED_IDENTITY = _capture_identity(Path(__file__).resolve().parent)
 def main() -> None:
     parser = argparse.ArgumentParser(description="Print the active Alterios MCP runtime fingerprint.")
     parser.add_argument("--pretty", action="store_true")
+    parser.add_argument("--processes", action="store_true", help="Include local alterios-mcp process inventory.")
+    parser.add_argument(
+        "--cleanup-stale",
+        action="store_true",
+        help="Stop duplicate alterios-mcp processes after keeping the newest N processes.",
+    )
+    parser.add_argument("--keep-newest", type=int, default=1, help="How many newest alterios-mcp processes to keep.")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Execute cleanup. Without this flag cleanup is a dry-run plan.",
+    )
     args = parser.parse_args()
-    print(json.dumps(build_runtime_fingerprint(), ensure_ascii=False, indent=2 if args.pretty else None))
+    payload = build_runtime_fingerprint()
+    if args.processes or args.cleanup_stale:
+        payload["process_hygiene"] = cleanup_alterios_mcp_processes(
+            keep_newest=args.keep_newest,
+            dry_run=not args.apply,
+        ) if args.cleanup_stale else {
+            "process_count": len(collect_alterios_mcp_processes()),
+            "instance_count": len(collect_alterios_mcp_instances()),
+            "processes": collect_alterios_mcp_processes(),
+            "instances": collect_alterios_mcp_instances(),
+        }
+    print(json.dumps(payload, ensure_ascii=False, indent=2 if args.pretty else None))
 
 
 if __name__ == "__main__":
