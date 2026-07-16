@@ -1948,6 +1948,11 @@ def _normalize_material_module_fields(
         ):
             if source_key in raw:
                 normalized_field[target_key] = raw[source_key]
+        if field_type != "date":
+            persistent_help = str(normalized_field.pop("help", "") or "").strip()
+            persistent_description = str(normalized_field.pop("description", "") or "").strip()
+            if not str(normalized_field.get("tooltip") or "").strip():
+                normalized_field["tooltip"] = persistent_help or persistent_description
         field_settings = dict(normalized_field.get("settings") or {})
         field_settings.setdefault("valueCount", 1)
         if field_type == "text":
@@ -2148,16 +2153,18 @@ def _material_comments_row() -> dict[str, Any]:
 
 def _material_open_form_container(
     *,
-    title: str,
+    tooltip: str,
     icon_id: str | None,
     form_id: str,
     form_name: str,
     view_entity_id: str,
     position: str,
+    default: bool = False,
 ) -> dict[str, Any]:
     container: dict[str, Any] = {
         "type": "action",
-        "title": title,
+        "title": "",
+        "tooltip": tooltip,
         "styles": {},
         "actions": [
             {
@@ -2171,7 +2178,7 @@ def _material_open_form_container(
             }
         ],
         "position": position,
-        "default": title == "Добавить",
+        "default": default,
         "conditions": [],
     }
     if icon_id:
@@ -2283,7 +2290,14 @@ def _material_close_action_container(icon_id: str | None) -> dict[str, Any]:
         "type": "action",
         "title": "Закрыть",
         "styles": {},
-        "actions": [{"_id": None, "type": "routing", "argumentsConfig": {}}],
+        "actions": [
+            {
+                "_id": None,
+                "type": "routing",
+                "routingType": "redirect_back",
+                "argumentsConfig": {},
+            }
+        ],
         "position": "bottom_left",
         "conditions": [],
     }
@@ -2347,12 +2361,13 @@ def _material_view_data_list_row(
                 },
                 "cellActionContainers": [
                     _material_open_form_container(
-                        title="Добавить",
+                        tooltip="Добавить",
                         icon_id=add_icon_id,
                         form_id=add_form_id,
                         form_name=add_form_name,
                         view_entity_id=view_entity_id,
                         position="top_left",
+                        default=True,
                     )
                 ],
                 "valueActionContainers": [

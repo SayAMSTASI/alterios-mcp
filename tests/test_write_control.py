@@ -2472,6 +2472,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
         "Закрыть",
         "Сохранить",
     ]
+    assert apply_client.forms["form-1"]["formActionContainers"][0]["actions"][0]["routingType"] == "redirect_back"
     assert (
         apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"][
             "field_test__mat_name"
@@ -2496,6 +2497,9 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     assert list_cell["type"] == "view_data_list"
     assert list_cell["displaying"]["fields"]["test__mat_name"]["order"] == 1
     assert list_cell["cellActionContainers"][0]["iconId"] == "add"
+    assert list_cell["cellActionContainers"][0]["title"] == ""
+    assert list_cell["cellActionContainers"][0]["tooltip"] == "Добавить"
+    assert list_cell["cellActionContainers"][0]["default"] is True
     row_menu = list_cell["valueActionContainers"][0]
     assert row_menu["type"] == "menu"
     assert row_menu["iconId"] == "menu"
@@ -2504,6 +2508,34 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     assert row_menu["containers"][2]["actions"][0]["type"] == "delete_contents"
     assert apply_client.groups["group-1"]["formId"] == "form-4"
     assert result["journal"]["event_id"].startswith("wj_")
+
+
+def test_material_module_fields_keep_persistent_help_only_for_dates() -> None:
+    fields = server._normalize_material_module_fields(
+        [
+            {
+                "name": "Наименование",
+                "mname": "mat_name",
+                "field_type": "text",
+                "description": "Постоянная сноска",
+                "help": "Подсказка",
+            },
+            {
+                "name": "Дата",
+                "mname": "mat_date",
+                "field_type": "date",
+                "description": "Формат даты",
+                "help": "Укажите дату",
+            },
+        ],
+        field_name_prefix="field_test",
+    )
+
+    assert "description" not in fields[0]
+    assert "help" not in fields[0]
+    assert fields[0]["tooltip"] == "Подсказка"
+    assert fields[1]["description"] == "Формат даты"
+    assert fields[1]["help"] == "Укажите дату"
 
 
 def test_create_report_tab_dry_run_stores_plan_without_real_network(tmp_path) -> None:
