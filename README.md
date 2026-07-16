@@ -22,7 +22,7 @@
 
 ## Что умеет сейчас
 
-Текущая поверхность MCP: **75 инструментов**, из них **35 write-like инструментов**.
+Текущая поверхность MCP: **99 инструментов**, из них **35 write-like инструментов**.
 Полная матрица методов ведется в [docs/alterios-method-coverage.md](docs/alterios-method-coverage.md).
 
 ### Профили и проекты
@@ -69,6 +69,9 @@ MCP умеет собирать состав проекта:
 - `alterios-runtime-info` - fingerprint запущенного MCP: commit, путь к
   исходникам, PID, время старта, версии схемы tools/UX-контракта и hashes skills;
 - `alterios-profile-smoke` - матрица профилей и project-route smoke.
+- `alterios-live-task-preflight` - быстрый read-only go/no-go перед live-задачей:
+  явный профиль/проект, runtime freshness, delivery evidence, project health
+  и replay smoke в одном отчете `ready/blocked`;
 - `alterios-replay-smoke` - локальная/read-only проверка MCP после обновления:
   tool registry, write gates, dry-run `plan_id`, form-surface, Stimulsoft layout
   и классификация risky routes.
@@ -385,9 +388,9 @@ ALTERIOS_DOTENV_PATH = "C:\\path\\to\\private\\alterios.env"
 Рабочий порядок такой:
 
 1. Проверить профиль и проект через `alterios_config` или `alterios-profile-smoke`.
-2. Перед сценарной live-записью запустить `alterios_project_health` по явному
-   `profile` и `project_id`; при ошибках сначала исправить blocker или
-   зафиксировать риск.
+2. Перед сценарной live-записью запустить `alterios_live_task_preflight` по
+   явному `profile`, `project_id`, сценарию и delivery evidence; при статусе
+   `blocked` сначала исправить blocker или явно зафиксировать риск.
 3. Вызвать нужный write-инструмент в dry-run режиме и сохранить `plan_id`.
 4. Проверить audit: целевой объект, route, diff, gate status, ожидаемый readback.
 5. Включить `ALTERIOS_MCP_ALLOW_WRITE=1` только для безопасной целевой среды.
@@ -401,6 +404,18 @@ dry-run typed tool или `alterios_write_safety_preflight`, затем явны
 `allow_destructive=true`. Cross-project native content-type clone не выполняется
 без явного target sandbox project, dry-run review, cleanup/readback-плана и
 подтвержденного route evidence.
+
+Быстрая CLI-проверка без live-записи:
+
+```powershell
+.\.venv\Scripts\python.exe -m alterios_mcp.live_task_preflight `
+  --profile <profile> `
+  --project-id <project-id> `
+  --scenario-tool alterios_create_material_module `
+  --work-item-ref <private-task-ref> `
+  --agent-handoff-ref <private-handoff-ref> `
+  --pretty
+```
 
 ## Основные пользовательские сценарии
 

@@ -776,7 +776,9 @@ Git:
 Чтобы быстрее пилить функционал, приоритет отдается сценарным tools и
 повторяемым командам:
 
-- `alterios_project_health` перед live structural write;
+- `alterios_live_task_preflight` перед любой live-задачей, чтобы одним шагом
+  проверить профиль/проект, runtime freshness, delivery evidence, health и replay;
+- `alterios_project_health` как детальная диагностика forms/views/scripts/BPMN/reports;
 - `alterios_create_material_module` для типового модуля материалов;
 - `alterios_create_report_tab` для report tab;
 - `alterios_create_process_flow` для BPMN/process flow;

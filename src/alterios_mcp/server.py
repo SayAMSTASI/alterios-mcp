@@ -52,6 +52,7 @@ from .local_workboard import (
     ensure_local_workboard,
     list_local_work_items,
 )
+from .live_task_preflight import run_live_task_preflight
 from .profile_smoke import run_profile_smoke
 from .printable_render import render_printable_pdf
 from .project_health import run_project_health
@@ -3718,6 +3719,38 @@ def alterios_ux_contract() -> dict[str, Any]:
             "fresh_runtime_fingerprint",
         ],
     }
+
+
+@mcp.tool()
+def alterios_live_task_preflight(
+    profile: str,
+    project_id: str,
+    scenario_tool: str | None = None,
+    delivery_evidence: dict[str, Any] | None = None,
+    expected_fingerprint: str | None = None,
+    include_project_health: bool = True,
+    refresh_health: bool = False,
+    allow_cached_health: bool = True,
+    require_clean_health: bool = True,
+    include_replay_smoke: bool = True,
+    include_live_replay: bool = False,
+    require_delivery_evidence: bool = True,
+) -> dict[str, Any]:
+    """Run a fast read-only go/no-go preflight before an Alterios live write task."""
+    return run_live_task_preflight(
+        profile=profile,
+        project_id=project_id,
+        scenario_tool=scenario_tool,
+        delivery_evidence=delivery_evidence,
+        expected_fingerprint=expected_fingerprint,
+        include_project_health=include_project_health,
+        refresh_health=refresh_health,
+        allow_cached_health=allow_cached_health,
+        require_clean_health=require_clean_health,
+        include_replay_smoke=include_replay_smoke,
+        include_live_replay=include_live_replay,
+        require_delivery_evidence=require_delivery_evidence,
+    )
 
 
 @mcp.tool()
