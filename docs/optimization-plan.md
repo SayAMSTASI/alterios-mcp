@@ -105,25 +105,24 @@
 
 ## Этап 17. UI/report validation
 
-Статус: пропущен / отложен по решению пользователя от 2026-07-10. Replay/smoke
-foundation реализован: `alterios-replay-smoke` и MCP tool `alterios_replay_smoke`
-проверяют локальные контракты MCP без записи и могут дополнительно запускать
-read-only live discovery.
+Статус: выполнен в автоматизируемом MCP-контуре; точечный UI-check остаётся
+обязательным для новых пользовательских паттернов.
 
-Что остается в отложенной зоне:
+Реализовано:
 
-1. Диагностика пустого Stimulsoft viewer.
-2. Render/PDF/image validation для отчетов.
-3. Проверка layout после render, а не только по JSON geometry.
-4. Расширение form listener coverage:
-   - add/update/remove listener;
-   - validation script refs;
-   - args map.
-5. Расширение bulk actions:
-   - selected manual script action;
-   - selected process action;
-   - destructive bulk delete только после отдельного dangerous workflow.
-6. Replay/smoke command для проверки MCP после обновления. Готово.
+1. `alterios_validate_printable_render` для Chromium render и PDF evidence.
+2. Статическая Stimulsoft geometry validation и проверка printable layout.
+3. `alterios_patch_form_cell_listeners` для точечного dry-run/apply/readback
+   listeners без перезаписи соседних настроек.
+4. `alterios_bulk_update_selected_content_fields` для безопасного bulk update.
+5. Fast-live workflows для selected manual script и selected BPMN process.
+6. `alterios_fast_live_bulk_delete` с admin/full profile, `plan_id`, dangerous
+   gates и absence readback для каждой записи.
+7. `alterios-replay-smoke` и MCP tool `alterios_replay_smoke`.
+
+Остаётся UI-specific проверка embedded Stimulsoft viewer: printable render
+подтверждает шаблон и PDF, но не заменяет проверку конкретного viewer-контейнера
+в пользовательском браузере.
 
 ## Этап 18. Inventory optimization
 
@@ -145,7 +144,7 @@ read-only live discovery.
 
 Осталось за пределами этого среза:
 
-1. Render/PDF/image validation отчетов остается в отложенном stage 17.
+1. Embedded viewer diagnostics остаётся UI-specific проверкой stage 17.
 2. Полностью инкрементальный backend diff без чтения проекта зависит от
    доступности reliable updatedAt/version по всем сущностям.
 
@@ -155,7 +154,7 @@ read-only live discovery.
 2. Сделать `alterios_create_material_module`. Готово.
 3. Сделать `alterios_create_report_tab`. Готово.
 4. Сделать `alterios_create_process_flow`. Готово.
-5. Stage 17 пропущен по решению пользователя; viewer/render diagnostics остается deferred.
+5. Stage 17 закрыт для printable render; embedded viewer проверяется точечно.
 6. Stage 18 закрыт как read-only write-preflight: cache/diff/project health.
 
 ## Этап 19. Fast live write и блокирующий UX-контракт

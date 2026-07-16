@@ -1,12 +1,13 @@
 # Дорожная карта Alterios MCP
 
-Roadmap ведет к production-oriented Alterios MCP, который безопасно
+Roadmap развивает production-oriented Alterios MCP 0.2, который безопасно
 инвентаризирует, изменяет и проверяет реальные Alterios instances с множеством
-проектов. Текущий код уже содержит read-only discovery и guarded generic
-writes; оставшаяся работа - довести coverage, safety и release-процесс до
-повторяемого состояния.
+проектов. Базовый контур уже включает 107 tools, профили registry, typed и
+сценарные writes, `plan_id`, health cache, replay smoke, UX gates и readback.
+Следующая работа направлена на совместимость разных установок, UI evidence и
+release automation, а не на расширение монолитного `server.py`.
 
-## 1. Foundation and safety
+## 1. Foundation and safety - поддерживается
 
 - Держать profile model на уровне instance: один profile равен одному Alterios
   instance, а не одному project.
@@ -24,7 +25,7 @@ writes; оставшаяся работа - довести coverage, safety и r
 - Поддерживать smoke checks для config loading, profile isolation, project
   override и secret redaction.
 
-## 2. Complete read-only inventory
+## 2. Read-only inventory - реализовано, расширяется по evidence
 
 - Сначала inventory instance-level projects.
 - Затем inventory project-level objects: content types, fields, views, forms,
@@ -48,7 +49,7 @@ writes; оставшаяся работа - довести coverage, safety и r
 - Добавлять typed wrappers для high-value services только после проверки
   payload contracts.
 
-## 4. Управляемая запись
+## 4. Управляемая запись - реализовано для штатных сценариев
 
 - Держать generic writes disabled by default и включать только через
   `ALTERIOS_MCP_ALLOW_WRITE=1`.
@@ -76,11 +77,12 @@ writes; оставшаяся работа - довести coverage, safety и r
   filters и project-context behavior.
 - Проверять, что API changes совпадают с тем, что оператор видит в UI.
 
-## 6. Release packaging
+## 6. Release packaging - следующий этап
 
 - Дать packaged console entry points и MCP server configuration examples.
-- В MCP client configs предпочитать установленный `alterios-mcp` console
-  script; `python -m alterios_mcp.server` держать как fallback.
+- В MCP client configs использовать установленный `alterios-mcp` console
+  script. `python -m alterios_mcp.server` оставлять только для диагностики и
+  compatibility tests, не создавать для него вторую конфигурацию MCP.
 - Документировать private configuration через environment variables и
   `ALTERIOS_DOTENV_PATH`; secrets не хранить и не копировать в repo.
 - Добавить release smoke tests для config, readonly inventory, project override
