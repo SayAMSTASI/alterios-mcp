@@ -133,7 +133,12 @@ from .write_control import (
     is_dangerous_write_risk,
 )
 from .write_plan import artifact_root, assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
-from .ux_contract import BLOCKING_FORM_ISSUE_CODES, UX_CONTRACT_VERSION
+from .ux_contract import (
+    BLOCKING_FORM_ISSUE_CODES,
+    PRINTABLE_REPORT_DEFAULT,
+    SCENARIO_APPLY_REQUIRES,
+    UX_CONTRACT_VERSION,
+)
 
 _ACTIVE_TOOL_PROFILE: dict[str, Any] | None = None
 
@@ -1865,13 +1870,13 @@ def _material_module_names(module_name: str, names: dict[str, str] | None = None
         "content_type": overrides.get("content_type") or module_name,
         "view": overrides.get("view") or f"{module_name}. Список",
         "add_form": overrides.get("add_form") or f"{module_name}. Добавить",
-        "edit_form": overrides.get("edit_form") or f"{module_name}. Карточка",
+        "edit_form": overrides.get("edit_form") or f"{module_name}. Редактирование",
         "view_form": overrides.get("view_form") or f"{module_name}. Просмотр",
         "list_form": overrides.get("list_form") or module_name,
         "group": overrides.get("group") or module_name,
-        "add_page_title": overrides.get("add_page_title") or overrides.get("add_form") or f"{module_name}. Добавить",
-        "edit_page_title": overrides.get("edit_page_title") or overrides.get("edit_form") or f"{module_name}. Карточка",
-        "view_page_title": overrides.get("view_page_title") or overrides.get("view_form") or f"{module_name}. Просмотр",
+        "add_page_title": overrides.get("add_page_title") or f"Добавить {module_name}",
+        "edit_page_title": overrides.get("edit_page_title") or module_name,
+        "view_page_title": overrides.get("view_page_title") or module_name,
         "list_page_title": overrides.get("list_page_title") or overrides.get("list_form") or module_name,
     }
 
@@ -2004,7 +2009,7 @@ def _material_comments_row() -> dict[str, Any]:
                 "editing": {},
                 "emitting": {},
                 "reporting": {},
-                "displaying": {"fields": {}, "header": {"title": "Комментарии", "position": "top_left"}},
+                "displaying": {"fields": {}, "header": {}},
                 "cellActionContainers": [],
             }
         ],
@@ -3276,7 +3281,7 @@ def _process_task_form_tabs(title: str, body: str | None = None) -> list[dict[st
                             "editing": {},
                             "emitting": {"listeners": []},
                             "reporting": {"reports": []},
-                            "displaying": {"fields": {}, "header": {"title": title, "position": "top_left"}},
+                            "displaying": {"fields": {}, "header": {}},
                             "cellActionContainers": [],
                         }
                     ],

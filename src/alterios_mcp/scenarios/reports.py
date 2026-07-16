@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from .._support import *
-from .views_forms import alterios_patch_form_tabs
+from ..ux_contract import assert_form_contract
+from .views_forms import alterios_upsert_form
 
 def alterios_upsert_report(
     name: str,
@@ -330,6 +331,18 @@ def alterios_create_report_tab(
         fullscreen_mode=fullscreen_mode,
         replace_existing_tab=replace_existing_tab,
     )
+    planned_form = {**target_form, "tabs": planned_tabs}
+    form_contract = analyze_form_surface(planned_form, strict=True)
+    printable_template = _report_template_payload({"template": template_payload})
+    printable_summary = _printable_band_summary(printable_template)
+    required_bands = list(PRINTABLE_REPORT_DEFAULT["required_bands"])
+    missing_bands = [band for band in required_bands if band not in printable_summary["bands"]]
+    printable_contract = {
+        "ok": normalized_report_type != "report" or not missing_bands,
+        "required_bands": required_bands,
+        "missing_bands": missing_bands,
+        "summary": printable_summary,
+    }
     context_validation = {
         "checked": bool(context_content_id),
         "context_content_id": context_content_id,
@@ -364,6 +377,8 @@ def alterios_create_report_tab(
             },
             "form_tabs": planned_tabs,
             "layout": analyze_stimulsoft_layout(template_payload),
+            "form_contract": form_contract,
+            "printable_contract": printable_contract,
         },
     }
     if dry_run:
@@ -371,10 +386,16 @@ def alterios_create_report_tab(
 
     if not plan_id:
         raise ValueError("plan_id is required when dry_run=false for alterios_create_report_tab.")
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+    assert_form_contract(form_contract)
+    if not printable_contract["ok"]:
+        raise ValueError(
+            "Printable report template is missing required bands: "
+            + ", ".join(printable_contract["missing_bands"])
+        )
     verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
     runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
-    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
 
     report_result = alterios_upsert_report(
         normalized_report_name,
@@ -401,10 +422,11 @@ def alterios_create_report_tab(
         fullscreen_mode=fullscreen_mode,
         replace_existing_tab=replace_existing_tab,
     )
-    form_result = alterios_patch_form_tabs(
-        normalized_form_id,
-        next_tabs,
-        expected_name=str(target_form.get("name") or "") or None,
+    form_result = alterios_upsert_form(
+        str(target_form.get("name") or ""),
+        form_id=normalized_form_id,
+        tabs=next_tabs,
+        enforce_ux_contract=True,
         allow_unmanaged_update=True,
         dry_run=False,
         profile=profile,
@@ -427,6 +449,17 @@ def alterios_create_report_tab(
         raise ValueError(
             f"Saved report template kind does not match report_type={normalized_report_type!r}."
         )
+    if normalized_report_type == "report":
+        saved_missing_bands = [
+            band
+            for band in required_bands
+            if band not in report_validation["printable"]["bands"]
+        ]
+        if saved_missing_bands:
+            raise ValueError(
+                "Saved printable report is missing required bands: "
+                + ", ".join(saved_missing_bands)
+            )
     report_tab_cell = _find_report_tab_cell(form_readback, tab_name=normalized_tab_name, report_id=resolved_report_id)
     if not report_tab_cell:
         raise ValueError("Report tab cell was not visible on form readback.")

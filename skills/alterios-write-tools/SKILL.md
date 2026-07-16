@@ -40,6 +40,9 @@ For material-module write scenarios, enforce the configured UX contract:
 - form-embedded views/lists must have a relevant field-based filter or `dataId: [openId]`;
 - list views must hide non-informative technical/service columns;
 - forms must use human-readable user-facing titles, tab names, and page names.
+- material-module apply must use target-project-local UUID values for every
+  action/group `iconId`; resolve them with `alterios_ensure_project_icon_library`
+  before the scenario dry-run/apply pair.
 
 Existing report coverage includes `alterios_upsert_report`,
 `alterios_patch_report_template`, `alterios_validate_report_project_base`,

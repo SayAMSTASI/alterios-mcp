@@ -54,15 +54,8 @@ def alterios_ux_contract() -> dict[str, Any]:
         "readonly": True,
         "version": UX_CONTRACT_VERSION,
         "blocking_form_issue_codes": sorted(BLOCKING_FORM_ISSUE_CODES),
-        "scenario_apply_requires": [
-            "plan_id",
-            "work_item_ref",
-            "agent_handoff_refs",
-            "verified_gitea_issue",
-            "analyst_implementer_verifier_handoffs",
-            "ux_contract_version",
-            "fresh_runtime_fingerprint",
-        ],
+        "scenario_apply_requires": list(SCENARIO_APPLY_REQUIRES),
+        "printable_report_default": PRINTABLE_REPORT_DEFAULT,
     }
 
 def _resource_fingerprint(resource: dict[str, Any], keys: tuple[str, ...]) -> str:

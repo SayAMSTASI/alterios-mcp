@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..ux_contract import assert_form_contract
 from .content import (
     alterios_upsert_content_type,
     alterios_upsert_field,
@@ -369,6 +370,16 @@ def alterios_create_material_module(
         raise ValueError("field_name_prefix must not be empty.")
     normalized_fields = _normalize_material_module_fields(fields, field_name_prefix=normalized_prefix)
     resolved_names = _material_module_names(normalized_module_name, names)
+    icon_contract = _material_module_icon_contract(
+        icon_id=icon_id,
+        add_icon_id=add_icon_id,
+        edit_icon_id=edit_icon_id,
+        view_icon_id=view_icon_id,
+        delete_icon_id=delete_icon_id,
+        menu_icon_id=menu_icon_id,
+        close_icon_id=close_icon_id,
+        save_icon_id=save_icon_id,
+    )
     operation = _material_module_operation(
         module_name=normalized_module_name,
         field_name_prefix=normalized_prefix,
@@ -417,42 +428,65 @@ def alterios_create_material_module(
         parent_group_id=parent_group_id,
         allow_unmanaged_update=allow_unmanaged_update,
     )
+    planned_preview = _material_module_plan_preview(
+        module_name=normalized_module_name,
+        names=resolved_names,
+        fields=normalized_fields,
+        field_name_prefix=normalized_prefix,
+        content_type_id=content_type_id or (preflight.get("content_type") or {}).get("_id"),
+        view_id=view_id or (preflight.get("view") or {}).get("_id"),
+        add_form_id=add_form_id or ((preflight.get("forms") or {}).get("add") or {}).get("_id"),
+        edit_form_id=edit_form_id or ((preflight.get("forms") or {}).get("edit") or {}).get("_id"),
+        view_form_id=view_form_id or ((preflight.get("forms") or {}).get("view") or {}).get("_id"),
+        list_form_id=list_form_id or ((preflight.get("forms") or {}).get("list") or {}).get("_id"),
+        group_id=group_id or (preflight.get("group") or {}).get("_id"),
+        parent_group_id=parent_group_id or (preflight.get("parent_group") or {}).get("_id"),
+        icon_id=icon_id,
+        add_icon_id=add_icon_id,
+        edit_icon_id=edit_icon_id,
+        view_icon_id=view_icon_id,
+        delete_icon_id=delete_icon_id,
+        menu_icon_id=menu_icon_id,
+        close_icon_id=close_icon_id,
+        save_icon_id=save_icon_id,
+    )
+    form_contracts = {
+        role: analyze_form_surface(
+            {
+                "name": form["name"],
+                "pageTitle": form["page_title"],
+                "tabs": form["tabs"],
+                "formActionContainers": form["formActionContainers"],
+            },
+            strict=True,
+        )
+        for role, form in planned_preview["forms"].items()
+    }
     response_payload: dict[str, Any] = {
         "module_name": normalized_module_name,
         "names": resolved_names,
+        "icon_contract": icon_contract,
+        "form_contracts": form_contracts,
         "preflight": preflight,
-        "planned": _material_module_plan_preview(
-            module_name=normalized_module_name,
-            names=resolved_names,
-            fields=normalized_fields,
-            field_name_prefix=normalized_prefix,
-            content_type_id=content_type_id or (preflight.get("content_type") or {}).get("_id"),
-            view_id=view_id or (preflight.get("view") or {}).get("_id"),
-            add_form_id=add_form_id or ((preflight.get("forms") or {}).get("add") or {}).get("_id"),
-            edit_form_id=edit_form_id or ((preflight.get("forms") or {}).get("edit") or {}).get("_id"),
-            view_form_id=view_form_id or ((preflight.get("forms") or {}).get("view") or {}).get("_id"),
-            list_form_id=list_form_id or ((preflight.get("forms") or {}).get("list") or {}).get("_id"),
-            group_id=group_id or (preflight.get("group") or {}).get("_id"),
-            parent_group_id=parent_group_id or (preflight.get("parent_group") or {}).get("_id"),
-            icon_id=icon_id,
-            add_icon_id=add_icon_id,
-            edit_icon_id=edit_icon_id,
-            view_icon_id=view_icon_id,
-            delete_icon_id=delete_icon_id,
-            menu_icon_id=menu_icon_id,
-            close_icon_id=close_icon_id,
-            save_icon_id=save_icon_id,
-        ),
+        "planned": planned_preview,
     }
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
 
     if not plan_id:
         raise ValueError("plan_id is required when dry_run=false for alterios_create_material_module.")
+    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
+    if not icon_contract["ok"]:
+        invalid = ", ".join(icon_contract["invalid"])
+        raise ValueError(
+            "Material module apply requires target-project-local UUID iconIds. "
+            f"Resolve icons with alterios_ensure_project_icon_library first: {invalid}."
+        )
+    for form_contract in form_contracts.values():
+        assert_form_contract(form_contract)
     verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
     runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
-    assert_plan_matches_audit(plan_id=plan_id, audit=audit.as_dict())
 
     steps: list[dict[str, Any]] = []
 
@@ -954,6 +988,16 @@ def alterios_patch_form_cell_listeners(
     readback = client.form_by_id(form_id).as_dict()
     response_payload.update({"saved": saved, "readback": readback})
     return controlled_write_result(audit=audit, response=response_payload)
+
+
+def _material_module_icon_contract(**icon_ids: str | None) -> dict[str, Any]:
+    invalid = sorted(name for name, value in icon_ids.items() if not value or not looks_like_uuid(str(value)))
+    return {
+        "ok": not invalid,
+        "required": sorted(icon_ids),
+        "invalid": invalid,
+        "resolution_tool": "alterios_ensure_project_icon_library",
+    }
 
 def alterios_upsert_form_manual_script_action(
     form_id: str,

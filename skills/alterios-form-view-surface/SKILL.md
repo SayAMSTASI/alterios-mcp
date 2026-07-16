@@ -77,7 +77,7 @@ Use this skill when a user-facing Alterios screen must be built, repaired, or au
 - For view/detail and edit forms, set `pageTitle` to `{наименование сущности в единственном роде}`.
 - Check field order, labels, `displaying`, required status, and source field meaning before treating a field cell as finished.
 - Use persistent bottom helper/footnote text under a form field only for fields whose persisted content type field is `date`. For other field types, prefer a clear label, tooltip, placeholder, or separate help block instead of always-visible bottom text. Treat analyzer issue `field_footnote_requires_date` as a tester failure before accepting a form.
-- For table display cells, keep the visible cell header centered and bold. For non-table display cells, do not add a visible cell header; use `pageTitle`, tab titles, field labels, or tooltips instead.
+- For table display cells, keep the visible cell header centered, bold, and give it a 10 px top padding. Check both `cell.header` and the runtime shape `cell.displaying.header`. For non-table display cells, do not add a visible cell header; use `pageTitle`, tab titles, field labels, or tooltips instead.
 - Use `view_data_list` for related rows and validate the real relation field.
 - Treat the user-approved master-detail reference pattern as: top context row, compact action hub, grouped menus, second-row detail blocks, related list with centered bold table header, and nested downstream form section.
 - In master-detail action hubs that follow this reference, short visible group labels on `top_center` action containers are allowed. Do not rewrite them to icon-only without a user request.

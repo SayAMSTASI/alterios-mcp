@@ -15,7 +15,9 @@ Use this skill as an independent verification pass before marking an Alterios MC
 4. Scan changed files and generated artifacts for secrets.
 5. For write tools, prove dry-run blocks by default and live write requires `ALTERIOS_MCP_ALLOW_WRITE=1`.
 6. For live writes, check API readback; for user-facing surfaces, check UI or render evidence.
-7. For form surfaces, fail verification on `element_action_title_must_be_tooltip`, `table_cell_header_style`, `non_table_cell_header`, or `field_footnote_requires_date` unless the user explicitly approved the exception.
+7. For form surfaces, call `alterios_ux_contract` and fail verification on every
+   returned blocking code. Do not maintain a shorter copied list in the verifier;
+   the machine-readable contract is authoritative.
 8. Record residual risks rather than hiding them.
 
 For report/write changes, include targeted coverage from `tests/test_write_control.py` and `tests/test_stimulsoft_layout.py` unless a narrower command is explicitly justified.

@@ -539,7 +539,12 @@ def _field_is_hidden(field_config: Any) -> bool:
 
 
 def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues: list[dict[str, Any]]) -> None:
+    header_path = f"{path}.header"
     header = cell.get("header")
+    if not isinstance(header, dict):
+        displaying = _dict_or_empty(cell.get("displaying"))
+        header = displaying.get("header")
+        header_path = f"{path}.displaying.header"
     if not isinstance(header, dict):
         return
     title = str(header.get("title") or "").strip()
@@ -551,7 +556,7 @@ def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues
             "warning",
             "non_table_cell_header",
             "Non-table cells should not render a visible cell header; use field labels, page titles, or help text instead.",
-            f"{path}.header",
+            header_path,
             {"cell_type": cell_type, "title": title},
         )
         return
@@ -564,12 +569,27 @@ def _analyze_cell_header(cell: dict[str, Any], cell_type: str, path: str, issues
             "warning",
             "table_cell_header_style",
             "Table cell headers must be centered and bold.",
-            f"{path}.header",
+            header_path,
             {
                 "title": title,
                 "textAlign": styles.get("textAlign") or styles.get("text-align"),
                 "fontWeight": styles.get("fontWeight") or styles.get("font-weight"),
             },
+        )
+    padding_top = styles.get("paddingTop", styles.get("padding-top"))
+    normalized_padding = str(padding_top or "").strip().lower().removesuffix("px")
+    try:
+        padding_value = float(normalized_padding)
+    except ValueError:
+        padding_value = -1
+    if padding_value != 10:
+        _add_issue(
+            issues,
+            "warning",
+            "table_cell_header_top_padding",
+            "Table cell headers must have a 10px top padding.",
+            header_path,
+            {"title": title, "paddingTop": padding_top},
         )
 
 
@@ -623,6 +643,15 @@ def _analyze_page_action_contract(
 ) -> None:
     top_actions = form.get("formActionContainers")
     form_kind = _explicit_form_kind(form)
+    if form_kind == "add" and not str(form.get("pageTitle") or "").strip().casefold().startswith(("добавить ", "add ")):
+        _add_issue(
+            issues,
+            "warning",
+            "add_page_title_must_start_with_add",
+            "An add form pageTitle must use the pattern 'Добавить {сущность}'.",
+            "pageTitle",
+            {"pageTitle": form.get("pageTitle")},
+        )
     if form_kind in {"add", "edit"}:
         observed = _page_action_categories(top_actions)
         if observed[:2] != ["close", "save"]:
@@ -706,6 +735,7 @@ def _analyze_view_detail_editing(
 ) -> None:
     if _form_has_submit_action(form.get("formActionContainers")):
         return
+    form_kind = _explicit_form_kind(form)
     for cell, path in view_data_cells:
         editing = _dict_or_empty(cell.get("editing"))
         if editing.get("enabled") is True:
@@ -717,6 +747,29 @@ def _analyze_view_detail_editing(
                 f"{path}.editing.enabled",
                 {"editing_enabled": True, "surface": "view/detail"},
             )
+        if form_kind != "view_detail":
+            continue
+        fields = _dict_or_empty(_dict_or_empty(cell.get("displaying")).get("fields"))
+        for field_name, raw_config in fields.items():
+            config = _dict_or_empty(raw_config)
+            if _field_is_hidden(config):
+                continue
+            if config.get("inputConfig") not in (None, {}):
+                _add_issue(
+                    issues,
+                    "warning",
+                    "view_detail_field_input_config_present",
+                    "Visible fields in a view/detail form must not expose an inputConfig.",
+                    f"{path}.displaying.fields.{field_name}.inputConfig",
+                )
+            if not isinstance(config.get("outputConfig"), dict):
+                _add_issue(
+                    issues,
+                    "warning",
+                    "view_detail_field_output_config_missing",
+                    "Visible fields in a view/detail form must define outputConfig for read-only rendering.",
+                    f"{path}.displaying.fields.{field_name}.outputConfig",
+                )
 
 
 def _form_has_submit_action(value: Any) -> bool:
@@ -761,6 +814,19 @@ def _analyze_action_containers(
     if not isinstance(containers, list):
         _add_issue(issues, "warning", "invalid_action_container_list", "Action containers value is not a list.", path)
         return
+    is_top_level_element_actions = ".cellActionContainers" in path and ".containers" not in path
+    if is_top_level_element_actions and len(containers) > 3 and not any(
+        isinstance(container, dict) and str(container.get("type") or "").strip().casefold() == "menu"
+        for container in containers
+    ):
+        _add_issue(
+            issues,
+            "warning",
+            "element_actions_must_use_menu",
+            "More than three element actions must be grouped in a menu.",
+            path,
+            {"action_container_count": len(containers)},
+        )
     known_order: list[tuple[str, str]] = []
     for index, container in enumerate(containers):
         container_path = f"{path}[{index}]"
@@ -821,14 +887,14 @@ def _analyze_action_containers(
             action_icons.append(container_icon)
         is_element_action = ".cellActionContainers" in path
         is_action_hub_item = is_element_action and str(container.get("position") or "").lower() == "top_center"
-        if container_icon and container_title and is_element_action and not is_nested_menu_item and not is_action_hub_item:
+        if container_title and is_element_action and not is_nested_menu_item and not is_action_hub_item:
             _add_issue(
                 issues,
                 "warning",
                 "element_action_title_must_be_tooltip",
                 "Element actions must render as icon-only; move visible text to tooltip and clear the outer title.",
                 container_path,
-                {"title": container_title, "icon": container_icon},
+                {"title": container_title, "icon": container_icon or None},
             )
         elif container_icon and container_title and not is_nested_menu_item:
             _add_issue(
@@ -851,19 +917,19 @@ def _analyze_action_containers(
                 _add_issue(
                     issues,
                     "warning",
-                    "missing_action_icon",
+                    "row_action_missing_icon" if row_actions else "missing_action_icon",
                     "Visible form/list action has no icon; Alterios actions should be icon-first.",
                     action_path,
                 )
             title = str(action.get("title") or "").strip()
-            if icon and title and is_element_action and not is_nested_menu_item:
+            if title and is_element_action and not is_nested_menu_item:
                 _add_issue(
                     issues,
                     "warning",
                     "element_action_title_must_be_tooltip",
                     "Element actions must render as icon-only; move visible text to tooltip and clear the action title.",
                     action_path,
-                    {"title": title, "icon": icon},
+                    {"title": title, "icon": icon or None},
                 )
             elif icon and title:
                 _add_issue(
