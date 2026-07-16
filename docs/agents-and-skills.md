@@ -22,7 +22,7 @@
 |---|---|---|---|---|---:|
 | Lead Engineer | Всегда, как владелец сессии | Интегрирует вывод агентов, выбирает конечное решение, запускает проверки, коммитит и пушит | Все артефакты агентов, код, live evidence | Проверенный repo state, commit/push, краткий итог | Да |
 | PM Control Loop | В начале этапа и после каждого проверенного среза | Разбить цель на этапы, зафиксировать acceptance criteria, вести статус, риски, блокеры, следующий шаг | Приватная Gitea, backlog, текущая цель пользователя | Обновленный статус, stage gate, список следующих задач | Только private workboard |
-| Business/System Analyst / Аналитик требований | Когда запрос нужно превратить в постановку, ТРЗ, сценарии или developer handoff | Формализовать бизнес-цель, роли, сценарии, модель данных, views/forms/scripts/BPMN/reports, acceptance criteria, open questions и Stage 19 preflight | Запрос пользователя, inventory, `alterios_project_health`, UI/HAR evidence, договор/ТЗ/протокол при наличии | Постановка/ТРЗ, карта объектов, view/form/process/report requirements, acceptance checklist | Только docs |
+| Business/System Analyst / Аналитик требований | Когда запрос нужно превратить в постановку, ТРЗ, сценарии или developer handoff | Формализовать бизнес-цель, роли, сценарии, модель данных, views/forms/scripts/BPMN/reports, acceptance criteria, open questions и Stage 19 preflight | Запрос пользователя, inventory, `alterios_live_task_preflight`, UI/HAR evidence, договор/ТЗ/протокол при наличии | Постановка/ТРЗ, карта объектов, view/form/process/report requirements, acceptance checklist | Только docs |
 | Project Base Explorer | Перед любыми изменениями project base или расширением покрытия | Read-only инвентаризация проектов, content types, fields, views, forms, scripts, diagrams, reports, files, comments, users/groups, tasks/processes; поиск route/response shape | `profile`, `project_id`, discovery JSON, live API read-only | JSON/MD матрицы, id/name map, route map, gaps | Нет |
 | Data Model Engineer | При типах материалов, полях, связях, источниках данных | Проектировать content types/material types, persisted field types, refs, file fields, calc/spreadsheet/combined/person fields, `contentNameTemplate`, role/source constraints | Inventory, `alterios-field-types`, существующие content types/fields | Спецификация модели, field matrix, safe migration plan | Да, scoped |
 | View Builder | При списках, представлениях, источниках для форм/отчетов | Проектировать views, view entities, joins, view fields, filters, sorts, display names, source fields, current-record context, `dataId/openId` behavior | Content model, view inventory, expected UI rows | View spec, view field matrix, get-data readback plan | Да, scoped |
@@ -65,8 +65,8 @@ Done:
   views, forms, scripts, BPMN, reports, groups, icons, users/roles;
 - для представлений фиксировать source content type, `viewEntity`, joins,
   relation field, view fields, filters, sorts, `openId/dataId` и readback;
-- перед live-write через сценарные tools требовать `alterios_project_health`
-  без blocking errors;
+- перед live-write через сценарные tools требовать `alterios_live_task_preflight`
+  со статусом `ready`;
 - отдавать профильным агентам scoped handoff, а не общий пересказ задачи.
 
 Done:

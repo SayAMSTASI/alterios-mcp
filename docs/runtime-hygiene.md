@@ -54,16 +54,34 @@
 .\.venv\Scripts\alterios-replay-smoke.exe --json
 ```
 
+## Быстрый live-preflight
+
+Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
+дубликаты MCP-процессов, project health, replay smoke и наличие приватной
+delivery evidence в единый результат `ready/blocked`:
+
+```powershell
+.\.venv\Scripts\python.exe -m alterios_mcp.live_task_preflight `
+  --profile <profile> `
+  --project-id <project-id> `
+  --scenario-tool alterios_create_material_module `
+  --work-item-ref <private-task-ref> `
+  --agent-handoff-ref <private-handoff-ref> `
+  --pretty
+```
+
 ## Правило для live-записи
 
 Для сценарных write-tools `alterios_create_material_module`,
 `alterios_create_report_tab` и `alterios_create_process_flow` перед apply нужен
-свежий `alterios_runtime_info`:
+успешный `alterios_live_task_preflight`:
 
 - `stale=false`;
 - `matches_expected=true`, если передан expected fingerprint;
 - `duplicate_process_count=0`;
 - `ux_contract_version` соответствует активному `alterios_ux_contract`.
+- `project_health` не содержит blockers;
+- `delivery_evidence` содержит ссылку на приватную задачу и handoff агентов.
 
 Если эти условия не выполнены, сначала очистите runtime и только потом
 повторяйте dry-run/apply.
