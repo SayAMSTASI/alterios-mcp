@@ -8,8 +8,8 @@
 
 Контекст текущего покрытия:
 
-- MCP tools: 104;
-- write-like MCP tools: 41;
+- MCP tools: 107;
+- write-like MCP tools: 44;
 - project-base сценарии уже покрывают content types, fields, content, files,
   views, forms, scripts, BPMN/process/tasks, reports, groups, comments;
 - users, roles, user groups writes и destructive delete имеют typed security
@@ -855,10 +855,11 @@ production-готовую возможность, но route и typed MCP tool �
    - inventory more listener shapes;
    - add/update/remove listener variants;
    - script/action linkage validation.
-4. Expanded bulk action tool:
-   - selected ids;
-   - manual script bulk action;
-   - destructive bulk delete only after dangerous evidence.
+4. Expanded bulk action tools реализованы:
+   - `alterios_fast_live_bulk_manual_script` для manual script по выбранным ID;
+   - `alterios_fast_live_bulk_process` для BPMN process по выбранным ID;
+   - `alterios_fast_live_bulk_delete` только в `full/admin`, после dry-run,
+     matching `plan_id`, dangerous gates и проверки отсутствия каждой записи.
 5. Native content type publish/transfer live execution:
    - designate target sandbox project;
    - source/target project map;

@@ -29,6 +29,9 @@ Use this skill when behavior crosses forms, scripts, BPMN, tasks, and data chang
 13. Prefer `alterios_upsert_form_manual_script_action` over raw form JSON. Pass
     `argument_entity_ids` when the script needs an entity from a joined view;
     let the tool resolve the corresponding `_idN` provider key.
+14. For selected rows, use `alterios_fast_live_bulk_manual_script` or
+    `alterios_fast_live_bulk_process`. Do not loop generic MCP calls manually:
+    the workflow must freeze target IDs in a plan and journal partial failures.
 
 ## Safety
 

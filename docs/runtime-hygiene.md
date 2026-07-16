@@ -34,6 +34,13 @@
 OS-процессами: `alterios-mcp.exe` launcher и дочерний `python.exe`. Для live-gate
 важен не сырой `process_count`, а `instance_count` и `duplicate_instance_count`.
 
+MCP-вызов `alterios_runtime_info(include_processes=true)` использует общий
+process snapshot с TTL 15 секунд. Повторные runtime/preflight проверки внутри
+TTL не запускают новый Windows CIM scan. Для принудительной диагностики
+передайте `refresh_processes=true`; TTL меняется через
+`process_cache_ttl_seconds`. Если нужен только итоговый счетчик без списков
+процессов, передайте `include_process_details=false`.
+
 ## Очистить старые процессы
 
 Сначала dry-run:

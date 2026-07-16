@@ -46,6 +46,8 @@ def test_live_profile_keeps_delivery_tools_and_hides_raw_escape_hatches() -> Non
         "alterios_live_task_preflight",
         "alterios_validate_form_contract",
         "alterios_fast_live_write",
+        "alterios_fast_live_bulk_manual_script",
+        "alterios_fast_live_bulk_process",
         "alterios_create_material_module",
         "alterios_create_report_tab",
         "alterios_create_process_flow",
@@ -56,6 +58,7 @@ def test_live_profile_keeps_delivery_tools_and_hides_raw_escape_hatches() -> Non
     assert "alterios_rest_write" not in names
     assert "alterios_call_write_service" not in names
     assert "alterios_upsert_user" not in names
+    assert "alterios_fast_live_bulk_delete" not in names
 
 
 def test_discovery_profile_has_no_mutating_work_tools() -> None:
@@ -75,5 +78,6 @@ def test_admin_profile_keeps_typed_security_but_not_generic_write() -> None:
 
     assert "alterios_upsert_user" in names
     assert "alterios_delete_role" in names
+    assert "alterios_fast_live_bulk_delete" in names
     assert "alterios_rest_write" not in names
     assert "alterios_call_write_service" not in names

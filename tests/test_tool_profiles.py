@@ -21,6 +21,9 @@ SAMPLE_TOOLS = [
     "alterios_live_task_preflight",
     "alterios_validate_form_contract",
     "alterios_fast_live_write",
+    "alterios_fast_live_bulk_manual_script",
+    "alterios_fast_live_bulk_process",
+    "alterios_fast_live_bulk_delete",
     "alterios_create_material_module",
     "alterios_upsert_content_type",
     "alterios_upsert_form_manual_script_action",
@@ -60,6 +63,9 @@ def test_classify_tool_covers_profile_boundaries() -> None:
     assert classify_tool("alterios_live_task_preflight") == "runtime_guard"
     assert classify_tool("alterios_validate_form_contract") == "read_only_discovery"
     assert classify_tool("alterios_fast_live_write") == "scenario"
+    assert classify_tool("alterios_fast_live_bulk_manual_script") == "scenario"
+    assert classify_tool("alterios_fast_live_bulk_process") == "scenario"
+    assert classify_tool("alterios_fast_live_bulk_delete") == "dangerous_workflow"
     assert classify_tool("alterios_create_material_module") == "scenario"
     assert classify_tool("alterios_upsert_content_type") == "typed_write"
     assert classify_tool("alterios_upsert_form_manual_script_action") == "typed_write"
@@ -92,12 +98,15 @@ def test_live_profile_keeps_scenarios_and_typed_helpers() -> None:
         "alterios_live_task_preflight",
         "alterios_create_material_module",
         "alterios_fast_live_write",
+        "alterios_fast_live_bulk_manual_script",
+        "alterios_fast_live_bulk_process",
         "alterios_upsert_content_type",
         "alterios_upsert_form_manual_script_action",
         "alterios_list_content_types",
     } <= enabled
     assert "alterios_upsert_user" not in enabled
     assert "alterios_delete_role" not in enabled
+    assert "alterios_fast_live_bulk_delete" not in enabled
     assert "gitea_create_work_item" in enabled
     assert "future_unclassified_tool" not in enabled
 
@@ -109,6 +118,7 @@ def test_admin_profile_adds_typed_admin_and_security_tools_without_raw_escapes()
     assert "alterios_upsert_content_type" in enabled
     assert "alterios_upsert_user" in enabled
     assert "alterios_delete_role" in enabled
+    assert "alterios_fast_live_bulk_delete" in enabled
     assert "gitea_create_work_item" in enabled
     assert "alterios_rest_write" not in enabled
     assert "alterios_call_write_service" not in enabled

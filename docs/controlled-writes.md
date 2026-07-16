@@ -56,6 +56,11 @@ Dangerous execution требует все обычные write gates плюс:
 Dry-run и `alterios_write_safety_preflight` доступны без этих gates, поэтому
 target IDs и route classification можно проверить до выполнения.
 
+Для массового удаления content rows generic `alterios_call_write_service` не
+используется. Применяется `alterios_fast_live_bulk_delete`: точные IDs,
+`expected_count` и `expected_content_type_id` сохраняются в dry-run плане,
+apply сверяет `plan_id`, а readback подтверждает отсутствие каждой записи.
+
 ## Форма audit
 
 Каждая controlled write возвращает:

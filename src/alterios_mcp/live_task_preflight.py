@@ -14,7 +14,7 @@ from .delivery_evidence import validate_delivery_evidence
 from .gitea_workboard import GiteaClient, GiteaConfig
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
-from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_instances, collect_alterios_mcp_processes
+from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_process_snapshot
 from .tool_profiles import allowed_tool_names
 from .ux_contract import UX_CONTRACT_VERSION
 
@@ -24,6 +24,9 @@ KNOWN_SCENARIO_TOOLS = {
     "alterios_create_material_module",
     "alterios_create_report_tab",
     "alterios_create_process_flow",
+    "alterios_fast_live_bulk_manual_script",
+    "alterios_fast_live_bulk_process",
+    "alterios_fast_live_bulk_delete",
     "alterios_clone_shared_content_type",
     "alterios_ensure_project_icons",
     "alterios_ensure_project_icon_library",
@@ -188,8 +191,9 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
     runtime = build_runtime_fingerprint(tool_count=_server_tool_count())
     expected = (expected_fingerprint or "").strip()
     matches_expected = not expected or runtime["fingerprint"] == expected
-    processes = collect_alterios_mcp_processes()
-    instances = collect_alterios_mcp_instances(processes)
+    snapshot = collect_alterios_mcp_process_snapshot(cache_ttl_seconds=15)
+    processes = snapshot["processes"]
+    instances = snapshot["instances"]
     duplicate_instance_count = max(0, len(instances) - 1)
     ok = not runtime["stale"] and matches_expected and duplicate_instance_count == 0
     if runtime["stale"]:
@@ -213,6 +217,7 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
                 "instance_count": len(instances),
                 "duplicate_instance_count": duplicate_instance_count,
                 "duplicate_process_count": duplicate_instance_count,
+                "cache": snapshot["cache"],
                 "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
             },
     }

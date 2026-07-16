@@ -141,3 +141,33 @@ def test_cleanup_alterios_mcp_processes_is_dry_run_by_default(monkeypatch) -> No
     assert [item["root_pid"] for item in dry_run["planned_stop"]] == [202, 203]
     assert stopped == [202, 203]
     assert [item["root_pid"] for item in applied["stopped"]] == [202, 203]
+
+
+def test_process_snapshot_reuses_ttl_cache_and_supports_refresh(monkeypatch) -> None:
+    calls = 0
+
+    def rows() -> list[dict[str, object]]:
+        nonlocal calls
+        calls += 1
+        return [
+            {
+                "pid": 401,
+                "parent_pid": 900,
+                "name": "python.exe",
+                "created_at": "2026-07-16T10:00:00",
+                "command_line": r'"C:\venv\python.exe" "C:\repo\alterios-mcp\.venv\Scripts\alterios-mcp.exe"',
+            }
+        ]
+
+    runtime_info.clear_process_snapshot_cache()
+    monkeypatch.setattr(runtime_info, "_process_rows", rows)
+
+    first = runtime_info.collect_alterios_mcp_process_snapshot(cache_ttl_seconds=30)
+    second = runtime_info.collect_alterios_mcp_process_snapshot(cache_ttl_seconds=30)
+    refreshed = runtime_info.collect_alterios_mcp_process_snapshot(refresh=True, cache_ttl_seconds=30)
+
+    assert calls == 2
+    assert first["cache"]["hit"] is False
+    assert second["cache"]["hit"] is True
+    assert refreshed["cache"]["hit"] is False
+    assert first["instances"][0]["root_pid"] == 401

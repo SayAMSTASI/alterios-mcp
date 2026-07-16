@@ -12,8 +12,8 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 104 | Полный callable registry в `src/alterios_mcp/server.py`; профиль `live` публикует 78 tools. |
-| Write-like MCP tools | 41 | Сценарные, typed, security и raw-write инструменты по классификации `tool_profiles.py`: `alterios_create_material_module`, `alterios_create_process_flow`, `alterios_create_report_tab`, `alterios_fast_live_write`, `alterios_export_project_icons`, `alterios_ensure_project_icons`, `alterios_ensure_project_icon_library`, `alterios_add_comment`, `alterios_upsert_content_type`, `alterios_plan_content_type_publish`, `alterios_clone_shared_content_type`, `alterios_upsert_field`, `alterios_create_content`, `alterios_upsert_group`, `alterios_upsert_help`, `alterios_update_content_fields`, `alterios_bulk_update_selected_content_fields`, `alterios_file_upload_to_field`, `alterios_upsert_view`, `alterios_upsert_view_entity`, `alterios_upsert_view_field`, `alterios_upsert_form`, `alterios_patch_form_actions`, `alterios_patch_form_tabs`, `alterios_patch_form_cell_listeners`, `alterios_upsert_form_manual_script_action`, `alterios_upsert_script`, `alterios_upsert_bpmn_diagram`, `alterios_start_process`, `alterios_complete_task`, `alterios_upsert_report`, `alterios_patch_report_template`, `alterios_execute_manual_script`, `alterios_upsert_user`, `alterios_upsert_user_group`, `alterios_upsert_role`, `alterios_delete_user`, `alterios_delete_user_group`, `alterios_delete_role`, `alterios_call_write_service`, `alterios_rest_write`. |
+| MCP tools | 107 | Полный callable registry в `src/alterios_mcp/server.py`; профиль `live` публикует 80 tools. |
+| Write-like MCP tools | 44 | Сценарные, typed, security, dangerous и raw-write инструменты по классификации `tool_profiles.py`; в число сценарных входят `alterios_fast_live_write`, `alterios_fast_live_bulk_manual_script`, `alterios_fast_live_bulk_process` и admin-only `alterios_fast_live_bulk_delete`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
 | REST route/method patterns in coverage registry | 78 | Read/detail/runtime/write/workflow/file/comment/report/security/content-transfer patterns ниже. |
@@ -43,7 +43,7 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Sandbox create/update/delete and cleanup are verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 104
+## MCP Tools: 107
 
 | Tool | Вид |
 |---|---|
@@ -116,6 +116,9 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_create_report_tab` | Controlled scenario tool for Project Database report plus openId form tab and dataId context check |
 | `alterios_validate_form_contract` | Strict blocking validation alias for the active form UX contract |
 | `alterios_fast_live_write` | Two-phase fast workflow: live preflight plus scenario plan/apply |
+| `alterios_fast_live_bulk_manual_script` | Fast cached-health plan/apply workflow for one manual script over selected content IDs |
+| `alterios_fast_live_bulk_process` | Fast cached-health plan/apply workflow for one BPMN process over selected content IDs |
+| `alterios_fast_live_bulk_delete` | Admin-only destructive bulk delete with exact target plan, dangerous gates and absence readback |
 | `alterios_view_data` | Runtime data read |
 | `alterios_discover_readonly` | Live route matrix |
 | `alterios_profile_smoke_matrix` | Profile/project read-only smoke matrix |
