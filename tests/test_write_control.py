@@ -2145,6 +2145,7 @@ def test_create_material_module_dry_run_stores_plan_without_real_network(tmp_pat
         "upsert_view_fields",
         "upsert_add_form",
         "upsert_edit_form",
+        "upsert_view_form",
         "upsert_list_form",
         "upsert_group",
         "readback_summary",
@@ -2462,10 +2463,15 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
     assert result["response"]["readback"]["view_data_smoke"]["body"] == {"rows": [], "count": 0}
     assert result["response"]["ids"]["add_form_id"] == "form-1"
     assert result["response"]["ids"]["edit_form_id"] == "form-2"
-    assert result["response"]["ids"]["list_form_id"] == "form-3"
+    assert result["response"]["ids"]["view_form_id"] == "form-3"
+    assert result["response"]["ids"]["list_form_id"] == "form-4"
     assert result["response"]["ids"]["group_id"] == "group-1"
     assert apply_client.content_types["ct-1"]["contentNameTemplate"] == "{{field_test__mat_name}}"
     assert apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["type"] == "content"
+    assert [action["title"] for action in apply_client.forms["form-1"]["formActionContainers"]] == [
+        "Закрыть",
+        "Сохранить",
+    ]
     assert (
         apply_client.forms["form-1"]["tabs"][0]["rows"][0]["cells"][0]["displaying"]["fields"][
             "field_test__mat_name"
@@ -2480,12 +2486,23 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
         == 1
     )
     assert apply_client.forms["form-2"]["tabs"][0]["rows"][1]["cells"][0]["type"] == "comments_list"
-    list_cell = apply_client.forms["form-3"]["tabs"][0]["rows"][0]["cells"][0]
+    view_cell = apply_client.forms["form-3"]["tabs"][0]["rows"][0]["cells"][0]
+    assert view_cell["type"] == "view_data"
+    assert view_cell["editing"]["enabled"] is False
+    assert apply_client.forms["form-3"]["formActionContainers"][0]["title"] == "Закрыть"
+    assert view_cell["cellActionContainers"][0]["title"] == ""
+    assert view_cell["cellActionContainers"][0]["tooltip"] == "Редактировать"
+    list_cell = apply_client.forms["form-4"]["tabs"][0]["rows"][0]["cells"][0]
     assert list_cell["type"] == "view_data_list"
     assert list_cell["displaying"]["fields"]["test__mat_name"]["order"] == 1
     assert list_cell["cellActionContainers"][0]["iconId"] == "add"
-    assert list_cell["valueActionContainers"][0]["iconId"] == "edit"
-    assert apply_client.groups["group-1"]["formId"] == "form-3"
+    row_menu = list_cell["valueActionContainers"][0]
+    assert row_menu["type"] == "menu"
+    assert row_menu["iconId"] == "menu"
+    assert [item["title"] for item in row_menu["containers"]] == ["Редактировать", "Просмотр", "Удалить"]
+    assert row_menu["containers"][1]["default"] is True
+    assert row_menu["containers"][2]["actions"][0]["type"] == "delete_contents"
+    assert apply_client.groups["group-1"]["formId"] == "form-4"
     assert result["journal"]["event_id"].startswith("wj_")
 
 

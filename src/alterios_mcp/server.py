@@ -1828,6 +1828,13 @@ def _response_body(value: Any) -> Any:
     return value
 
 
+def _managed_description(text: str | None, fallback: str) -> str:
+    description = (text or fallback).strip()
+    if MANAGED_MARKER in description:
+        return description
+    return f"{MANAGED_MARKER}: {description}"
+
+
 def _material_module_operation(
     *,
     module_name: str,
@@ -1837,14 +1844,20 @@ def _material_module_operation(
     view_id: str | None,
     add_form_id: str | None,
     edit_form_id: str | None,
+    view_form_id: str | None,
     list_form_id: str | None,
     group_id: str | None,
     parent_group_id: str | None,
     names: dict[str, str],
     content_name_template: str | None,
+    content_type_description: str | None,
     icon_id: str | None,
     add_icon_id: str | None,
     edit_icon_id: str | None,
+    view_icon_id: str | None,
+    delete_icon_id: str | None,
+    menu_icon_id: str | None,
+    close_icon_id: str | None,
     save_icon_id: str | None,
     allow_unmanaged_update: bool,
 ) -> WriteOperation:
@@ -1856,15 +1869,21 @@ def _material_module_operation(
         "viewId": view_id,
         "addFormId": add_form_id,
         "editFormId": edit_form_id,
+        "viewFormId": view_form_id,
         "listFormId": list_form_id,
         "groupId": group_id,
         "parentGroupId": parent_group_id,
         "names": names,
         "contentNameTemplate": content_name_template,
+        "contentTypeDescription": content_type_description,
         "icons": {
             "group": icon_id,
             "add": add_icon_id,
             "edit": edit_icon_id,
+            "view": view_icon_id,
+            "delete": delete_icon_id,
+            "menu": menu_icon_id,
+            "close": close_icon_id,
             "save": save_icon_id,
         },
         "allowUnmanagedUpdate": allow_unmanaged_update,
@@ -1877,7 +1896,7 @@ def _material_module_operation(
         path="scenario://material-module",
         summary=(
             "Create or update a complete Alterios material module: content type, fields, view, "
-            "add/edit/list forms, and menu group."
+            "add/edit/view/list forms, and menu group."
         ),
         request={key: value for key, value in request.items() if value is not None},
     )
@@ -1929,6 +1948,17 @@ def _normalize_material_module_fields(
         ):
             if source_key in raw:
                 normalized_field[target_key] = raw[source_key]
+        field_settings = dict(normalized_field.get("settings") or {})
+        field_settings.setdefault("valueCount", 1)
+        if field_type == "text":
+            field_settings.setdefault("widget", "text")
+            field_settings.setdefault("maxLength", 2000 if field_settings.get("widget") == "textarea" else 255)
+        if field_type == "number":
+            field_settings.setdefault("widget", "text")
+            field_settings.setdefault("maxLength", 255)
+            field_settings.setdefault("precision", 2)
+            field_settings.setdefault("defaultValue", [None])
+        normalized_field["settings"] = field_settings
         normalized.append(normalized_field)
     return normalized
 
@@ -1962,8 +1992,13 @@ def _material_module_names(module_name: str, names: dict[str, str] | None = None
         "view": overrides.get("view") or f"{module_name}. Список",
         "add_form": overrides.get("add_form") or f"{module_name}. Добавить",
         "edit_form": overrides.get("edit_form") or f"{module_name}. Карточка",
+        "view_form": overrides.get("view_form") or f"{module_name}. Просмотр",
         "list_form": overrides.get("list_form") or module_name,
         "group": overrides.get("group") or module_name,
+        "add_page_title": overrides.get("add_page_title") or overrides.get("add_form") or f"{module_name}. Добавить",
+        "edit_page_title": overrides.get("edit_page_title") or overrides.get("edit_form") or f"{module_name}. Карточка",
+        "view_page_title": overrides.get("view_page_title") or overrides.get("view_form") or f"{module_name}. Просмотр",
+        "list_page_title": overrides.get("list_page_title") or overrides.get("list_form") or module_name,
     }
 
 
@@ -1983,7 +2018,7 @@ def _material_content_display_fields(fields: list[dict[str, Any]]) -> dict[str, 
 
 
 def _material_view_display_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
-    display: dict[str, Any] = {"_id": {"order": 0, "hidden": True}}
+    display: dict[str, Any] = {"_id": {"order": 0, "hidden": True}, "_id0": {"order": 0, "hidden": True}}
     for index, field in enumerate(fields, start=1):
         field_order = int(field.get("order", index - 1)) + 1
         display[field["view_mname"]] = {"order": field_order, "hidden": False, "title": field["name"]}
@@ -2035,6 +2070,59 @@ def _material_view_data_row(module_name: str, view_id: str, fields: list[dict[st
         "styles": _material_row_styles(),
         "reverse": False,
     }
+
+
+def _material_edit_from_view_action(
+    *,
+    icon_id: str | None,
+    edit_form_id: str,
+    edit_form_name: str,
+    view_entity_id: str,
+) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": "",
+        "tooltip": "Редактировать",
+        "styles": {},
+        "actions": [
+            {
+                "_id": edit_form_id,
+                "name": edit_form_name,
+                "type": "forms",
+                "openInDialog": True,
+                "openInNewTab": False,
+                "viewEntityId": view_entity_id,
+                "argumentsConfig": {},
+            }
+        ],
+        "position": "top_left",
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
+def _material_view_form_row(
+    *,
+    module_name: str,
+    view_id: str,
+    fields: list[dict[str, Any]],
+    edit_form_id: str,
+    edit_form_name: str,
+    view_entity_id: str,
+    edit_icon_id: str | None,
+) -> dict[str, Any]:
+    row = _material_view_data_row(module_name, view_id, fields, editable=False)
+    row["cells"][0]["cellActionContainers"] = [
+        _material_edit_from_view_action(
+            icon_id=edit_icon_id,
+            edit_form_id=edit_form_id,
+            edit_form_name=edit_form_name,
+            view_entity_id=view_entity_id,
+        )
+    ]
+    return row
 
 
 def _material_comments_row() -> dict[str, Any]:
@@ -2091,6 +2179,119 @@ def _material_open_form_container(
     return container
 
 
+def _material_row_form_menu_item(
+    *,
+    title: str,
+    icon_id: str | None,
+    form_id: str,
+    form_name: str,
+    view_entity_id: str,
+    default: bool = False,
+) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": title,
+        "styles": {},
+        "actions": [
+            {
+                "_id": form_id,
+                "name": form_name,
+                "type": "forms",
+                "openInDialog": True,
+                "openInNewTab": False,
+                "viewEntityId": view_entity_id,
+                "argumentsConfig": {},
+            }
+        ],
+        "position": "toolbar",
+        "default": default,
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
+def _material_row_delete_menu_item(icon_id: str | None, view_entity_id: str) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": "Удалить",
+        "styles": {},
+        "actions": [
+            {
+                "type": "delete_contents",
+                "openInDialog": False,
+                "openInNewTab": False,
+                "viewEntityId": view_entity_id,
+                "argumentsConfig": {},
+            }
+        ],
+        "position": "toolbar",
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
+def _material_row_menu_container(
+    *,
+    menu_icon_id: str | None,
+    edit_icon_id: str | None,
+    view_icon_id: str | None,
+    delete_icon_id: str | None,
+    edit_form_id: str,
+    edit_form_name: str,
+    view_form_id: str,
+    view_form_name: str,
+    view_entity_id: str,
+) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "menu",
+        "title": "",
+        "tooltip": "Действия",
+        "styles": {},
+        "actions": [],
+        "position": "toolbar",
+        "conditions": [],
+        "containers": [
+            _material_row_form_menu_item(
+                title="Редактировать",
+                icon_id=edit_icon_id,
+                form_id=edit_form_id,
+                form_name=edit_form_name,
+                view_entity_id=view_entity_id,
+            ),
+            _material_row_form_menu_item(
+                title="Просмотр",
+                icon_id=view_icon_id,
+                form_id=view_form_id,
+                form_name=view_form_name,
+                view_entity_id=view_entity_id,
+                default=True,
+            ),
+            _material_row_delete_menu_item(delete_icon_id, view_entity_id),
+        ],
+    }
+    if menu_icon_id:
+        container["iconId"] = menu_icon_id
+    return container
+
+
+def _material_close_action_container(icon_id: str | None) -> dict[str, Any]:
+    container: dict[str, Any] = {
+        "type": "action",
+        "title": "Закрыть",
+        "styles": {},
+        "actions": [{"_id": None, "type": "routing", "argumentsConfig": {}}],
+        "position": "bottom_left",
+        "conditions": [],
+    }
+    if icon_id:
+        container["iconId"] = icon_id
+    return container
+
+
 def _material_save_action_container(icon_id: str | None) -> dict[str, Any]:
     container: dict[str, Any] = {
         "type": "action",
@@ -2105,6 +2306,10 @@ def _material_save_action_container(icon_id: str | None) -> dict[str, Any]:
     return container
 
 
+def _material_edit_form_actions(*, close_icon_id: str | None, save_icon_id: str | None) -> list[dict[str, Any]]:
+    return [_material_close_action_container(close_icon_id), _material_save_action_container(save_icon_id)]
+
+
 def _material_view_data_list_row(
     *,
     module_name: str,
@@ -2114,9 +2319,14 @@ def _material_view_data_list_row(
     add_form_name: str,
     edit_form_id: str,
     edit_form_name: str,
+    view_form_id: str,
+    view_form_name: str,
     fields: list[dict[str, Any]],
     add_icon_id: str | None,
     edit_icon_id: str | None,
+    view_icon_id: str | None,
+    delete_icon_id: str | None,
+    menu_icon_id: str | None,
 ) -> dict[str, Any]:
     return {
         "cells": [
@@ -2146,13 +2356,16 @@ def _material_view_data_list_row(
                     )
                 ],
                 "valueActionContainers": [
-                    _material_open_form_container(
-                        title="Редактировать",
-                        icon_id=edit_icon_id,
-                        form_id=edit_form_id,
-                        form_name=edit_form_name,
+                    _material_row_menu_container(
+                        menu_icon_id=menu_icon_id,
+                        edit_icon_id=edit_icon_id,
+                        view_icon_id=view_icon_id,
+                        delete_icon_id=delete_icon_id,
+                        edit_form_id=edit_form_id,
+                        edit_form_name=edit_form_name,
+                        view_form_id=view_form_id,
+                        view_form_name=view_form_name,
                         view_entity_id=view_entity_id,
-                        position="toolbar",
                     )
                 ],
             }
@@ -2171,6 +2384,7 @@ def _material_module_preflight(
     view_id: str | None,
     add_form_id: str | None,
     edit_form_id: str | None,
+    view_form_id: str | None,
     list_form_id: str | None,
     group_id: str | None,
     parent_group_id: str | None,
@@ -2210,6 +2424,7 @@ def _material_module_preflight(
     forms = {
         "add": _find_form(client, form_id=add_form_id, name=names["add_form"]),
         "edit": _find_form(client, form_id=edit_form_id, name=names["edit_form"]),
+        "view": _find_form(client, form_id=view_form_id, name=names["view_form"]),
         "list": _find_form(client, form_id=list_form_id, name=names["list_form"]),
     }
     for kind, form in forms.items():
@@ -2244,12 +2459,17 @@ def _material_module_plan_preview(
     view_id: str | None,
     add_form_id: str | None,
     edit_form_id: str | None,
+    view_form_id: str | None,
     list_form_id: str | None,
     group_id: str | None,
     parent_group_id: str | None,
     icon_id: str | None,
     add_icon_id: str | None,
     edit_icon_id: str | None,
+    view_icon_id: str | None,
+    delete_icon_id: str | None,
+    menu_icon_id: str | None,
+    close_icon_id: str | None,
     save_icon_id: str | None,
 ) -> dict[str, Any]:
     planned_content_type_id = content_type_id or "$content_type_id"
@@ -2257,6 +2477,7 @@ def _material_module_plan_preview(
     planned_view_entity_id = "$view_entity_id"
     planned_add_form_id = add_form_id or "$add_form_id"
     planned_edit_form_id = edit_form_id or "$edit_form_id"
+    planned_view_form_id = view_form_id or "$view_form_id"
     planned_list_form_id = list_form_id or "$list_form_id"
     return {
         "steps": [
@@ -2267,6 +2488,7 @@ def _material_module_plan_preview(
             "upsert_view_fields",
             "upsert_add_form",
             "upsert_edit_form",
+            "upsert_view_form",
             "upsert_list_form",
             "upsert_group",
             "readback_summary",
@@ -2293,12 +2515,17 @@ def _material_module_plan_preview(
         "forms": {
             "add": {
                 "name": names["add_form"],
+                "page_title": names["add_page_title"],
                 "form_id": add_form_id,
                 "tabs": [{"name": None, "rows": [_material_content_form_row(module_name, planned_content_type_id, fields)]}],
-                "formActionContainers": [_material_save_action_container(save_icon_id)],
+                "formActionContainers": _material_edit_form_actions(
+                    close_icon_id=close_icon_id,
+                    save_icon_id=save_icon_id,
+                ),
             },
             "edit": {
                 "name": names["edit_form"],
+                "page_title": names["edit_page_title"],
                 "form_id": edit_form_id,
                 "tabs": [
                     {
@@ -2309,10 +2536,36 @@ def _material_module_plan_preview(
                         ],
                     }
                 ],
-                "formActionContainers": [_material_save_action_container(save_icon_id)],
+                "formActionContainers": _material_edit_form_actions(
+                    close_icon_id=close_icon_id,
+                    save_icon_id=save_icon_id,
+                ),
+            },
+            "view": {
+                "name": names["view_form"],
+                "page_title": names["view_page_title"],
+                "form_id": view_form_id,
+                "tabs": [
+                    {
+                        "name": None,
+                        "rows": [
+                            _material_view_form_row(
+                                module_name=module_name,
+                                view_id=planned_view_id,
+                                fields=fields,
+                                edit_form_id=planned_edit_form_id,
+                                edit_form_name=names["edit_form"],
+                                view_entity_id=planned_view_entity_id,
+                                edit_icon_id=edit_icon_id,
+                            )
+                        ],
+                    }
+                ],
+                "formActionContainers": [_material_close_action_container(close_icon_id)],
             },
             "list": {
                 "name": names["list_form"],
+                "page_title": names["list_page_title"],
                 "form_id": list_form_id,
                 "tabs": [
                     {
@@ -2326,9 +2579,14 @@ def _material_module_plan_preview(
                                 add_form_name=names["add_form"],
                                 edit_form_id=planned_edit_form_id,
                                 edit_form_name=names["edit_form"],
+                                view_form_id=planned_view_form_id,
+                                view_form_name=names["view_form"],
                                 fields=fields,
                                 add_icon_id=add_icon_id,
                                 edit_icon_id=edit_icon_id,
+                                view_icon_id=view_icon_id,
+                                delete_icon_id=delete_icon_id,
+                                menu_icon_id=menu_icon_id,
                             )
                         ],
                     }
@@ -2543,12 +2801,13 @@ def _project_database_native_dashboard_template(
     columns: list[dict[str, str]],
     base_url: str,
 ) -> dict[str, Any]:
+    visible_columns = _visible_report_columns(columns)
     template = _project_database_dashboard_template(
         report_name=report_name,
         marker=marker,
         source_view_id=source_view_id,
         source_view_name=source_view_name,
-        columns=columns,
+        columns=visible_columns,
     )
     try:
         return _stimulsoft_native_project_database_template(
@@ -2557,7 +2816,7 @@ def _project_database_native_dashboard_template(
             marker=marker,
             source_view_id=source_view_id,
             source_view_name=source_view_name,
-            columns=columns,
+            columns=visible_columns,
             base_url=base_url,
         )
     except Exception as exc:
@@ -2720,12 +2979,14 @@ def _visible_report_columns(columns: list[dict[str, str]]) -> list[dict[str, str
         for column in columns
         if not _is_technical_report_column(column.get("name") or "", column.get("alias") or "")
     ]
-    return visible or [column for column in columns if column.get("name") != "_id"] or columns
+    return visible or [
+        column for column in columns if not re.fullmatch(r"_id\d*", column.get("name") or "")
+    ] or columns
 
 
 def _is_technical_report_column(name: str, alias: str) -> bool:
     lowered = f"{name} {alias}".lower()
-    if name == "_id":
+    if re.fullmatch(r"_id\d*", name):
         return True
     return name.startswith("test__field_") or "bulk_select" in lowered
 
@@ -6032,14 +6293,20 @@ def alterios_create_material_module(
     view_id: str | None = None,
     add_form_id: str | None = None,
     edit_form_id: str | None = None,
+    view_form_id: str | None = None,
     list_form_id: str | None = None,
     group_id: str | None = None,
     names: dict[str, str] | None = None,
     content_name_template: str | None = None,
+    content_type_description: str | None = None,
     parent_group_id: str | None = None,
     icon_id: str | None = "inventory_2",
     add_icon_id: str | None = "add",
     edit_icon_id: str | None = "edit",
+    view_icon_id: str | None = "preview",
+    delete_icon_id: str | None = "delete",
+    menu_icon_id: str | None = "menu",
+    close_icon_id: str | None = "keyboard_return",
     save_icon_id: str | None = "save",
     allow_unmanaged_update: bool = False,
     dry_run: bool = True,
@@ -6064,14 +6331,20 @@ def alterios_create_material_module(
         view_id=view_id,
         add_form_id=add_form_id,
         edit_form_id=edit_form_id,
+        view_form_id=view_form_id,
         list_form_id=list_form_id,
         group_id=group_id,
         parent_group_id=parent_group_id,
         names=resolved_names,
         content_name_template=content_name_template,
+        content_type_description=content_type_description,
         icon_id=icon_id,
         add_icon_id=add_icon_id,
         edit_icon_id=edit_icon_id,
+        view_icon_id=view_icon_id,
+        delete_icon_id=delete_icon_id,
+        menu_icon_id=menu_icon_id,
+        close_icon_id=close_icon_id,
         save_icon_id=save_icon_id,
         allow_unmanaged_update=allow_unmanaged_update,
     )
@@ -6091,6 +6364,7 @@ def alterios_create_material_module(
         view_id=view_id,
         add_form_id=add_form_id,
         edit_form_id=edit_form_id,
+        view_form_id=view_form_id,
         list_form_id=list_form_id,
         group_id=group_id,
         parent_group_id=parent_group_id,
@@ -6109,12 +6383,17 @@ def alterios_create_material_module(
             view_id=view_id or (preflight.get("view") or {}).get("_id"),
             add_form_id=add_form_id or ((preflight.get("forms") or {}).get("add") or {}).get("_id"),
             edit_form_id=edit_form_id or ((preflight.get("forms") or {}).get("edit") or {}).get("_id"),
+            view_form_id=view_form_id or ((preflight.get("forms") or {}).get("view") or {}).get("_id"),
             list_form_id=list_form_id or ((preflight.get("forms") or {}).get("list") or {}).get("_id"),
             group_id=group_id or (preflight.get("group") or {}).get("_id"),
             parent_group_id=parent_group_id or (preflight.get("parent_group") or {}).get("_id"),
             icon_id=icon_id,
             add_icon_id=add_icon_id,
             edit_icon_id=edit_icon_id,
+            view_icon_id=view_icon_id,
+            delete_icon_id=delete_icon_id,
+            menu_icon_id=menu_icon_id,
+            close_icon_id=close_icon_id,
             save_icon_id=save_icon_id,
         ),
     }
@@ -6133,6 +6412,10 @@ def alterios_create_material_module(
         content_type_id=content_type_id,
         field_name_prefix=normalized_prefix,
         content_name_template=content_name_template,
+        description=_managed_description(
+            content_type_description,
+            f"справочник «{resolved_names['content_type']}» для хранения пользовательских записей модуля.",
+        ),
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6191,6 +6474,10 @@ def alterios_create_material_module(
             content_type_id=content_type_id,
             field_name_prefix=normalized_prefix,
             content_name_template=resolved_content_name_template,
+            description=_managed_description(
+                content_type_description,
+                f"справочник «{resolved_names['content_type']}» для хранения пользовательских записей модуля.",
+            ),
             allow_unmanaged_update=allow_unmanaged_update,
             dry_run=False,
             profile=profile,
@@ -6288,9 +6575,9 @@ def alterios_create_material_module(
     add_form_result = alterios_upsert_form(
         resolved_names["add_form"],
         form_id=add_form_id,
-        page_title=resolved_names["add_form"],
+        page_title=resolved_names["add_page_title"],
         tabs=add_tabs,
-        form_action_containers=[_material_save_action_container(save_icon_id)],
+        form_action_containers=_material_edit_form_actions(close_icon_id=close_icon_id, save_icon_id=save_icon_id),
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6314,9 +6601,9 @@ def alterios_create_material_module(
     edit_form_result = alterios_upsert_form(
         resolved_names["edit_form"],
         form_id=edit_form_id,
-        page_title=resolved_names["edit_form"],
+        page_title=resolved_names["edit_page_title"],
         tabs=edit_tabs,
-        form_action_containers=[_material_save_action_container(save_icon_id)],
+        form_action_containers=_material_edit_form_actions(close_icon_id=close_icon_id, save_icon_id=save_icon_id),
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
@@ -6327,6 +6614,39 @@ def alterios_create_material_module(
     if not edit_form_id:
         raise ValueError("Edit form id was not resolved after save.")
     steps.append({"step": "edit_form", "id": edit_form_id, "result": edit_form_result})
+
+    view_tabs = [
+        {
+            "name": None,
+            "rows": [
+                _material_view_form_row(
+                    module_name=normalized_module_name,
+                    view_id=view_id,
+                    fields=saved_fields,
+                    edit_form_id=edit_form_id,
+                    edit_form_name=resolved_names["edit_form"],
+                    view_entity_id=view_entity_id,
+                    edit_icon_id=edit_icon_id,
+                ),
+            ],
+        }
+    ]
+    view_form_result = alterios_upsert_form(
+        resolved_names["view_form"],
+        form_id=view_form_id,
+        page_title=resolved_names["view_page_title"],
+        tabs=view_tabs,
+        form_action_containers=[_material_close_action_container(close_icon_id)],
+        allow_unmanaged_update=allow_unmanaged_update,
+        dry_run=False,
+        profile=profile,
+        project_id=project_id,
+    )
+    view_form_body = _response_body((view_form_result.get("response") or {}).get("readback"))
+    view_form_id = _extract_response_id(view_form_body) or _extract_response_id(view_form_result) or view_form_id
+    if not view_form_id:
+        raise ValueError("View form id was not resolved after save.")
+    steps.append({"step": "view_form", "id": view_form_id, "result": view_form_result})
 
     list_tabs = [
         {
@@ -6340,9 +6660,14 @@ def alterios_create_material_module(
                     add_form_name=resolved_names["add_form"],
                     edit_form_id=edit_form_id,
                     edit_form_name=resolved_names["edit_form"],
+                    view_form_id=view_form_id,
+                    view_form_name=resolved_names["view_form"],
                     fields=saved_fields,
                     add_icon_id=add_icon_id,
                     edit_icon_id=edit_icon_id,
+                    view_icon_id=view_icon_id,
+                    delete_icon_id=delete_icon_id,
+                    menu_icon_id=menu_icon_id,
                 )
             ],
         }
@@ -6350,7 +6675,7 @@ def alterios_create_material_module(
     list_form_result = alterios_upsert_form(
         resolved_names["list_form"],
         form_id=list_form_id,
-        page_title=resolved_names["list_form"],
+        page_title=resolved_names["list_page_title"],
         tabs=list_tabs,
         form_action_containers=[],
         allow_unmanaged_update=allow_unmanaged_update,
@@ -6398,6 +6723,7 @@ def alterios_create_material_module(
         "forms": {
             "add": _resource_summary(_find_form(client, form_id=add_form_id)),
             "edit": _resource_summary(_find_form(client, form_id=edit_form_id)),
+            "view": _resource_summary(_find_form(client, form_id=view_form_id)),
             "list": _resource_summary(_find_form(client, form_id=list_form_id)),
         },
         "group": _resource_summary(_find_group(client, group_id=group_id)),
@@ -6412,6 +6738,7 @@ def alterios_create_material_module(
                 "view_entity_id": view_entity_id,
                 "add_form_id": add_form_id,
                 "edit_form_id": edit_form_id,
+                "view_form_id": view_form_id,
                 "list_form_id": list_form_id,
                 "group_id": group_id,
             },
