@@ -73,6 +73,12 @@ TTL не запускают новый Windows CIM scan. Для принудит
 `ALTERIOS_MCP_TOOL_PROFILE=live`. Активный реестр проверяйте через
 `alterios_tool_profile`; смена профиля требует перезапуска процесса.
 
+`alterios_runtime_info` по умолчанию возвращает компактный fingerprint без
+OS-process scan. Для проверки количества экземпляров передавайте
+`include_processes=true`; полный список PID/команд нужен только для диагностики
+и включается отдельным `include_process_details=true`. Это не меняет fingerprint
+и stale-проверку, но не задерживает обычный live preflight.
+
 Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
 дубликаты MCP instances, project health, replay smoke и наличие приватной
 delivery evidence в единый результат `ready/blocked`:

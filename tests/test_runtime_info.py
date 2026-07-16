@@ -4,6 +4,7 @@ from pathlib import Path
 
 from alterios_mcp import runtime_info
 from alterios_mcp.runtime_info import build_runtime_fingerprint
+from alterios_mcp.scenarios import runtime as runtime_scenario
 
 
 def test_runtime_fingerprint_is_stable_and_secret_free(tmp_path: Path) -> None:
@@ -171,3 +172,42 @@ def test_process_snapshot_reuses_ttl_cache_and_supports_refresh(monkeypatch) -> 
     assert second["cache"]["hit"] is True
     assert refreshed["cache"]["hit"] is False
     assert first["instances"][0]["root_pid"] == 401
+
+
+def test_runtime_tool_defaults_to_compact_fingerprint_without_process_scan(monkeypatch) -> None:
+    full = {
+        "fingerprint": "fingerprint-1",
+        "stale": False,
+        "source_hashes": {"server.py": "a", "runtime.py": "b"},
+        "disk": {
+            "source_hashes": {"server.py": "a", "runtime.py": "b"},
+            "skills_hash": "skills-1",
+        },
+    }
+    monkeypatch.setattr(runtime_scenario, "_runtime_fingerprint", lambda: full)
+    monkeypatch.setattr(
+        runtime_scenario,
+        "collect_alterios_mcp_process_snapshot",
+        lambda **_: (_ for _ in ()).throw(AssertionError("process scan must be opt-in")),
+    )
+
+    result = runtime_scenario.alterios_runtime_info()
+
+    assert result["ok"] is True
+    assert "source_hashes" not in result
+    assert "source_hashes" not in result["disk"]
+    assert result["source_summary"]["loaded_file_count"] == 2
+    assert result["source_summary"]["loaded_digest"] == result["source_summary"]["disk_digest"]
+    assert result["timing_ms"] >= 0
+
+
+def test_runtime_refresh_does_not_spawn_git_in_hot_path(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runtime_info,
+        "_git_state",
+        lambda _root: (_ for _ in ()).throw(AssertionError("git must not run during runtime refresh")),
+    )
+
+    result = build_runtime_fingerprint()
+
+    assert result["git"] == runtime_info._LOADED_IDENTITY["git"]
