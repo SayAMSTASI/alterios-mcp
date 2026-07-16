@@ -608,6 +608,8 @@ rg -n "(Bearer\s+[A-Za-z0-9._-]{20,}|\bsk-[A-Za-z0-9]{20,}|ALTERIOS_[A-Z0-9_]*=.
   проверка и очистка локальных `alterios-mcp` процессов перед live-записью.
 - [docs/mcp-tool-profiles.md](docs/mcp-tool-profiles.md) - профили `live`,
   `discovery`, `admin`, `full` и проверка private Gitea agent evidence.
+- [docs/architecture.md](docs/architecture.md) - доменная архитектура
+  registration modules, scenarios, builders, validators и composition root.
 - [docs/controlled-writes.md](docs/controlled-writes.md) - правила безопасной
   записи.
 - [docs/administrator-guide.md](docs/administrator-guide.md) - инструкция

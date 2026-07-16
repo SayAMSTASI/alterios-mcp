@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -85,15 +84,16 @@ def run_replay_smoke(
 
 
 def _tool_registry_check(*, expected_tool_count_min: int) -> dict[str, Any]:
-    server_path = Path(__file__).with_name("server.py")
-    source = server_path.read_text(encoding="utf-8")
-    tool_count = len(re.findall(r"^@mcp\.tool\(\)", source, flags=re.MULTILINE))
+    from .tools import all_tool_names
+
+    registry_path = Path(__file__).with_name("tools")
+    tool_count = len(all_tool_names())
     return {
         "name": "mcp_tool_registry",
         "ok": tool_count >= expected_tool_count_min,
         "tool_count": tool_count,
         "expected_tool_count_min": expected_tool_count_min,
-        "server_path": str(server_path),
+        "registry_path": str(registry_path),
     }
 
 

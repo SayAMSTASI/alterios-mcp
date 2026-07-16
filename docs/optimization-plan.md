@@ -180,11 +180,13 @@ read-only live discovery.
 8. Process inventory для `alterios_runtime_info(include_processes=true)` теперь
    использует фильтрованный Windows scan и общий TTL cache с forced refresh.
 
-Что еще не готово:
+Архитектурная оптимизация:
 
-1. `server.py` остается физическим монолитом; профили разделяют реестр tools,
-   но доменные пакеты пока не вынесены в отдельные registration modules.
-2. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
+1. Выполнено: `server.py` стал точкой сборки меньше 500 строк; registration,
+   scenarios, builders и validators разделены по доменным модулям. Публичные
+   имена, JSON-схемы аргументов и профили зафиксированы golden snapshot.
+2. Отложено: lazy imports будут рассматриваться только после замера startup time.
+3. Диагностика пустого Stimulsoft viewer и обязательный UI render-check для
    каждого нового паттерна остаются отдельным этапом.
-3. Истинный backend incremental scan без полного project read требует надежных
+4. Истинный backend incremental scan без полного project read требует надежных
    `updatedAt`/version-маркеров Alterios для всех проверяемых сущностей.
