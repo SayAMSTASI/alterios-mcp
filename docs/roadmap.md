@@ -11,7 +11,7 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 | Область | Подтвержденное состояние |
 |---|---|
-| Версия | `0.2.2` |
+| Версия | `0.2.3` |
 | Публичный MCP registry | 108 tools |
 | Профили tools | `live` - 81, `discovery` - 55, `admin` - 106, `full` - 108 |
 | Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
@@ -21,7 +21,7 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 | Диагностика | project health с TTL/diff cache, runtime info, doctor, release/replay smoke и report viewer diagnostics |
 | UX-контроль | блокирующий form contract, icon/action contract, printable/PDF validation |
 | Управление работой | private Gitea/local fallback, agent evidence и stage transitions |
-| Автотесты | 320 тестов; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
+| Автотесты | 322 теста; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
 | Производительность импорта | 1,36-1,78 секунды на текущем Windows runtime при пяти отдельных запусках |
 
 Публичные имена tools, JSON Schema аргументов и состав профилей зафиксированы в
@@ -123,12 +123,14 @@ Stage gate:
 
 1. Добавлена публикация versioned wheel и GitHub Release с checksum, changelog и
    compatibility notes.
-2. Добавлен `manage_release.ps1` для install, update и rollback
-   для Windows.
+2. Добавлен `manage_release.ps1` для install, update и rollback для Windows;
+   начиная с 0.2.3 обновление последнего релиза не требует ручного URL wheel.
 3. Оставить в MCP client config один console entry point `alterios-mcp`;
    диагностические способы запуска не должны создавать дубли процессов.
 4. Добавлен `alterios-release-smoke` для doctor, registry profiles и replay.
 5. Обновлена инструкция администратора по установке и обновлению без clone.
+6. Добавлена `alterios-suggest-fixes`, которая предлагает несколько вариантов
+   устранения диагностированных проблем без автоматической записи.
 
 Stage gate:
 
