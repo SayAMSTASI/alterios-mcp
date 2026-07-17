@@ -1,108 +1,217 @@
 # Дорожная карта Alterios MCP
 
-Roadmap развивает production-oriented Alterios MCP 0.2, который безопасно
-инвентаризирует, изменяет и проверяет реальные Alterios instances с множеством
-проектов. Базовый контур уже включает 107 tools, профили registry, typed и
-сценарные writes, `plan_id`, health cache, replay smoke, UX gates и readback.
-Следующая работа направлена на совместимость разных установок, UI evidence и
-release automation, а не на расширение монолитного `server.py`.
+Актуализировано: 17 июля 2026 года.
 
-## 1. Foundation and safety - поддерживается
+Roadmap отделяет подтвержденное состояние продукта от прогноза. Дата этапа
+является целевым сроком, а не обещанием: этап закрывается только после выполнения
+stage gate. Если внешний Alterios-контур, browser evidence или release-доступ
+недоступны, срок пересматривается, а этап получает статус `Blocked` или `Risk`.
 
-- Держать profile model на уровне instance: один profile равен одному Alterios
-  instance, а не одному project.
-- Расширять profile registry через `ALTERIOS_PROFILES` и
-  `ALTERIOS_<PROFILE>_*` auto-discovery.
-- Требовать, чтобы project-scoped tools принимали явный `project_id`.
-- Использовать `ALTERIOS_<PROFILE>_PROJECT_ID` только как optional default для
-  local convenience.
-- Поддерживать `ALTERIOS_DOTENV_PATH` как основной способ подключить private
-  dotenv без копирования secrets в репозиторий.
-- Скрывать tokens, auth headers, passwords, cookies и API keys во всех tool
-  responses и errors.
-- Держать read-only defaults; writes - за `ALTERIOS_MCP_ALLOW_WRITE=1`,
-  destructive/security writes - за `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1`.
-- Поддерживать smoke checks для config loading, profile isolation, project
-  override и secret redaction.
+## 1. Текущий состав
 
-## 2. Read-only inventory - реализовано, расширяется по evidence
+| Область | Подтвержденное состояние |
+|---|---|
+| Версия | `0.2.1` |
+| Публичный MCP registry | 107 tools |
+| Профили tools | `live` - 80, `discovery` - 54, `admin` - 105, `full` - 107 |
+| Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
+| Рабочие слои | `tools/`, `scenarios/`, `builders/`, `validators/` |
+| Запись | typed writes, сценарии, `plan_id`, write journal, readback и dangerous gates |
+| Сценарии | модуль материалов, отчетная вкладка, BPMN/process flow, bulk script/process/delete |
+| Диагностика | project health с TTL/diff cache, runtime info, live preflight, replay smoke |
+| UX-контроль | блокирующий form contract, icon/action contract, printable/PDF validation |
+| Управление работой | private Gitea/local fallback, agent evidence и stage transitions |
+| Автотесты | 312 тестов; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
+| Производительность импорта | 1,36-1,78 секунды на текущем Windows runtime при пяти отдельных запусках |
 
-- Сначала inventory instance-level projects.
-- Затем inventory project-level objects: content types, fields, views, forms,
-  scripts, diagrams, contents, tasks, processes, reports, files, users/groups и
-  view data.
-- Нормализовать route metadata: scope, method, path, required params,
-  pagination, filters, response shape и common errors.
-- Добавлять stable MCP tools для common inventory tasks, а не полагаться только
-  на generic REST calls.
-- Сохранять reproducible JSON artifacts с profile/project context без secrets.
+Публичные имена tools, JSON Schema аргументов и состав профилей зафиксированы в
+`tests/fixtures/tool_registry_snapshot.json`. Изменение этого снимка считается
+изменением публичного контракта и требует отдельного решения о совместимости.
 
-## 3. Каталог runtime-сервисов скриптов
+## 2. Статус предыдущего плана
 
-- Расширять known script-service catalog: categories, arguments, permissions,
-  read/write labels и examples.
-- Probe read-only services по profile/project для body style, endpoint template
-  behavior и response shape.
-- Держать runtime service names отдельно от `/api/scripts/execute-manual`,
-  который выполняет saved scripts by UUID.
-- Классифицировать mutating services по risk и safeguards.
-- Добавлять typed wrappers для high-value services только после проверки
-  payload contracts.
+| Этап | Статус | Результат |
+|---|---|---|
+| 1-14. Discovery и typed API foundation | Done | Инвентаризация, проектные сущности, формы, scripts/BPMN, reports, files и security surface |
+| 15. Write workflow foundation | Done | `plan_id`, journal, apply только проверенного плана |
+| 16. Сценарные tools | Done | Material module, report tab и process flow |
+| 17. UI/report validation | Done with Risk | Printable/PDF и form listeners закрыты; embedded Stimulsoft viewer требует отдельного UI evidence |
+| 18. Inventory optimization | Done | TTL cache, persisted diff и project health |
+| 19. Fast live write и UX contract | Done | Fast-live workflows, blocking validators, runtime optimization и разделение монолита |
 
-## 4. Управляемая запись - реализовано для штатных сценариев
+Исторические критерии этапов 15-19 сохранены в
+`docs/optimization-plan.md`. Новая разработка начинается с этапа 20.
 
-- Держать generic writes disabled by default и включать только через
-  `ALTERIOS_MCP_ALLOW_WRITE=1`.
-- Держать destructive/security generic writes за дополнительным
-  `ALTERIOS_MCP_ALLOW_DANGEROUS_WRITE=1` и `allow_destructive=true`.
-- Требовать явный `project_id`, verified profile output и narrow target
-  arguments.
-- Предпочитать typed write tools с validation, а не broad generic endpoints.
-- Считать `alterios_rest_write` research/emergency layer, а не штатным
-  operator interface.
-- Запускать `alterios_write_safety_preflight` перед generic REST route, который
-  еще не modeled typed tool.
-- Расширять typed writes по entity family: content/files, views/forms,
-  scripts, BPMN/process/tasks, reports, затем security/destructive flows.
-- Добавлять dry-run validation, request summaries и redacted audit records.
-- Подтверждать writes через API readback и, где нужно, UI-visible behavior.
+## 3. Этап 20. Стабилизация 0.2.2
 
-## 5. Browser/UI discovery
+**Срок:** 17-24 июля 2026 года.
 
-- Снимать реальные UI network flows для list pages, forms, task screens,
-  process actions, reports, dashboards, file fields и permission-sensitive
-  flows.
-- Маппить UI actions на REST endpoints и script-service calls.
-- Использовать UI discovery для missing headers, route variants, encoded
-  filters и project-context behavior.
-- Проверять, что API changes совпадают с тем, что оператор видит в UI.
+**Статус:** In Progress.
 
-## 6. Release packaging - следующий этап
+**Ответственный:** Lead Engineer.
 
-- Дать packaged console entry points и MCP server configuration examples.
-- В MCP client configs использовать установленный `alterios-mcp` console
-  script. `python -m alterios_mcp.server` оставлять только для диагностики и
-  compatibility tests, не создавать для него вторую конфигурацию MCP.
-- Документировать private configuration через environment variables и
-  `ALTERIOS_DOTENV_PATH`; secrets не хранить и не копировать в repo.
-- Добавить release smoke tests для config, readonly inventory, project override
-  и write-gate behavior.
-- Публиковать versioned artifacts, changelog notes, compatibility notes и
-  example discovery outputs.
-- Держать docs aligned с implemented tools, чтобы production operators видели,
-  что shipped, experimental или planned.
+Задачи:
 
-## 7. Агенты и skills
+1. Добавить `doctor`-проверку установки: console entry point, Python, dotenv,
+   tool profile, write gates и доступность профилей из чистой пользовательской
+   PowerShell-сессии.
+2. Добавить GitHub Actions для Python 3.11-3.13: pytest, registry snapshot,
+   replay smoke, sensitive-data scan и сборка wheel.
+3. Зафиксировать startup benchmark и не допускать регрессию выше 2 секунд на
+   эталонном Windows runtime без OS process scan.
+4. Добавить диагностический сценарий для embedded Stimulsoft viewer: source
+   data, template, container state и browser evidence должны проверяться
+   раздельно.
+5. Убрать расхождения README, administrator guide, changelog и фактических
+   entry points.
 
-- Держать agent roles как project control layer: PM, Business/System Analyst,
-  Project Base Explorer, Data Model Engineer, View Builder, Form Surface
-  Engineer, UI Icons & Actions Reviewer, Script/BPMN Flow Integrator,
-  Report/Stimulsoft Specialist, Write Tool Engineer, Safety Verifier,
-  Documentation Scribe и Skill Curator.
-- Хранить operating contract в `docs/agents-and-skills.md`.
-- Добавлять repo-owned skills только после реализации workflow и проверки
-  через tests или live sandbox readback.
-- Стартовый набор skills: project base inventory, requirements analyst, typed
-  write tools, form/view surfaces, BPMN task flow и Stimulsoft Project
-  Database reports.
-- Не кодировать в skills непроверенное API behavior как факт.
+Stage gate:
+
+- установка в чистое virtual environment завершается одной документированной
+  командой;
+- `doctor`, полный pytest и replay smoke проходят;
+- CI собирает wheel и не публикует secrets;
+- viewer limitation воспроизводимо диагностируется и явно отражается в
+  результате, даже если браузерный рендер внешнего контура недоступен.
+
+## 4. Этап 21. Совместимость Alterios instances
+
+**Срок:** 27 июля - 7 августа 2026 года.
+
+**Статус:** Next.
+
+**Ответственный:** Project Base Explorer.
+
+Задачи:
+
+1. Составить обезличенную compatibility matrix минимум для двух разных
+   Alterios instances.
+2. Добавить capability discovery для route variants, script services,
+   view formats, report export и security endpoints.
+3. Разделить `supported`, `unsupported`, `requires UI evidence` и
+   `requires dangerous gate` в machine-readable capability result.
+4. Обеспечить graceful degradation: отсутствие необязательного endpoint не
+   должно ломать весь inventory или startup MCP.
+5. Добавить compatibility fixtures и no-network regression tests.
+
+Stage gate:
+
+- одинаковый пакет запускается минимум на двух instances без изменения кода;
+- различия маршрутов отражаются в capability report;
+- базовые inventory, material module dry-run, report dry-run и process dry-run
+  проходят на обоих профилях;
+- публичные business URL, UUID, названия материалов и данные не попадают в Git.
+
+## 5. Этап 22. Подключаемые расширения
+
+**Срок:** 10-21 августа 2026 года.
+
+**Статус:** Next.
+
+**Ответственный:** Lead Engineer.
+
+Цель этапа - не возвращать бизнес-логику в `server.py`, а дать отдельным
+установкам добавлять tools и сценарии без форка ядра.
+
+Задачи:
+
+1. Описать plugin contract для регистрации tools, scenarios и validators.
+2. Добавить discovery плагинов через Python entry points и явный allowlist.
+3. Разделить core registry snapshot и snapshots подключенных плагинов.
+4. Ввести metadata плагина: версия, совместимость core, требуемый tool profile,
+   write risk и зависимости.
+5. Изолировать ошибку плагина: несовместимое расширение отключается с понятной
+   диагностикой и не блокирует core MCP.
+
+Stage gate:
+
+- эталонный внешний плагин добавляет один read tool и один guarded write
+  scenario без изменения `server.py`;
+- запуск без плагинов сохраняет текущие 107 tools и их схемы;
+- allowlist, version mismatch и plugin failure покрыты тестами;
+- plugin API задокументирован как versioned contract.
+
+## 6. Этап 23. Release packaging и обновление
+
+**Срок:** 24 августа - 4 сентября 2026 года.
+
+**Статус:** Planned.
+
+**Ответственный:** Lead Engineer.
+
+Задачи:
+
+1. Публиковать versioned wheel и GitHub Release с checksum, changelog и
+   compatibility notes.
+2. Добавить воспроизводимые команды install, update, rollback и runtime restart
+   для Windows.
+3. Оставить в MCP client config один console entry point `alterios-mcp`;
+   диагностические способы запуска не должны создавать дубли процессов.
+4. Добавить release smoke для read-only профиля, project override, write gate,
+   multi-profile isolation и plugin-disabled startup.
+5. Подготовить краткую инструкцию администратора по установке и обновлению.
+
+Stage gate:
+
+- новый пользователь устанавливает MCP по README без локального clone;
+- update и rollback проверены в отдельном virtual environment;
+- release artifact проходит CI, replay smoke и sensitive-data scan;
+- после restart существует один логический MCP instance без stale runtime.
+
+## 7. Этап 24. Пилот и решение о 1.0
+
+**Срок:** 7-18 сентября 2026 года.
+
+**Статус:** Planned.
+
+**Ответственный:** Safety Verifier.
+
+Задачи:
+
+1. Выполнить пилот минимум на двух Alterios instances.
+2. Проверить end-to-end сценарии: material module, printable report,
+   BPMN/process, selected bulk operation и guarded destructive dry-run.
+3. Зафиксировать API readback, UI spot-check и rollback notes по каждому
+   пользовательскому паттерну.
+4. Проверить отсутствие secrets и проектных данных в публичных artifacts.
+5. Сформировать go/no-go решение для `1.0` и список известных ограничений.
+
+Stage gate:
+
+- нет открытых Critical/High дефектов безопасности или потери данных;
+- все обязательные сценарии имеют воспроизводимый evidence;
+- документация соответствует release package;
+- оставшиеся ограничения явно классифицированы как Risk или Deferred.
+
+Целевая дата решения о выпуске `1.0`: **18 сентября 2026 года**. Если stage gate
+не пройден, версия остается `0.x`, а новая дата назначается после разбора
+конкретных блокеров.
+
+## 8. Постоянно поддерживаемые контуры
+
+Эти направления не являются отдельными разовыми этапами и проверяются в каждом
+release slice:
+
+- profile isolation и явный `project_id`;
+- secret redaction и public-tree sensitive scan;
+- read-only defaults, write gates и destructive gates;
+- dry-run -> reviewed `plan_id` -> apply -> API readback -> UI spot-check;
+- сохранение совместимости registry или явное versioned breaking change;
+- актуальность skills только после подтверждения поведением кода и live
+  evidence;
+- один accountable owner на этап и независимый Verifier перед `Done`.
+
+## 9. Правила пересмотра сроков
+
+Roadmap пересматривается после каждого завершенного этапа или при появлении
+внешнего блокера. Обновление должно содержать:
+
+1. фактическую дату и commit/release evidence;
+2. незакрытый критерий stage gate;
+3. причину изменения срока;
+4. нового ответственного и ближайший проверяемый результат;
+5. влияние на целевую дату следующего release.
+
+Новые tools сами по себе не являются прогрессом Roadmap. Прогресс учитывается,
+только если workflow реализован, протестирован, задокументирован и доступен в
+установленном MCP runtime.
