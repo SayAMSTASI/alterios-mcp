@@ -11,6 +11,7 @@ from alterios_mcp.tools import DOMAIN_MODULES, all_tool_functions, all_tool_name
 from alterios_mcp.validators.common import _validate_script_type_config
 from alterios_mcp.ux_contract import (
     BLOCKING_FORM_ISSUE_CODES,
+    BLOCKING_MODULE_ISSUE_CODES,
     PRINTABLE_REPORT_DEFAULT,
     SCENARIO_APPLY_REQUIRES,
     UX_CONTRACT_VERSION,
@@ -34,7 +35,7 @@ def test_domain_registration_modules_are_thin_and_complete() -> None:
     functions = all_tool_functions()
     names = all_tool_names()
 
-    assert len(functions) == len(names) == 108
+    assert len(functions) == len(names) == 109
     assert len(names) == len(set(names))
     for module in DOMAIN_MODULES:
         path = Path(module.__file__)
@@ -102,6 +103,7 @@ def test_machine_readable_ux_contract_is_synchronized_with_code_and_docs() -> No
 
     assert contract_json["version"] == UX_CONTRACT_VERSION
     assert set(contract_json["blocking_form_issue_codes"]) == set(BLOCKING_FORM_ISSUE_CODES)
+    assert set(contract_json["blocking_module_issue_codes"]) == set(BLOCKING_MODULE_ISSUE_CODES)
     assert contract_json["scenario_apply_requires"] == list(SCENARIO_APPLY_REQUIRES)
     assert contract_json["printable_report_default"] == PRINTABLE_REPORT_DEFAULT
     assert f"Версия контракта: `{UX_CONTRACT_VERSION}`" in contract_markdown

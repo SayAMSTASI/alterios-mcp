@@ -1,6 +1,6 @@
 # Матрица skills и UX-контракта
 
-Версия: `2026-07-17.1`.
+Версия: `2026-07-17.2`.
 
 Документ фиксирует, какие правила из skills являются блокирующими, какие требуют
 live-evidence, а какие остаются рекомендациями. Единственный машинный источник
@@ -20,9 +20,9 @@ live-evidence, а какие остаются рекомендациями. Ед
 | Skill | Hard UX-контракт | Evidence gate / advisory |
 |---|---|---|
 | `alterios-business-requirements-analyst` | Постановка и критерии приемки обязательны для live-сценария. | Mermaid-схема, роли и бизнес-термины проверяются аналитиком; это не form-JSON validation. |
-| `alterios-field-types` | Новый тип материала имеет осмысленное описание; поля получают пользовательскую подсказку; постоянная сноска допустима только для `date`. | Тип, relation settings и фактический `mname` подтверждаются API readback и populated-data smoke. |
-| `alterios-form-view-surface` | Нет пустых tabs/rows/cells; data-ячейки занимают рабочую ширину; встроенные views имеют field/current-record filter; отдельные list/add/edit/view формы; заголовки человекочитаемы; таблица имеет centered+bold+10px header, нетабличная ячейка без header; технические колонки скрыты; view read-only. | F-pattern, плотность, необычный интерфейс и master-detail композиция требуют UI-проверки. |
-| `alterios-ui-icons-and-actions` | Действия имеют project-local UUID `iconId`; element actions icon-only с tooltip; Close перед Save; row menu содержит Edit/View/Delete и View default; более трех element actions уходят в menu; print menu использует dropdown и открывает target в новой вкладке. | Семантика UUID подтверждается registry/file readback. Необычный существующий интерфейс меняется только с одобрением пользователя. |
+| `alterios-field-types` | Новый тип материала и low-level upsert имеют осмысленное описание; поля получают пользовательскую подсказку; постоянная сноска допустима только для `date`; relation entity содержит join. | Тип, расширенные relation settings и фактический `mname` подтверждаются API readback и populated-data smoke. |
+| `alterios-form-view-surface` | Нет пустых tabs/rows/cells; view работает в experimental/v2; встроенные views имеют field/current-record filter; отдельные list/add/edit/view формы; element actions edit/view совпадают кроме перехода в edit; заголовки человекочитаемы; таблица имеет centered+bold+10px header, нетабличная ячейка без header; технические колонки скрыты; view read-only. | F-pattern, плотность, необычный интерфейс и master-detail композиция требуют UI-проверки. |
+| `alterios-ui-icons-and-actions` | Действия имеют project-local UUID `iconId`; registry-семантика соответствует действию; Google source size 16, SVG canvas 20px, цвет `#4B77D1`; element actions icon-only с tooltip; Close перед Save; row menu содержит Edit/View/Delete и View default; более трех element actions уходят в menu; print menu использует dropdown и открывает target в новой вкладке. | Неизвестный файл требует однократного deep file readback. Необычный существующий интерфейс меняется только с одобрением пользователя. |
 | `alterios-script-bpmn-flow` | Manual script использует UUID, непустые argument bindings и однозначный `viewEntityId` для `__entity_id`. | Side effects, listener order, BPMN refs и аргументы подтверждаются sandbox/process smoke. |
 | `alterios-stimulsoft-project-db` | Печатная форма открывается в новой вкладке и имеет Close; printable по умолчанию является report, не dashboard. | Источник Project Database, openId, непустой render и PDF/image layout подтверждаются render evidence. |
 | `alterios-write-tools` | Dry-run plan_id, write gates, UX version, runtime fingerprint и project-local icon IDs обязательны для apply. | Readback, write journal и rollback notes обязательны после записи. |

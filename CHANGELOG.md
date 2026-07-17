@@ -1,5 +1,27 @@
 # История изменений
 
+## 0.2.4 - 2026-07-17
+
+### Добавлено
+
+- `alterios_validate_module_contract` для единой проверки типа материала,
+  подсказок полей, experimental/v2 view, entities/joins/fields, комплекта
+  add/edit/view/list форм, иконок, bulk-интерфейса и источников отчетов.
+- Ограниченный live-read: 9 базовых точечных API-вызовов без project inventory;
+  скачивание неразрешенных SVG включается отдельно и ограничено 32 файлами.
+- Чистый FastMCP-независимый module validator и тесты CPU/request budget.
+
+### Изменено
+
+- Low-level `alterios_upsert_content_type` блокирует apply без содержательного
+  пользовательского описания.
+- View/edit формы должны иметь одинаковый набор действий элемента, кроме
+  перехода из просмотра в редактирование.
+- Иконки проверяются по project-local registry, семантике, Google Size=16,
+  SVG canvas 20px и цвету `#4B77D1`.
+- Публичный registry расширен до 109 tools; профили `live`, `discovery`,
+  `admin`, `full` содержат 82, 56, 107 и 109 tools.
+
 ## 0.2.3 - 2026-07-17
 
 ### Добавлено

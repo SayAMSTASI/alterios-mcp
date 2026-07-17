@@ -54,6 +54,7 @@ from .validators.common import (
     _assert_expected_task,
     _normalize_process_script_refs,
 )
+from .validators.module_contract import ICON_COLOR, ICON_RENDER_SIZE, ICON_SOURCE_SIZE, validate_icon_svg
 
 from .bulk_live import (
     execute_bulk_delete,
@@ -135,6 +136,7 @@ from .write_control import (
 from .write_plan import artifact_root, assert_plan_matches_audit, list_write_journal, list_write_plans, load_write_plan
 from .ux_contract import (
     BLOCKING_FORM_ISSUE_CODES,
+    BLOCKING_MODULE_ISSUE_CODES,
     PRINTABLE_REPORT_DEFAULT,
     SCENARIO_APPLY_REQUIRES,
     UX_CONTRACT_VERSION,
@@ -734,6 +736,14 @@ def _read_project_icon_library(
         content_type = str(raw.get("mime") or _icon_mime_type(filename))
         if not _downloaded_icon_payload_valid(data, filename=filename, content_type=content_type):
             raise ValueError(f"Icon library file {path} is not a valid icon payload.")
+        if path.suffix.lower() == ".svg":
+            svg_contract = validate_icon_svg(data)
+            if not svg_contract["ok"]:
+                raise ValueError(
+                    f"Icon library file {path} violates the SVG contract: "
+                    f"width={svg_contract.get('width')}, height={svg_contract.get('height')}, "
+                    f"colors={svg_contract.get('colors')}."
+                )
         icons_by_semantic[semantic] = {
             "semantic": semantic,
             "filename": filename,
@@ -741,6 +751,10 @@ def _read_project_icon_library(
             "mime": content_type,
             "sha256": hashlib.sha256(data).hexdigest(),
             "bytes": len(data),
+            "source_size": ICON_SOURCE_SIZE,
+            "render_size": ICON_RENDER_SIZE,
+            "color": ICON_COLOR,
+            "file_contract_verified": path.suffix.lower() == ".svg",
             "usage_hint": raw.get("usage_hint") or _icon_usage_hint(semantic),
         }
 

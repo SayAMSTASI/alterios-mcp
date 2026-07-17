@@ -80,6 +80,7 @@
       "alterios_upsert_view_field",
       "alterios_ux_contract",
       "alterios_validate_form_contract",
+      "alterios_validate_module_contract",
       "alterios_validate_printable_render",
       "alterios_validate_process_result",
       "alterios_validate_report_project_base",
@@ -146,6 +147,7 @@
       "alterios_tool_profile",
       "alterios_ux_contract",
       "alterios_validate_form_contract",
+      "alterios_validate_module_contract",
       "alterios_validate_printable_render",
       "alterios_validate_process_result",
       "alterios_validate_report_project_base",
@@ -247,6 +249,7 @@
       "alterios_upsert_view_field",
       "alterios_ux_contract",
       "alterios_validate_form_contract",
+      "alterios_validate_module_contract",
       "alterios_validate_printable_render",
       "alterios_validate_process_result",
       "alterios_validate_report_project_base",
@@ -337,6 +340,7 @@
       "alterios_upsert_view_field",
       "alterios_ux_contract",
       "alterios_validate_form_contract",
+      "alterios_validate_module_contract",
       "alterios_validate_printable_render",
       "alterios_validate_process_result",
       "alterios_validate_report_project_base",
@@ -359,8 +363,7 @@
       "gitea_workboard_probe"
     ]
   },
-  "schema_version": 1,
-  "tool_count": 108,
+  "tool_count": 109,
   "tools": {
     "alterios_add_comment": {
       "properties": {
@@ -7204,6 +7207,151 @@
         }
       },
       "title": "alterios_validate_form_contractArguments",
+      "type": "object"
+    },
+    "alterios_validate_module_contract": {
+      "properties": {
+        "add_form_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Add Form Id"
+        },
+        "content_type_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Type Id"
+        },
+        "edit_form_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edit Form Id"
+        },
+        "list_form_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "List Form Id"
+        },
+        "max_icon_files": {
+          "default": 16,
+          "title": "Max Icon Files",
+          "type": "integer"
+        },
+        "module": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Module"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile"
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project Id"
+        },
+        "report_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Ids"
+        },
+        "require_bulk_interface": {
+          "default": false,
+          "title": "Require Bulk Interface",
+          "type": "boolean"
+        },
+        "verify_icon_files": {
+          "default": false,
+          "title": "Verify Icon Files",
+          "type": "boolean"
+        },
+        "view_form_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "View Form Id"
+        },
+        "view_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "View Id"
+        }
+      },
+      "title": "alterios_validate_module_contractArguments",
       "type": "object"
     },
     "alterios_validate_printable_render": {

@@ -12,7 +12,7 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 107 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 80 tools. |
+| MCP tools | 109 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 82 tools. |
 | Write-like MCP tools | 44 | Сценарные, typed, security, dangerous и raw-write инструменты по классификации `tool_profiles.py`; в число сценарных входят `alterios_fast_live_write`, `alterios_fast_live_bulk_manual_script`, `alterios_fast_live_bulk_process` и admin-only `alterios_fast_live_bulk_delete`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
@@ -115,6 +115,7 @@ browser/HAR capture и sandbox write-практику.
 | `alterios_validate_stimulsoft_layout` | Stimulsoft report layout validation read |
 | `alterios_create_report_tab` | Controlled scenario tool for Project Database report plus openId form tab and dataId context check |
 | `alterios_validate_form_contract` | Strict blocking validation alias for the active form UX contract |
+| `alterios_validate_module_contract` | Bounded validation of content type, fields, v2 view/joins, four form roles, icons, bulk and reports |
 | `alterios_fast_live_write` | Two-phase fast workflow: live preflight plus scenario plan/apply |
 | `alterios_fast_live_bulk_manual_script` | Fast cached-health plan/apply workflow for one manual script over selected content IDs |
 | `alterios_fast_live_bulk_process` | Fast cached-health plan/apply workflow for one BPMN process over selected content IDs |

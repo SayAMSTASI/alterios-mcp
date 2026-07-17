@@ -11,17 +11,17 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 | Область | Подтвержденное состояние |
 |---|---|
-| Версия | `0.2.3` |
-| Публичный MCP registry | 108 tools |
-| Профили tools | `live` - 81, `discovery` - 55, `admin` - 106, `full` - 108 |
+| Версия | `0.2.4` |
+| Публичный MCP registry | 109 tools |
+| Профили tools | `live` - 82, `discovery` - 56, `admin` - 107, `full` - 109 |
 | Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
 | Рабочие слои | `tools/`, `scenarios/`, `builders/`, `validators/` |
 | Запись | typed writes, сценарии, `plan_id`, write journal, readback и dangerous gates |
 | Сценарии | модуль материалов, отчетная вкладка, BPMN/process flow, bulk script/process/delete |
 | Диагностика | project health с TTL/diff cache, runtime info, doctor, release/replay smoke и report viewer diagnostics |
-| UX-контроль | блокирующий form contract, icon/action contract, printable/PDF validation |
+| UX-контроль | единый module contract, блокирующий form/icon/action contract, printable/PDF validation |
 | Управление работой | private Gitea/local fallback, agent evidence и stage transitions |
-| Автотесты | 322 теста; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
+| Автотесты | 329 тестов; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
 | Производительность импорта | 1,36-1,78 секунды на текущем Windows runtime при пяти отдельных запусках |
 
 Публичные имена tools, JSON Schema аргументов и состав профилей зафиксированы в

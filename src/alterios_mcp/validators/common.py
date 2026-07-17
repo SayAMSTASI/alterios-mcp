@@ -47,7 +47,8 @@ def _normalize_google_icon_svg(text: str, *, size: int, color: str) -> bytes:
         attrs += ' viewBox="0 -960 960 960"'
     if "xmlns=" not in attrs:
         attrs += ' xmlns="http://www.w3.org/2000/svg"'
-    replacement = f'<svg{attrs} width="{size}" height="{size}" fill="{color}">'
+    render_size = 20 if size == 16 else size
+    replacement = f'<svg{attrs} width="{render_size}px" height="{render_size}px" fill="{color}">'
     normalized = text[: match.start()] + replacement + text[match.end() :]
     return normalized.encode("utf-8")
 

@@ -73,6 +73,7 @@ def alterios_ux_contract() -> dict[str, Any]:
         "readonly": True,
         "version": UX_CONTRACT_VERSION,
         "blocking_form_issue_codes": sorted(BLOCKING_FORM_ISSUE_CODES),
+        "blocking_module_issue_codes": sorted(BLOCKING_MODULE_ISSUE_CODES),
         "scenario_apply_requires": list(SCENARIO_APPLY_REQUIRES),
         "printable_report_default": PRINTABLE_REPORT_DEFAULT,
     }

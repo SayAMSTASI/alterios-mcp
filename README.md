@@ -8,8 +8,8 @@
 dry-run -> проверенный `plan_id` -> запись -> API/UI readback -> приватный отчёт
 о результате.
 
-Текущая версия: **0.2.3**. Публичный registry содержит **108 MCP tools**:
-`live` - 81, `discovery` - 55, `admin` - 106, `full` - 108.
+Текущая версия: **0.2.4**. Публичный registry содержит **109 MCP tools**:
+`live` - 82, `discovery` - 56, `admin` - 107, `full` - 109.
 
 ## Основные возможности
 
@@ -80,7 +80,7 @@ python -m venv .venv
 
 ```powershell
 .\manage_release.ps1 -Action Update `
-  -Package "C:\packages\alterios_mcp-0.2.3-py3-none-any.whl" `
+  -Package "C:\packages\alterios_mcp-0.2.4-py3-none-any.whl" `
   -ExpectedSha256 "<sha256>" `
   -DotenvPath "C:\path\to\private\alterios.env"
 ```
@@ -179,10 +179,10 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 
 | Профиль | Tools | Назначение |
 |---|---:|---|
-| `live` | 81 | Основной профиль: health, scenarios, typed writes и проверка результата |
-| `discovery` | 55 | Read-only исследование, inventory и validators |
-| `admin` | 106 | Администрирование, security и controlled destructive operations |
-| `full` | 108 | Разработка MCP и исследование неизвестных routes |
+| `live` | 82 | Основной профиль: health, scenarios, typed writes и проверка результата |
+| `discovery` | 56 | Read-only исследование, inventory и validators |
+| `admin` | 107 | Администрирование, security и controlled destructive operations |
+| `full` | 109 | Разработка MCP и исследование неизвестных routes |
 
 Профиль выбирается до запуска процесса через `ALTERIOS_MCP_TOOL_PROFILE`.
 Для обычных задач используйте `live`. `full` не является режимом повышенного
@@ -269,7 +269,9 @@ Stimulsoft, layout, привязку report-ячейки формы, printable P
 - нетабличная ячейка не получает лишний заголовок;
 - `iconId` всегда относится к файлу текущего проекта.
 
-Проверка: `alterios_validate_form_contract`. Источник правил:
+Проверка одной формы: `alterios_validate_form_contract`. Единая проверка типа
+материала, полей, view/joins, add/edit/view/list форм, иконок, bulk и отчетов:
+`alterios_validate_module_contract`. Источник правил:
 [docs/ux-contract.md](docs/ux-contract.md) и
 [docs/ux-contract.json](docs/ux-contract.json).
 Матрица происхождения правил из skills и граница между блокирующими,
