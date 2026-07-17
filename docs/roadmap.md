@@ -11,17 +11,17 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 | Область | Подтвержденное состояние |
 |---|---|
-| Версия | `0.2.1` |
-| Публичный MCP registry | 107 tools |
-| Профили tools | `live` - 80, `discovery` - 54, `admin` - 105, `full` - 107 |
+| Версия | `0.2.2` |
+| Публичный MCP registry | 108 tools |
+| Профили tools | `live` - 81, `discovery` - 55, `admin` - 106, `full` - 108 |
 | Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
 | Рабочие слои | `tools/`, `scenarios/`, `builders/`, `validators/` |
 | Запись | typed writes, сценарии, `plan_id`, write journal, readback и dangerous gates |
 | Сценарии | модуль материалов, отчетная вкладка, BPMN/process flow, bulk script/process/delete |
-| Диагностика | project health с TTL/diff cache, runtime info, live preflight, replay smoke |
+| Диагностика | project health с TTL/diff cache, runtime info, doctor, release/replay smoke и report viewer diagnostics |
 | UX-контроль | блокирующий form contract, icon/action contract, printable/PDF validation |
 | Управление работой | private Gitea/local fallback, agent evidence и stage transitions |
-| Автотесты | 312 тестов; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
+| Автотесты | 320 тестов; replay smoke - 6 успешных проверок из 6, 1 live-check пропускается без явного флага |
 | Производительность импорта | 1,36-1,78 секунды на текущем Windows runtime при пяти отдельных запусках |
 
 Публичные имена tools, JSON Schema аргументов и состав профилей зафиксированы в
@@ -44,25 +44,25 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 ## 3. Этап 20. Стабилизация 0.2.2
 
-**Срок:** 17-24 июля 2026 года.
+**Фактическая дата:** 17 июля 2026 года.
 
-**Статус:** In Progress.
+**Статус:** Done.
 
 **Ответственный:** Lead Engineer.
 
-Задачи:
+Результат:
 
-1. Добавить `doctor`-проверку установки: console entry point, Python, dotenv,
+1. Добавлена `alterios-doctor`-проверка: console entry point, Python, dotenv,
    tool profile, write gates и доступность профилей из чистой пользовательской
    PowerShell-сессии.
-2. Добавить GitHub Actions для Python 3.11-3.13: pytest, registry snapshot,
+2. Добавлен GitHub Actions matrix для Python 3.11-3.13: pytest, registry snapshot,
    replay smoke, sensitive-data scan и сборка wheel.
-3. Зафиксировать startup benchmark и не допускать регрессию выше 2 секунд на
+3. Зафиксирован startup benchmark с бюджетом 2 секунды на
    эталонном Windows runtime без OS process scan.
-4. Добавить диагностический сценарий для embedded Stimulsoft viewer: source
+4. Добавлен `alterios_diagnose_report_viewer`: source
    data, template, container state и browser evidence должны проверяться
    раздельно.
-5. Убрать расхождения README, administrator guide, changelog и фактических
+5. Синхронизированы README, administrator guide, changelog и фактические
    entry points.
 
 Stage gate:
@@ -102,54 +102,33 @@ Stage gate:
   проходят на обоих профилях;
 - публичные business URL, UUID, названия материалов и данные не попадают в Git.
 
-## 5. Этап 22. Подключаемые расширения
+## 5. Пользовательские расширения
 
-**Срок:** 10-21 августа 2026 года.
+**Статус:** Deferred outside core.
 
-**Статус:** Next.
-
-**Ответственный:** Lead Engineer.
-
-Цель этапа - не возвращать бизнес-логику в `server.py`, а дать отдельным
-установкам добавлять tools и сценарии без форка ядра.
-
-Задачи:
-
-1. Описать plugin contract для регистрации tools, scenarios и validators.
-2. Добавить discovery плагинов через Python entry points и явный allowlist.
-3. Разделить core registry snapshot и snapshots подключенных плагинов.
-4. Ввести metadata плагина: версия, совместимость core, требуемый tool profile,
-   write risk и зависимости.
-5. Изолировать ошибку плагина: несовместимое расширение отключается с понятной
-   диагностикой и не блокирует core MCP.
-
-Stage gate:
-
-- эталонный внешний плагин добавляет один read tool и один guarded write
-  scenario без изменения `server.py`;
-- запуск без плагинов сохраняет текущие 107 tools и их схемы;
-- allowlist, version mismatch и plugin failure покрыты тестами;
-- plugin API задокументирован как versioned contract.
+Плагинная система исключена из обязательного Roadmap. Пользователь может
+создавать собственные Python-пакеты, skills или обертки над MCP под свои
+бизнес-сценарии. Core сохраняет стабильные registration/scenario/validator
+границы, но не берет на себя discovery и сопровождение сторонних плагинов.
 
 ## 6. Этап 23. Release packaging и обновление
 
-**Срок:** 24 августа - 4 сентября 2026 года.
+**Фактическая дата:** 17 июля 2026 года.
 
-**Статус:** Planned.
+**Статус:** Done.
 
 **Ответственный:** Lead Engineer.
 
-Задачи:
+Результат:
 
-1. Публиковать versioned wheel и GitHub Release с checksum, changelog и
+1. Добавлена публикация versioned wheel и GitHub Release с checksum, changelog и
    compatibility notes.
-2. Добавить воспроизводимые команды install, update, rollback и runtime restart
+2. Добавлен `manage_release.ps1` для install, update и rollback
    для Windows.
 3. Оставить в MCP client config один console entry point `alterios-mcp`;
    диагностические способы запуска не должны создавать дубли процессов.
-4. Добавить release smoke для read-only профиля, project override, write gate,
-   multi-profile isolation и plugin-disabled startup.
-5. Подготовить краткую инструкцию администратора по установке и обновлению.
+4. Добавлен `alterios-release-smoke` для doctor, registry profiles и replay.
+5. Обновлена инструкция администратора по установке и обновлению без clone.
 
 Stage gate:
 
@@ -160,7 +139,7 @@ Stage gate:
 
 ## 7. Этап 24. Пилот и решение о 1.0
 
-**Срок:** 7-18 сентября 2026 года.
+**Срок:** 10-21 августа 2026 года.
 
 **Статус:** Planned.
 
@@ -183,7 +162,7 @@ Stage gate:
 - документация соответствует release package;
 - оставшиеся ограничения явно классифицированы как Risk или Deferred.
 
-Целевая дата решения о выпуске `1.0`: **18 сентября 2026 года**. Если stage gate
+Целевая дата решения о выпуске `1.0`: **21 августа 2026 года**. Если stage gate
 не пройден, версия остается `0.x`, а новая дата назначается после разбора
 конкретных блокеров.
 

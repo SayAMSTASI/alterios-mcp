@@ -14,6 +14,8 @@ PROFILES = ("full", "live", "discovery", "admin")
 def _profile_registry(profile: str) -> list[dict[str, object]]:
     env = dict(os.environ)
     env["ALTERIOS_MCP_TOOL_PROFILE"] = profile
+    source_root = str(Path(__file__).parents[1] / "src")
+    env["PYTHONPATH"] = source_root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     code = (
         "import asyncio,json; "
         "from alterios_mcp.server import mcp; "

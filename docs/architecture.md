@@ -1,7 +1,7 @@
 # Архитектура Alterios MCP
 
-Актуально для версии 0.2.1. Текущий публичный registry: 107 tools; профили
-`live`/`discovery`/`admin`/`full` содержат 80/54/105/107 tools соответственно.
+Актуально для версии 0.2.2. Текущий публичный registry: 108 tools; профили
+`live`/`discovery`/`admin`/`full` содержат 81/55/106/108 tools соответственно.
 
 ## 1. Назначение
 
@@ -46,7 +46,7 @@ scenario callables и функцию `register`. MCP-схема строится
 Golden snapshot находится в
 `tests/fixtures/tool_registry_snapshot.json` и фиксирует:
 
-- 107 публичных имён tools;
+- 108 публичных имён tools;
 - JSON Schema аргументов каждого tool;
 - состав профилей `full`, `live`, `discovery`, `admin`.
 

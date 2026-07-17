@@ -103,6 +103,7 @@ READ_ONLY_DISCOVERY_TOOL_NAMES = frozenset(
         "alterios_validate_report_project_base",
         "alterios_validate_stimulsoft_layout",
         "alterios_validate_printable_render",
+        "alterios_diagnose_report_viewer",
         "alterios_discover_readonly",
     }
 )
@@ -205,6 +206,7 @@ LIVE_READ_HELPER_TOOL_NAMES = frozenset(
         "alterios_validate_report_project_base",
         "alterios_validate_stimulsoft_layout",
         "alterios_validate_printable_render",
+        "alterios_diagnose_report_viewer",
     }
 )
 
