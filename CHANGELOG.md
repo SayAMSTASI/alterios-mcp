@@ -1,5 +1,26 @@
 # История изменений
 
+## 0.2.2 - 2026-07-17
+
+### Добавлено
+
+- `alterios-doctor` для локальной проверки Python, console scripts, dotenv,
+  профилей, write gates, runtime source, startup budget и лишних процессов.
+- `alterios-release-smoke` для package-level проверки doctor, registry profiles
+  и replay smoke.
+- `alterios_diagnose_report_viewer`, который раздельно проверяет source data,
+  Stimulsoft template/layout, report cell, PDF и browser container evidence.
+- GitHub Actions для Python 3.11-3.13, сборки wheel, clean-venv smoke и
+  tag-based GitHub Release с SHA-256 checksums.
+- `scripts/manage_release.ps1` для воспроизводимых install/update/rollback.
+
+### Изменено
+
+- Публичный registry расширен до 108 tools; профили `live`, `discovery`,
+  `admin`, `full` содержат 81, 55, 106 и 108 tools.
+- Основной путь установки использует versioned release wheel; editable install
+  остается путем разработки.
+
 ## 0.2.1 - 2026-07-17
 
 ### Исправлено

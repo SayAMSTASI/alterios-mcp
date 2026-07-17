@@ -15,6 +15,7 @@
       "alterios_delete_role",
       "alterios_delete_user",
       "alterios_delete_user_group",
+      "alterios_diagnose_report_viewer",
       "alterios_discover_readonly",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
@@ -111,6 +112,7 @@
       "alterios_analyze_form_surface",
       "alterios_call_readonly_service",
       "alterios_config",
+      "alterios_diagnose_report_viewer",
       "alterios_discover_readonly",
       "alterios_file_metadata",
       "alterios_get_form",
@@ -179,6 +181,7 @@
       "alterios_delete_role",
       "alterios_delete_user",
       "alterios_delete_user_group",
+      "alterios_diagnose_report_viewer",
       "alterios_discover_readonly",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
@@ -283,6 +286,7 @@
       "alterios_create_material_module",
       "alterios_create_process_flow",
       "alterios_create_report_tab",
+      "alterios_diagnose_report_viewer",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
       "alterios_execute_manual_script",
@@ -356,7 +360,7 @@
     ]
   },
   "schema_version": 1,
-  "tool_count": 107,
+  "tool_count": 108,
   "tools": {
     "alterios_add_comment": {
       "properties": {
@@ -1983,6 +1987,154 @@
         "user_group_id"
       ],
       "title": "alterios_delete_user_groupArguments",
+      "type": "object"
+    },
+    "alterios_diagnose_report_viewer": {
+      "properties": {
+        "expected_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Mode"
+        },
+        "expected_open_id": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Open Id"
+        },
+        "form_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Form Id"
+        },
+        "output_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Path"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile"
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project Id"
+        },
+        "report_id": {
+          "title": "Report Id",
+          "type": "string"
+        },
+        "sample_rows": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sample Rows"
+        },
+        "source_view_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source View Id"
+        },
+        "tab_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tab Name"
+        },
+        "validate_printable_pdf": {
+          "default": false,
+          "title": "Validate Printable Pdf",
+          "type": "boolean"
+        },
+        "view_limit": {
+          "default": 5,
+          "title": "View Limit",
+          "type": "integer"
+        },
+        "viewer_evidence": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Viewer Evidence"
+        }
+      },
+      "required": [
+        "report_id"
+      ],
+      "title": "alterios_diagnose_report_viewerArguments",
       "type": "object"
     },
     "alterios_discover_readonly": {

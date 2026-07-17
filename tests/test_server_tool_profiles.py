@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,8 @@ import pytest
 def _server_profile(profile: str) -> dict[str, object]:
     env = dict(os.environ)
     env["ALTERIOS_MCP_TOOL_PROFILE"] = profile
+    source_root = str(Path(__file__).parents[1] / "src")
+    env["PYTHONPATH"] = source_root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     code = (
         "import asyncio,json; "
         "from alterios_mcp.server import mcp,alterios_tool_profile; "

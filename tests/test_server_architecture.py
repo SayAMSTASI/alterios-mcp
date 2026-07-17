@@ -34,7 +34,7 @@ def test_domain_registration_modules_are_thin_and_complete() -> None:
     functions = all_tool_functions()
     names = all_tool_names()
 
-    assert len(functions) == len(names) == 107
+    assert len(functions) == len(names) == 108
     assert len(names) == len(set(names))
     for module in DOMAIN_MODULES:
         path = Path(module.__file__)

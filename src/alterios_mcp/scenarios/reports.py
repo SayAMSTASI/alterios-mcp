@@ -191,6 +191,142 @@ def alterios_validate_printable_render(
         "render": render,
     }
 
+def alterios_diagnose_report_viewer(
+    report_id: str,
+    source_view_id: str | None = None,
+    form_id: str | None = None,
+    tab_name: str | None = None,
+    expected_mode: str | None = None,
+    expected_open_id: bool | None = None,
+    view_limit: int = 5,
+    viewer_evidence: dict[str, Any] | None = None,
+    validate_printable_pdf: bool = False,
+    sample_rows: list[dict[str, Any]] | None = None,
+    output_path: str | None = None,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Diagnose report data, template, form binding, PDF, and browser viewer evidence separately."""
+    if view_limit < 1:
+        raise ValueError("view_limit must be positive.")
+    normalized_mode = (expected_mode or "").strip().lower()
+    if normalized_mode == "printable":
+        normalized_mode = "report"
+    if normalized_mode and normalized_mode not in {"report", "dashboard"}:
+        raise ValueError("expected_mode must be 'report'/'printable', 'dashboard', or null.")
+
+    client = _client(profile, project_id)
+    report = client.report_by_id(report_id).body
+    if not isinstance(report, dict):
+        raise ValueError("Report readback returned unexpected payload.")
+    validation = _report_project_base_validation(report)
+    has_printable = bool(validation.get("has_printable_page"))
+    has_dashboard = bool(validation.get("has_dashboard_page"))
+    detected_mode = "report" if has_printable and not has_dashboard else "dashboard" if has_dashboard and not has_printable else "ambiguous"
+    layout = analyze_stimulsoft_layout(report)
+
+    source_readback = None
+    source_row_count = None
+    if source_view_id:
+        source_readback = client.view_data_simplified(source_view_id, limit=view_limit, offset=0).as_dict()
+        source_row_count = _view_row_count(source_readback)
+
+    form_readback = None
+    report_cells: list[dict[str, Any]] = []
+    if form_id:
+        form_readback = client.form_by_id(form_id).body
+        if not isinstance(form_readback, dict):
+            raise ValueError("Form readback returned unexpected payload.")
+        report_cells = _report_cells(form_readback, report_id=report_id, tab_name=tab_name)
+
+    browser = _viewer_evidence_summary(viewer_evidence)
+    pdf_evidence: dict[str, Any] = {
+        "status": "not_requested",
+        "ok": None,
+        "note": "Set validate_printable_pdf=true for Chromium/PDF evidence.",
+    }
+    if validate_printable_pdf:
+        if detected_mode != "report":
+            pdf_evidence = {
+                "status": "not_applicable",
+                "ok": False,
+                "note": "Printable PDF validation requires a StiPage report.",
+            }
+        else:
+            try:
+                pdf_result = alterios_validate_printable_render(
+                    report_id=report_id,
+                    sample_rows=sample_rows,
+                    output_path=output_path,
+                    profile=profile,
+                    project_id=project_id,
+                )
+                pdf_evidence = {"status": "collected", "ok": True, "result": pdf_result}
+            except (OSError, ValueError) as exc:
+                pdf_evidence = {"status": "failed", "ok": False, "error": safe_error(str(exc))}
+
+    blocking: list[str] = []
+    warnings: list[str] = []
+    if not validation.get("has_template"):
+        blocking.append("report_template_missing")
+    if detected_mode == "ambiguous":
+        blocking.append("report_mode_ambiguous")
+    if normalized_mode and detected_mode != normalized_mode:
+        blocking.append("report_mode_mismatch")
+    if not validation.get("has_project_database"):
+        blocking.append("project_database_source_missing")
+    if not layout.get("ok"):
+        blocking.append("stimulsoft_layout_invalid")
+    if source_view_id:
+        source_status = source_readback.get("status_code") if isinstance(source_readback, dict) else None
+        if source_status not in {200, 201}:
+            blocking.append("source_view_readback_failed")
+        elif source_row_count == 0:
+            warnings.append("source_view_has_no_rows")
+    if form_id and not report_cells:
+        blocking.append("report_form_binding_missing")
+    if report_cells and expected_open_id is not None:
+        if not any(isinstance(cell.get("params"), dict) and cell["params"].get("openId") is expected_open_id for cell in report_cells):
+            blocking.append("report_form_open_id_mismatch")
+    if not validation.get("has_encrypted_project_database_connection"):
+        warnings.append("encrypted_project_database_connection_not_confirmed")
+    if browser["status"] == "not_collected":
+        warnings.append("browser_viewer_evidence_not_collected")
+    elif browser.get("ok") is False:
+        blocking.append("browser_viewer_failed")
+    if validate_printable_pdf and pdf_evidence.get("ok") is False:
+        blocking.append("printable_pdf_failed")
+
+    return {
+        "readonly": True,
+        "report": _resource_summary(report),
+        "detected_mode": detected_mode,
+        "expected_mode": normalized_mode or None,
+        "template": validation,
+        "layout": layout,
+        "source": {
+            "view_id": source_view_id,
+            "row_count": source_row_count,
+            "readback": source_readback,
+        },
+        "form_binding": {
+            "form_id": form_id,
+            "tab_name": tab_name,
+            "expected_open_id": expected_open_id,
+            "cell_count": len(report_cells),
+            "cells": report_cells,
+        },
+        "printable_pdf": pdf_evidence,
+        "browser_viewer": browser,
+        "summary": {
+            "ok": not blocking,
+            "status": "failed" if blocking else ("warning" if warnings else "ready"),
+            "blocking_issues": blocking,
+            "warnings": warnings,
+            "next_actions": _report_viewer_next_actions(blocking, warnings),
+        },
+    }
+
 def alterios_create_report_tab(
     source_view_id: str,
     target_form_id: str,
@@ -506,4 +642,70 @@ def alterios_create_report_tab(
     )
     return controlled_write_result(audit=audit, response=response_payload, plan_id=plan_id)
 
-__all__ = ['alterios_upsert_report', 'alterios_patch_report_template', 'alterios_validate_report_project_base', 'alterios_validate_stimulsoft_layout', 'alterios_validate_printable_render', 'alterios_create_report_tab']
+def _report_cells(form: dict[str, Any], *, report_id: str, tab_name: str | None) -> list[dict[str, Any]]:
+    cells: list[dict[str, Any]] = []
+    for tab in form.get("tabs") or []:
+        if not isinstance(tab, dict) or (tab_name is not None and tab.get("name") != tab_name):
+            continue
+        for row in tab.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            for cell in row.get("cells") or []:
+                if not isinstance(cell, dict) or cell.get("type") != "report":
+                    continue
+                params = cell.get("params") or {}
+                if isinstance(params, dict) and params.get("reportId") == report_id:
+                    cells.append(cell)
+    return cells
+
+
+def _viewer_evidence_summary(evidence: dict[str, Any] | None) -> dict[str, Any]:
+    if evidence is None:
+        return {
+            "status": "not_collected",
+            "ok": None,
+            "note": "Capture the embedded viewer container in the authenticated browser and pass its evidence.",
+        }
+    if not isinstance(evidence, dict):
+        raise ValueError("viewer_evidence must be an object or null.")
+    width = float(evidence.get("width") or 0)
+    height = float(evidence.get("height") or 0)
+    child_count = int(evidence.get("child_count") or 0)
+    blocking_errors = [str(item) for item in evidence.get("blocking_errors") or []]
+    ok = (
+        evidence.get("container_found") is True
+        and evidence.get("container_visible") is True
+        and width > 0
+        and height > 0
+        and child_count > 0
+        and not blocking_errors
+    )
+    return {
+        "status": "collected" if ok else "failed",
+        "ok": ok,
+        "container_found": evidence.get("container_found") is True,
+        "container_visible": evidence.get("container_visible") is True,
+        "width": width,
+        "height": height,
+        "child_count": child_count,
+        "blocking_errors": blocking_errors,
+        "screenshot_path": evidence.get("screenshot_path"),
+    }
+
+
+def _report_viewer_next_actions(blocking: list[str], warnings: list[str]) -> list[str]:
+    actions: list[str] = []
+    if "report_template_missing" in blocking or "report_mode_ambiguous" in blocking:
+        actions.append("Repair the Stimulsoft template before checking the embedded viewer.")
+    if "project_database_source_missing" in blocking or "source_view_readback_failed" in blocking:
+        actions.append("Verify the Project Database source view and its get-data-simplified response.")
+    if "report_form_binding_missing" in blocking or "report_form_open_id_mismatch" in blocking:
+        actions.append("Repair the report cell binding on the target form and verify openId params.")
+    if "printable_pdf_failed" in blocking:
+        actions.append("Fix printable layout/data expressions and repeat Chromium/PDF validation.")
+    if "browser_viewer_failed" in blocking or "browser_viewer_evidence_not_collected" in warnings:
+        actions.append("Open the report in an authenticated browser and capture container dimensions, children, errors, and screenshot.")
+    return actions
+
+
+__all__ = ['alterios_upsert_report', 'alterios_patch_report_template', 'alterios_validate_report_project_base', 'alterios_validate_stimulsoft_layout', 'alterios_validate_printable_render', 'alterios_diagnose_report_viewer', 'alterios_create_report_tab']
