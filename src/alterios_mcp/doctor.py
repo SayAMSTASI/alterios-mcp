@@ -21,6 +21,7 @@ MINIMUM_PYTHON = (3, 11)
 CONSOLE_SCRIPTS = (
     "alterios-mcp",
     "alterios-doctor",
+    "alterios-suggest-fixes",
     "alterios-replay-smoke",
     "alterios-release-smoke",
 )

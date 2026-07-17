@@ -8,7 +8,7 @@
 dry-run -> проверенный `plan_id` -> запись -> API/UI readback -> приватный отчёт
 о результате.
 
-Текущая версия: **0.2.2**. Публичный registry содержит **108 MCP tools**:
+Текущая версия: **0.2.3**. Публичный registry содержит **108 MCP tools**:
 `live` - 81, `discovery` - 55, `admin` - 106, `full` - 108.
 
 ## Основные возможности
@@ -34,12 +34,35 @@ dry-run -> проверенный `plan_id` -> запись -> API/UI readback -
 Требуется Python 3.11 или новее.
 
 ```powershell
-$venv = "$env:LOCALAPPDATA\alterios-mcp\venv"
-python -m venv $venv
-& "$venv\Scripts\python.exe" -m pip install `
-  "https://github.com/SayAMSTASI/alterios-mcp/releases/download/v0.2.2/alterios_mcp-0.2.2-py3-none-any.whl"
-& "$venv\Scripts\alterios-doctor.exe" --json
-& "$venv\Scripts\alterios-release-smoke.exe" --json
+$manager = "$env:LOCALAPPDATA\alterios-mcp\manage_release.ps1"
+New-Item (Split-Path $manager) -ItemType Directory -Force | Out-Null
+Invoke-WebRequest `
+  "https://github.com/SayAMSTASI/alterios-mcp/releases/latest/download/manage_release.ps1" `
+  -OutFile $manager
+& $manager -Action Install -DotenvPath "C:\path\to\private\alterios.env"
+```
+
+Менеджер сам скачивает wheel последнего GitHub Release, проверяет wheel и свою
+обновлённую копию по `SHA256SUMS.txt`, создаёт окружение, устанавливает MCP и
+запускает doctor и release smoke. Он сохраняется в постоянном каталоге
+пользователя.
+
+Последующие обновления выполняются одной командой:
+
+```powershell
+& "$env:LOCALAPPDATA\alterios-mcp\manage_release.ps1" -Action Update
+```
+
+Перед обновлением закройте Codex или другой MCP-клиент. Если это неудобно,
+добавьте `-StopRunningMcp`: менеджер остановит только процессы из своей `.venv`.
+Предыдущий release wheel сохраняется и используется для автоматического
+rollback, если doctor или release smoke после обновления не пройдут.
+
+Проверить наличие версии и получить варианты исправления можно без записи:
+
+```powershell
+& "$env:LOCALAPPDATA\alterios-mcp\manage_release.ps1" -Action Check
+& "$env:LOCALAPPDATA\alterios-mcp\manage_release.ps1" -Action Solutions
 ```
 
 Для разработки из исходного кода:
@@ -51,15 +74,26 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-Для install/update/rollback можно скачать `manage_release.ps1` из GitHub
-Release и передать ему URL или локальный путь к нужному wheel. После любой
-операции перезапустите MCP-клиент: работающий процесс не перечитывает пакет и
-registry автоматически.
+Для фиксированной версии или автономной установки можно передать менеджеру URL
+или локальный путь к wheel. После любой операции перезапустите MCP-клиент:
+работающий процесс не перечитывает пакет и registry автоматически.
 
 ```powershell
 .\manage_release.ps1 -Action Update `
-  -Package "https://github.com/SayAMSTASI/alterios-mcp/releases/download/v0.2.2/alterios_mcp-0.2.2-py3-none-any.whl" `
+  -Package "C:\packages\alterios_mcp-0.2.3-py3-none-any.whl" `
+  -ExpectedSha256 "<sha256>" `
   -DotenvPath "C:\path\to\private\alterios.env"
+```
+
+### 1.1. Предложения по устранению проблем
+
+Команда `alterios-suggest-fixes` запускает read-only диагностику и возвращает
+для каждой ошибки несколько вариантов решения: рекомендуемый путь,
+альтернативу, готовую команду, уровень риска и необходимость перезапуска.
+
+```powershell
+& "$env:LOCALAPPDATA\alterios-mcp\venv\Scripts\alterios-suggest-fixes.exe" `
+  --require-config --processes
 ```
 
 ### 2. Приватная конфигурация
