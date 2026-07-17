@@ -25,6 +25,7 @@ def test_release_workflow_and_management_script_cover_delivery_contract() -> Non
     manager = (ROOT / "scripts" / "manage_release.ps1").read_text(encoding="utf-8")
 
     assert 'tags:' in release_workflow
+    assert 'python -m pip install -e ".[dev]"' in release_workflow
     assert 'python scripts/verify_release_wheel.py dist/*.whl' in release_workflow
     assert 'SHA256SUMS.txt' in release_workflow
     assert 'gh release create' in release_workflow
