@@ -763,8 +763,8 @@ git pull --ff-only
 
 На текущем этапе основной функциональный контур готов для эксплуатации:
 
-- версия пакета - 0.2.3;
-- полный registry - 108 MCP tools; `live` - 81, `discovery` - 55,
+- версия пакета - 0.2.4;
+- полный registry - 109 MCP tools; `live` - 82, `discovery` - 56,
   `admin` - 106;
 - `server.py` является composition root, а registration, scenarios, builders и
   validators разделены по доменным модулям;

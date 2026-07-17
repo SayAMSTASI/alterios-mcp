@@ -2579,10 +2579,36 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
         "close_icon_id": "00000000-0000-4000-8000-000000000007",
         "save_icon_id": "00000000-0000-4000-8000-000000000008",
     }
+    icon_semantics = {
+        "icon_id": "category",
+        "add_icon_id": "add_2",
+        "edit_icon_id": "edit",
+        "view_icon_id": "preview",
+        "delete_icon_id": "delete",
+        "menu_icon_id": "more_vert",
+        "close_icon_id": "keyboard_return",
+        "save_icon_id": "save",
+    }
+    icon_registry = {
+        "icons": {
+            semantic: {
+                "semantic": semantic,
+                "file_id": icon_ids[key],
+                "size": 16,
+                "render_size": 20,
+                "color": "#4B77D1",
+                "file_contract_verified": True,
+            }
+            for key, semantic in icon_semantics.items()
+        }
+    }
 
     with patch.dict("os.environ", {"ALTERIOS_MCP_ARTIFACTS_DIR": str(tmp_path)}, clear=True):
         dry_run_client = FakeMaterialClient()
-        with patch.object(server, "_client", return_value=dry_run_client):
+        with (
+            patch.object(server, "_client", return_value=dry_run_client),
+            patch("alterios_mcp.scenarios.views_forms._read_project_icon_registry", return_value=icon_registry),
+        ):
             dry_run = server.alterios_create_material_module(
                 "Материалы",
                 "mat",
@@ -2602,6 +2628,7 @@ def test_create_material_module_execution_creates_full_surface_without_real_netw
             clear=True,
         ),
         patch.object(server, "_client", return_value=apply_client),
+        patch("alterios_mcp.scenarios.views_forms._read_project_icon_registry", return_value=icon_registry),
     ):
         result = server.alterios_create_material_module(
             "Материалы",
@@ -3648,7 +3675,10 @@ def test_export_project_icons_defaults_to_selected_folder_only(tmp_path) -> None
 def test_ensure_project_icon_library_dry_run_inventories_before_upload(tmp_path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir()
-    (library_dir / "save_16dp.svg").write_text('<svg viewBox="0 0 16 16"></svg>', encoding="utf-8")
+    (library_dir / "save_16dp.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 -960 960 960" fill="#4B77D1"></svg>',
+        encoding="utf-8",
+    )
     (library_dir / "manifest.json").write_text(
         json.dumps(
             {
@@ -3697,7 +3727,7 @@ def test_ensure_project_icon_library_dry_run_inventories_before_upload(tmp_path)
 def test_ensure_project_icon_library_execution_uploads_missing_and_writes_registry(tmp_path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir()
-    icon_data = b'<svg viewBox="0 0 16 16"></svg>'
+    icon_data = b'<svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 -960 960 960" fill="#4B77D1"></svg>'
     (library_dir / "save_16dp.svg").write_bytes(icon_data)
     (library_dir / "manifest.json").write_text(
         json.dumps(

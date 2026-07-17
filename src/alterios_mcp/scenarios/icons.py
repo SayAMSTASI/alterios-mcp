@@ -443,6 +443,8 @@ def alterios_ensure_project_icons(
             "style": style,
             "source": _google_icon_url(google_name=google_name, style=style),
             "sha256": hashlib.sha256(svg).hexdigest(),
+            "render_size": 20,
+            "file_contract_verified": True,
         }
         ensured_icons.append(
             {
@@ -621,6 +623,10 @@ def alterios_ensure_project_icon_library(
                 "matched_by": "semantic_guess",
                 "hash": selected.get("hash"),
                 "library_sha256": library_icon["sha256"],
+                "source_size": library_icon["source_size"],
+                "render_size": library_icon["render_size"],
+                "color": library_icon["color"],
+                "file_contract_verified": library_icon["file_contract_verified"],
             }
             ensured_icons.append(
                 {
@@ -650,6 +656,10 @@ def alterios_ensure_project_icon_library(
             "source": "repo_icon_library",
             "library_path": str(Path(library_icon["path"]).relative_to(base_dir)),
             "sha256": library_icon["sha256"],
+            "source_size": library_icon["source_size"],
+            "render_size": library_icon["render_size"],
+            "color": library_icon["color"],
+            "file_contract_verified": library_icon["file_contract_verified"],
         }
         ensured_icons.append(
             {

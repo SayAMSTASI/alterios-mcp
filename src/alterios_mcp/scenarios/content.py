@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..validators.module_contract import is_meaningful_description
 
 def alterios_list_comments(
     entity_id: str,
@@ -81,10 +82,7 @@ def alterios_upsert_content_type(
     payload = {
         **(existing or {}),
         "name": name,
-        "description": description
-        if description is not None
-        else (existing or {}).get("description")
-        or f"{MANAGED_MARKER}: alterios-mcp content type.",
+        "description": description if description is not None else (existing or {}).get("description"),
         "settings": settings if settings is not None else (existing or {}).get("settings") or {"maxRefDepth": 0},
         "share": share if share is not None else (existing or {}).get("share") or False,
         "shareCreating": share_creating if share_creating is not None else (existing or {}).get("shareCreating") or False,
@@ -133,9 +131,24 @@ def alterios_upsert_content_type(
             ),
         ),
         "planned_payload": strip_alterios_metadata(payload),
+        "module_contract": {
+            "ok": is_meaningful_description(payload.get("description")),
+            "blocking_issue": None
+            if is_meaningful_description(payload.get("description"))
+            else {
+                "code": "content_type_description_missing",
+                "path": "description",
+                "message": "A low-level content type upsert requires a meaningful user-facing description before apply.",
+            },
+        },
     }
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
+    if not response_payload["module_contract"]["ok"]:
+        raise ValueError(
+            "Alterios module UX contract failed: content_type_description_missing at description. "
+            "Pass a meaningful content type description before apply."
+        )
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
     saved = client.save_content_type(payload).as_dict()
     saved_id = _extract_response_id(saved) or payload.get("_id")

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from .._support import *
 from ..ux_contract import assert_form_contract
+from ..validators.module_contract import (
+    assert_module_contract,
+    validate_module_contract as validate_module_payload_contract,
+)
 from .content import (
     alterios_upsert_content_type,
     alterios_upsert_field,
@@ -450,23 +454,54 @@ def alterios_create_material_module(
         close_icon_id=close_icon_id,
         save_icon_id=save_icon_id,
     )
-    form_contracts = {
-        role: analyze_form_surface(
-            {
-                "name": form["name"],
-                "pageTitle": form["page_title"],
-                "tabs": form["tabs"],
-                "formActionContainers": form["formActionContainers"],
-            },
-            strict=True,
-        )
+    target = audit.as_dict()["target"]
+    target_profile = str(target["profile"])
+    target_project_id = str(target["project_id"])
+    icon_registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+    planned_forms = {
+        role: {
+            "name": form["name"],
+            "pageTitle": form["page_title"],
+            "tabs": form["tabs"],
+            "formActionContainers": form["formActionContainers"],
+        }
         for role, form in planned_preview["forms"].items()
     }
+    planned_icon_ids = _module_referenced_icon_ids(planned_forms)
+    module_contract = validate_module_payload_contract(
+        {
+            "content_type": {
+                **planned_preview["content_type"],
+                "description": _managed_description(
+                    content_type_description,
+                    f"справочник «{resolved_names['content_type']}» для хранения пользовательских записей модуля.",
+                ),
+            },
+            "fields": normalized_fields,
+            "view": planned_preview["view"],
+            "view_entities": [planned_preview["view"]["entity"]],
+            "view_fields": [
+                {"mname": "_id", "alias": "ID"},
+                *[
+                    {"mname": field["view_mname"], "alias": field["name"]}
+                    for field in normalized_fields
+                ],
+            ],
+            "forms": planned_forms,
+            "reports": [],
+            "group": planned_preview["group"],
+            "icon_registry": icon_registry,
+        },
+        strict=True,
+        icon_payloads=_module_local_icon_payloads(icon_registry, planned_icon_ids),
+    )
+    form_contracts = module_contract["forms"]
     response_payload: dict[str, Any] = {
         "module_name": normalized_module_name,
         "names": resolved_names,
         "icon_contract": icon_contract,
         "form_contracts": form_contracts,
+        "module_contract": module_contract,
         "preflight": preflight,
         "planned": planned_preview,
     }
@@ -484,6 +519,7 @@ def alterios_create_material_module(
         )
     for form_contract in form_contracts.values():
         assert_form_contract(form_contract)
+    assert_module_contract(module_contract)
     verified_delivery_evidence = _assert_delivery_evidence(delivery_evidence)
     runtime_gate = _assert_runtime_gate(expected_runtime_fingerprint)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
@@ -1220,6 +1256,167 @@ def alterios_validate_form_contract(
         strict=True,
     )
 
+
+def alterios_validate_module_contract(
+    module: dict[str, Any] | None = None,
+    content_type_id: str | None = None,
+    view_id: str | None = None,
+    add_form_id: str | None = None,
+    edit_form_id: str | None = None,
+    view_form_id: str | None = None,
+    list_form_id: str | None = None,
+    report_ids: list[str] | None = None,
+    require_bulk_interface: bool = False,
+    verify_icon_files: bool = False,
+    max_icon_files: int = 16,
+    profile: str | None = None,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate one complete module without a project-wide scan.
+
+    Pass ``module`` for a zero-network offline check, or exact object IDs for a
+    bounded live read. SVG downloads are disabled by default and capped when
+    explicitly enabled.
+    """
+    live_ids = {
+        "content_type_id": content_type_id,
+        "view_id": view_id,
+        "add_form_id": add_form_id,
+        "edit_form_id": edit_form_id,
+        "view_form_id": view_form_id,
+        "list_form_id": list_form_id,
+    }
+    if module is not None and (any(live_ids.values()) or report_ids):
+        raise ValueError("Provide either module JSON or live object IDs, not both.")
+    if max_icon_files < 0 or max_icon_files > 32:
+        raise ValueError("max_icon_files must be between 0 and 32.")
+
+    api_calls = 0
+    icon_downloads = 0
+    icon_payloads: dict[str, bytes] = {}
+    if module is not None:
+        module_payload = module
+        load_mode = "offline_payload"
+    else:
+        missing = [name for name, value in live_ids.items() if not value]
+        if missing:
+            raise ValueError(f"Live module validation requires exact IDs: {', '.join(missing)}.")
+        client = _client(profile, project_id)
+        content_type = client.content_type_by_id(str(content_type_id)).body
+        api_calls += 1
+        fields_body = client.list_fields(content_type_id=str(content_type_id), limit=1000, offset=0).body
+        api_calls += 1
+        fields = _module_object_rows(fields_body)
+        view = client.view_by_id(str(view_id)).body
+        api_calls += 1
+        view_entities = _module_object_rows(client.view_entities(str(view_id)).body)
+        api_calls += 1
+        view_fields = _module_object_rows(client.view_fields_populated(str(view_id)).body)
+        api_calls += 1
+        forms: dict[str, Any] = {}
+        for role, form_id in (
+            ("add", add_form_id),
+            ("edit", edit_form_id),
+            ("view", view_form_id),
+            ("list", list_form_id),
+        ):
+            forms[role] = client.form_by_id(str(form_id)).body
+            api_calls += 1
+        reports = []
+        for report_id in report_ids or []:
+            reports.append(client.report_by_id(str(report_id)).body)
+            api_calls += 1
+        target_profile = str(client.config.profile or profile or "default")
+        target_project_id = str(client.config.project_id or project_id or "")
+        registry = _read_project_icon_registry(profile=target_profile, project_id=target_project_id)
+        module_payload = {
+            "content_type": content_type,
+            "fields": fields,
+            "view": view,
+            "view_entities": view_entities,
+            "view_fields": view_fields,
+            "forms": forms,
+            "reports": reports,
+            "icon_registry": registry,
+        }
+        referenced_icon_ids = _module_referenced_icon_ids(forms)
+        icon_payloads.update(_module_local_icon_payloads(registry, referenced_icon_ids))
+        unresolved_icon_ids = sorted(referenced_icon_ids.difference(icon_payloads))
+        if verify_icon_files:
+            if len(unresolved_icon_ids) > max_icon_files:
+                raise ValueError(
+                    f"Deep icon verification would download {len(unresolved_icon_ids)} files; "
+                    f"increase max_icon_files up to 32 or validate a smaller module."
+                )
+            for file_id in unresolved_icon_ids:
+                data, _ = client.download_file(file_id)
+                api_calls += 1
+                icon_downloads += 1
+                icon_payloads[file_id] = data
+        load_mode = "exact_live_ids"
+
+    validation = validate_module_payload_contract(
+        module_payload,
+        strict=True,
+        require_bulk_interface=require_bulk_interface,
+        icon_payloads=icon_payloads,
+    )
+    return {
+        **validation,
+        "load_profile": {
+            "mode": load_mode,
+            "project_inventory_scan": False,
+            "api_call_count": api_calls,
+            "icon_download_count": icon_downloads,
+            "icon_downloads_enabled": verify_icon_files,
+            "max_icon_files": max_icon_files,
+            "expected_base_api_calls": 9,
+            "expected_report_api_calls": len(report_ids or []),
+        },
+    }
+
+
+def _module_object_rows(body: Any) -> list[dict[str, Any]]:
+    if isinstance(body, list):
+        if len(body) == 2 and isinstance(body[0], list):
+            body = body[0]
+        return [item for item in body if isinstance(item, dict)]
+    return listandcount_items(body)
+
+
+def _module_referenced_icon_ids(forms: dict[str, Any]) -> set[str]:
+    result: set[str] = set()
+    for value in _walk_values(forms):
+        if isinstance(value, dict) and looks_like_uuid(str(value.get("iconId") or "")):
+            result.add(str(value["iconId"]))
+    return result
+
+
+def _module_local_icon_payloads(registry: dict[str, Any], file_ids: set[str]) -> dict[str, bytes]:
+    payloads: dict[str, bytes] = {}
+    base_dir = _project_icon_library_dir()
+    for entry in (registry.get("icons") or {}).values():
+        if not isinstance(entry, dict) or str(entry.get("file_id") or "") not in file_ids:
+            continue
+        if entry.get("source") != "repo_icon_library":
+            continue
+        relative_path = str(entry.get("library_path") or entry.get("filename") or "").strip()
+        if not relative_path:
+            continue
+        path = (base_dir / relative_path).resolve()
+        try:
+            path.relative_to(base_dir)
+        except ValueError:
+            continue
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        expected_hash = str(entry.get("sha256") or entry.get("library_sha256") or "")
+        if expected_hash and hashlib.sha256(data).hexdigest() != expected_hash:
+            continue
+        payloads[str(entry["file_id"])] = data
+    return payloads
+
 def _form_surface_result(
     *,
     form_id: str | None,
@@ -1282,4 +1479,4 @@ def _form_view_ids(form: dict[str, Any]) -> set[str]:
             view_ids.add(str(params["viewId"]))
     return view_ids
 
-__all__ = ['alterios_upsert_view', 'alterios_upsert_view_entity', 'alterios_upsert_view_field', 'alterios_upsert_form', 'alterios_create_material_module', 'alterios_patch_form_actions', 'alterios_patch_form_tabs', 'alterios_patch_form_cell_listeners', 'alterios_upsert_form_manual_script_action', 'alterios_analyze_form_surface', 'alterios_validate_form_contract']
+__all__ = ['alterios_upsert_view', 'alterios_upsert_view_entity', 'alterios_upsert_view_field', 'alterios_upsert_form', 'alterios_create_material_module', 'alterios_patch_form_actions', 'alterios_patch_form_tabs', 'alterios_patch_form_cell_listeners', 'alterios_upsert_form_manual_script_action', 'alterios_analyze_form_surface', 'alterios_validate_form_contract', 'alterios_validate_module_contract']

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-UX_CONTRACT_VERSION = "2026-07-17.1"
+UX_CONTRACT_VERSION = "2026-07-17.2"
 
 BLOCKING_FORM_ISSUE_CODES = frozenset(
     {
@@ -39,6 +39,29 @@ BLOCKING_FORM_ISSUE_CODES = frozenset(
         "view_detail_field_input_config_present",
         "view_detail_field_output_config_missing",
         "view_detail_view_data_must_be_readonly",
+    }
+)
+
+BLOCKING_MODULE_ISSUE_CODES = frozenset(
+    {
+        "bulk_interface_missing",
+        "content_type_description_missing",
+        "field_tooltip_missing",
+        "icon_file_color_mismatch",
+        "icon_file_contract_unverified",
+        "icon_file_size_mismatch",
+        "icon_registry_entry_missing",
+        "icon_semantic_mismatch",
+        "icon_source_size_mismatch",
+        "module_form_role_missing",
+        "relation_join_invalid",
+        "relation_join_missing",
+        "report_source_fields_missing",
+        "report_source_missing",
+        "view_edit_element_actions_mismatch",
+        "view_engine_not_v2",
+        "view_entity_missing",
+        "view_field_missing",
     }
 )
 

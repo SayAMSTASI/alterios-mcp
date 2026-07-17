@@ -14,7 +14,7 @@ def test_release_version_and_console_scripts_are_synchronized() -> None:
     project = pyproject["project"]
     scripts = project["scripts"]
 
-    assert project["version"] == __version__ == "0.2.3"
+    assert project["version"] == __version__ == "0.2.4"
     assert scripts["alterios-mcp"] == "alterios_mcp.server:main"
     assert scripts["alterios-doctor"] == "alterios_mcp.doctor:main"
     assert scripts["alterios-suggest-fixes"] == "alterios_mcp.suggest_fixes:main"
