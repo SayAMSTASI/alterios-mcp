@@ -11,6 +11,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
+from .performance import track_http
 
 from .services import get_service
 
@@ -874,6 +875,7 @@ class AlteriosClient:
         headers[self.config.auth_header] = auth_value
         return headers
 
+    @track_http
     def _send(self, prepared: PreparedAlteriosRequest) -> AlteriosResponse:
         data = None
         if prepared.body is not None:

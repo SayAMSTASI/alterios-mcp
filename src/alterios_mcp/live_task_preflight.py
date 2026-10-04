@@ -18,6 +18,8 @@ from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_proces
 from .runtime_info import process_hygiene
 from .tool_profiles import allowed_tool_names
 from .ux_contract import UX_CONTRACT_VERSION
+from .scoped_health import run_scoped_health
+from .response_output import present
 
 
 LIVE_TASK_PREFLIGHT_SCHEMA_VERSION = 1
@@ -55,6 +57,9 @@ def run_live_task_preflight(
     allow_closed_work_item: bool = False,
     gitea_dotenv_path: str | None = None,
     artifacts_dir: str | None = None,
+    health_scope: list[dict[str, str]] | None = None,
+    scope_max_objects: int = 50,
+    scope_max_depth: int = 3,
 ) -> dict[str, Any]:
     """Return a read-only go/no-go preflight for an Alterios live task."""
     target_profile = profile.strip()
@@ -63,6 +68,8 @@ def run_live_task_preflight(
         raise ValueError("profile is required for live task preflight.")
     if not target_project_id:
         raise ValueError("project_id is required for live task preflight.")
+    if health_scope is not None and (not include_project_health or scenario_tool != "typed_write"):
+        raise ValueError("health_scope is available only for typed_write with health checks enabled; broad scenarios retain full project health")
 
     checks: list[dict[str, Any]] = []
     blockers: list[dict[str, str]] = []
@@ -97,7 +104,19 @@ def run_live_task_preflight(
     )
     checks.append(_scenario_check(scenario_tool=scenario_tool, warnings=warnings))
 
-    if include_project_health:
+    if health_scope is not None:
+        try:
+            health = run_scoped_health(profile=target_profile, project_id=target_project_id,
+                objects=health_scope, max_objects=scope_max_objects, max_depth=scope_max_depth)
+            if not health["summary"]["ok"]:
+                blockers.append({"code": "scoped_health_errors", "message": "Scoped checks failed or exceeded their coverage budget."})
+            checks.append({"name": "scoped_health", "ok": health["summary"]["ok"],
+                           "result": present(health)})
+            warnings.append({"code": "scoped_health_only", "message": "Only explicit objects and supported outgoing references were checked; project-wide and incoming impact remain unverified."})
+        except (AlteriosConfigError, AlteriosRequestError, OSError, ValueError) as exc:
+            blockers.append({"code": "scoped_health_failed", "message": type(exc).__name__})
+            checks.append({"name": "scoped_health", "ok": False})
+    elif include_project_health:
         checks.append(
             _project_health_check(
                 profile=target_profile,
@@ -137,7 +156,7 @@ def run_live_task_preflight(
         "scenario_tool": (scenario_tool or "").strip() or None,
         "summary": {
             "ok": ok,
-            "status": "ready" if ok else "blocked",
+            "status": ("ready_within_scope" if health_scope is not None else "ready") if ok else "blocked",
             "check_count": len(checks),
             "blocker_count": len(blockers),
             "warning_count": len(warnings),
