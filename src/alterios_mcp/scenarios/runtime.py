@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .._support import *
 from ..runtime_info import process_hygiene
+from ..authoring_policy import AUTHORING_INSTRUCTIONS
 
 def alterios_config(profile: str | None = None) -> dict[str, Any]:
     """Return redacted Alterios configuration and missing required values."""
@@ -65,6 +66,7 @@ def alterios_ux_contract() -> dict[str, Any]:
     return {
         "readonly": True,
         "version": UX_CONTRACT_VERSION,
+        "authoring_instructions": AUTHORING_INSTRUCTIONS,
         "blocking_form_issue_codes": sorted(BLOCKING_FORM_ISSUE_CODES),
         "blocking_module_issue_codes": sorted(BLOCKING_MODULE_ISSUE_CODES),
         "scenario_apply_requires": list(SCENARIO_APPLY_REQUIRES),

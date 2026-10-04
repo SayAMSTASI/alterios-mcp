@@ -22,9 +22,10 @@ from .scenarios import diagnostics as _diagnostics_scenarios
 from .scenarios import read_workflows as _read_workflow_scenarios
 from .tool_profiles import apply_tool_profile
 from .tools import all_tool_functions, all_tool_names, register_all_tools
+from .authoring_policy import AUTHORING_INSTRUCTIONS
 
 
-mcp = FastMCP("alterios")
+mcp = FastMCP("alterios", instructions=AUTHORING_INSTRUCTIONS)
 register_all_tools(mcp)
 _support.configure_tool_name_provider(all_tool_names)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..authoring_policy import has_managed_marker
 from .views_forms import alterios_upsert_form
 
 def alterios_view_data(
@@ -52,7 +53,7 @@ def alterios_upsert_script(
     payload = {
         **(existing or {}),
         "name": name,
-        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp script.",
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: Скрипт обработки данных.",
         "type": effective_type,
         "active": _script_active_default(effective_type, existing, active),
         "body": body if body is not None else (existing or {}).get("body") or "",
@@ -109,8 +110,8 @@ def alterios_validate_script(
     validation = {
         "type_matches": expected_type is None or script.get("type") == expected_type,
         "active_matches": expected_active is None or script.get("active") is expected_active,
-        "managed": MANAGED_MARKER in str(script.get("description") or ""),
-        "managed_matches": not expected_managed or MANAGED_MARKER in str(script.get("description") or ""),
+        "managed": has_managed_marker(script.get("description")),
+        "managed_matches": not expected_managed or has_managed_marker(script.get("description")),
         "has_body": bool(script.get("body")),
         "has_config": isinstance(script.get("config"), dict),
         "librariesIds_is_list": isinstance(script.get("librariesIds"), list),
@@ -142,7 +143,7 @@ def alterios_upsert_bpmn_diagram(
     payload = {
         **(existing or {}),
         "name": name,
-        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp BPMN diagram.",
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: Схема бизнес-процесса.",
         "value": value if value is not None else (existing or {}).get("value") or "",
         "contentTypeId": content_type_id if content_type_id is not None else (existing or {}).get("contentTypeId"),
         "createOnStart": create_on_start if create_on_start is not None else (existing or {}).get("createOnStart", False),
@@ -543,7 +544,7 @@ def alterios_create_process_flow(
         page_title=task_form_page_title or normalized_task_form_name,
         tabs=planned_tabs,
         form_action_containers=planned_actions,
-        description=task_form_description or f"{MANAGED_MARKER}: alterios-mcp process task form.",
+        description=task_form_description or f"{MANAGED_MARKER}: Форма выполнения задачи бизнес-процесса.",
         enforce_ux_contract=True,
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
@@ -564,7 +565,7 @@ def alterios_create_process_flow(
         diagram_id=diagram_id,
         value=actual_bpmn_xml,
         content_type_id=resolved_content_type_id,
-        description=f"{MANAGED_MARKER}: alterios-mcp process flow.",
+        description=f"{MANAGED_MARKER}: Схема выполнения бизнес-процесса.",
         allow_unmanaged_update=allow_unmanaged_update,
         dry_run=False,
         profile=profile,
