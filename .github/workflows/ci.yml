@@ -29,6 +29,7 @@ jobs:
       - run: python -m alterios_mcp.replay_smoke --json
       - run: python -m alterios_mcp.doctor --skip-console-scripts --skip-startup-benchmark --json
       - run: python scripts/check_public_tree.py
+      - run: python scripts/benchmark_read_workflows.py --repeats 1 --output artifacts/performance.json
 
   package:
     runs-on: ubuntu-latest

@@ -119,6 +119,9 @@ def alterios_live_task_preflight(
     required_agent_roles: list[str] | None = None,
     allow_closed_work_item: bool = False,
     gitea_dotenv_path: str | None = None,
+    health_scope: list[dict[str, str]] | None = None,
+    scope_max_objects: int = 50,
+    scope_max_depth: int = 3,
 ) -> dict[str, Any]:
     """Run a fast read-only go/no-go preflight before an Alterios live write task."""
     return run_live_task_preflight(
@@ -139,6 +142,9 @@ def alterios_live_task_preflight(
         required_agent_roles=required_agent_roles,
         allow_closed_work_item=allow_closed_work_item,
         gitea_dotenv_path=gitea_dotenv_path,
+        health_scope=health_scope,
+        scope_max_objects=scope_max_objects,
+        scope_max_depth=scope_max_depth,
     )
 
 def alterios_list_profiles(profile: str | None = None) -> dict[str, Any]:

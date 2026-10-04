@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 
 from .client import AlteriosRequestError, listandcount_items, redact_sensitive
 from .discovery import OBJECT_ROUTES
@@ -30,20 +32,28 @@ def fingerprint(value: Any) -> str:
 
 def safe_payload(value: Any) -> Any:
     """Redact structured secrets, including structured JSON inside log strings."""
-    value = redact_sensitive(value)
+    return _safe_text(redact_sensitive(value))
+
+
+def _safe_text(value: Any) -> Any:
     if isinstance(value, dict):
-        return {key: safe_payload(item) for key, item in value.items()}
+        return {key: _safe_text(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [safe_payload(item) for item in value]
+        return [_safe_text(item) for item in value]
     if isinstance(value, str):
         if value.lstrip().startswith(("{", "[")):
             try:
                 return json.dumps(safe_payload(json.loads(value)), ensure_ascii=False)
             except (ValueError, RecursionError):
                 pass
-        value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/=-]+", r"\1<redacted>", value)
-        value = re.sub(r'''(?i)((?:[\w-]*(?:token|password|secret|api[_-]?key|cookie|authorization)[\w-]*)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)''', r"\1<redacted>", value)
-        value = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "<redacted>", value)
+        if "bearer" in value.casefold():
+            value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/=-]+", r"\1<redacted>", value)
+        if re.search(r"(?i)token|password|secret|api[_-]?key|cookie|authorization", value):
+            # Start only at a key boundary; do not consume ordinary assignments,
+            # which may contain credential assignments inside their string values.
+            value = re.sub(r'''(?i)(?<![\w-])(?=[\w-]*(?:token|password|secret|api[_-]?key|cookie|authorization))([\w-]+["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)''', r"\1<redacted>", value)
+        if "@" in value:
+            value = re.sub(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "<redacted>", value)
     return value
 
 
@@ -166,11 +176,14 @@ def read_kind(client: Any, kind: str, *, filters: dict[str, Any] | None = None,
 
 def collect_snapshot(client: Any, *, kinds: list[str], page_size: int = 200,
                      max_pages: int = 100, max_rows: int = 10000,
-                     include_details: bool = False, max_detail_objects: int = 200) -> dict[str, Any]:
+                     include_details: bool = False, max_detail_objects: int = 200,
+                     detail_workers: int = 4) -> dict[str, Any]:
     if not kinds or len(kinds) != len(set(kinds)) or set(kinds) - SNAPSHOT_KINDS:
         raise ValueError("Choose distinct supported project kinds")
     if not 1 <= max_detail_objects <= 2000 or not 1 <= max_rows <= MAX_ROWS:
         raise ValueError("Invalid detail/row budget")
+    if not 1 <= detail_workers <= 8:
+        raise ValueError("detail_workers must be between 1 and 8")
     result = {"schema_version": 1, "snapshot_id": "scan_" + uuid.uuid4().hex,
               "readonly": True, "started_at": utc_now(),
               "target": {"profile": client.config.profile, "project_id": client.config.project_id},
@@ -186,22 +199,32 @@ def collect_snapshot(client: Any, *, kinds: list[str], page_size: int = 200,
             continue
         batch = read_kind(client, kind, page_size=page_size, max_pages=max_pages, max_rows=remaining)
         if include_details and kind in detail_methods:
-            for row in batch["rows"]:
-                if detailed >= max_detail_objects:
-                    batch["errors"].append({"code": "detail_limit"})
-                    break
+            selected = batch["rows"][:max_detail_objects - detailed]
+            if len(selected) < len(batch["rows"]):
+                batch["errors"].append({"code": "detail_limit"})
+            detailed += len(selected)
+
+            def hydrate(row):
                 identity = row.get("_id")
                 try:
                     if not identity:
                         raise ValueError("Missing object ID")
-                    detailed += 1
                     row["_snapshot_detail"] = getattr(client, detail_methods[kind])(identity).body
                     if kind == "views":
                         row["_snapshot_entities"] = client.view_entities(identity).body
                         row["_snapshot_fields"] = client.view_fields_populated(identity).body
                 except (OSError, ValueError, AlteriosRequestError) as exc:
-                    batch["errors"].append({"code": "detail_read_failed", "id": identity,
-                                             "error_type": type(exc).__name__})
+                    return {"code": "detail_read_failed", "id": identity, "error_type": type(exc).__name__}
+                return None
+
+            # Only independent detail reads are concurrent. Pagination and the
+            # shared row/detail budgets remain sequential and deterministic.
+            with ThreadPoolExecutor(max_workers=detail_workers) as pool:
+                futures = [pool.submit(copy_context().run, hydrate, row) for row in selected]
+                for future in futures:
+                    error = future.result()
+                    if error:
+                        batch["errors"].append(error)
             batch["complete"] = batch["complete"] and not batch["errors"]
         result["objects"][kind] = batch
         remaining -= batch["loaded"]
@@ -209,6 +232,7 @@ def collect_snapshot(client: Any, *, kinds: list[str], page_size: int = 200,
     result["complete"] = all(x["complete"] for x in result["objects"].values())
     result["include_details"] = include_details
     result["detail_objects_read"] = detailed
+    result["detail_workers"] = detail_workers
     result["limitations"] = ["Only selected kinds; linked content/fragments must be included explicitly.",
                               "Detail hydration enabled." if include_details else "List-route fields only; full reports and joined view metadata may be omitted.",
                               "Concurrent remote edits may change data without changing row counts."]
@@ -295,11 +319,12 @@ def relation_graph(snapshot: dict[str, Any], *, root_id: str | None = None,
         nodes.append({"key": key, "kind": kind, "id": identity, "name": row.get("name"), "mname": row.get("mname")})
     edges = []
     for kind, identity, row in records:
+        source_key = kind + ":" + identity
         for path, value in walk(row):
             if path in {"/_id", "/id"} or not isinstance(value, str):
                 continue
             for target in by_id.get(value, []):
-                edges.append({"source": kind + ":" + identity, "target": target, "path": path,
+                edges.append({"source": source_key, "target": target, "path": path,
                               "evidence": "exact scalar ID match"})
                 if len(edges) > max_edges:
                     break

@@ -1,9 +1,28 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+import pytest
 
 from alterios_mcp import live_task_preflight, server
 from alterios_mcp.ux_contract import UX_CONTRACT_VERSION
+
+
+@pytest.mark.parametrize("healthy", [True, False])
+def test_scoped_preflight_does_not_run_full_inventory_or_hide_errors(monkeypatch, tmp_path, healthy):
+    monkeypatch.setenv("ALTERIOS_MCP_ARTIFACTS_DIR", str(tmp_path))
+    monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
+    monkeypatch.setattr(live_task_preflight, "collect_alterios_mcp_process_snapshot",
+                        lambda **kwargs: {"processes": [], "instances": [], "cache": {"hit": True}})
+    monkeypatch.setattr(live_task_preflight, "run_project_health", lambda **kwargs: pytest.fail("Full inventory is forbidden in scoped mode"))
+    monkeypatch.setattr(live_task_preflight, "run_scoped_health", lambda **kwargs:
+                        {"summary": {"ok": healthy}, "full_project_verified": False, "errors": [] if healthy else [{"code": "missing"}]})
+    with patch.dict("os.environ", ENV):
+        result = live_task_preflight.run_live_task_preflight(profile="primary", project_id="p", scenario_tool="typed_write",
+            delivery_evidence=DELIVERY_EVIDENCE, verify_gitea_evidence=False, include_replay_smoke=False,
+            require_clean_health=False, health_scope=[{"kind": "fields", "id": "field-one"}])
+    assert result["summary"]["ok"] is healthy
+    assert result["summary"]["status"] == ("ready_within_scope" if healthy else "blocked")
+    assert result["checks"][4]["name"] == "scoped_health"
 
 
 ENV = {
