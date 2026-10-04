@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..runtime_info import process_hygiene
 
 def alterios_config(profile: str | None = None) -> dict[str, Any]:
     """Return redacted Alterios configuration and missing required values."""
@@ -42,15 +43,7 @@ def alterios_runtime_info(
         )
         processes = snapshot["processes"]
         instances = snapshot["instances"]
-        duplicate_process_count = sum(int(item.get("process_count") or 0) for item in instances[1:])
-        runtime["process_hygiene"] = {
-            "process_count": len(processes),
-            "instance_count": len(instances),
-            "duplicate_instance_count": max(0, len(instances) - 1),
-            "duplicate_process_count": duplicate_process_count,
-            "cache": snapshot["cache"],
-            "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
-        }
+        runtime["process_hygiene"] = process_hygiene(snapshot)
         if include_process_details:
             runtime["process_hygiene"].update({"processes": processes, "instances": instances})
     runtime["ok"] = not runtime["stale"] and runtime["matches_expected"]

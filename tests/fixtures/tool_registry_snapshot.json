@@ -3,6 +3,7 @@
     "admin": [
       "alterios_add_comment",
       "alterios_analyze_form_surface",
+      "alterios_audit_log",
       "alterios_bulk_update_selected_content_fields",
       "alterios_call_readonly_service",
       "alterios_clone_shared_content_type",
@@ -16,10 +17,13 @@
       "alterios_delete_user",
       "alterios_delete_user_group",
       "alterios_diagnose_report_viewer",
+      "alterios_diagnose_view",
       "alterios_discover_readonly",
+      "alterios_download_files",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
       "alterios_execute_manual_script",
+      "alterios_export_dataset",
       "alterios_export_project_icons",
       "alterios_fast_live_bulk_delete",
       "alterios_fast_live_bulk_manual_script",
@@ -27,6 +31,7 @@
       "alterios_fast_live_write",
       "alterios_file_metadata",
       "alterios_file_upload_to_field",
+      "alterios_find_usages",
       "alterios_get_form",
       "alterios_get_role",
       "alterios_get_user",
@@ -36,7 +41,9 @@
       "alterios_list_comments",
       "alterios_list_content_types",
       "alterios_list_fields",
+      "alterios_list_files",
       "alterios_list_groups",
+      "alterios_list_notifications",
       "alterios_list_objects",
       "alterios_list_process_tasks",
       "alterios_list_profiles",
@@ -54,6 +61,8 @@
       "alterios_plan_content_type_publish",
       "alterios_profile_smoke_matrix",
       "alterios_project_health",
+      "alterios_read_all_objects",
+      "alterios_relation_graph",
       "alterios_replay_smoke",
       "alterios_report_full",
       "alterios_resolve_project_icon",
@@ -111,11 +120,16 @@
     ],
     "discovery": [
       "alterios_analyze_form_surface",
+      "alterios_audit_log",
       "alterios_call_readonly_service",
       "alterios_config",
       "alterios_diagnose_report_viewer",
+      "alterios_diagnose_view",
       "alterios_discover_readonly",
+      "alterios_download_files",
+      "alterios_export_dataset",
       "alterios_file_metadata",
+      "alterios_find_usages",
       "alterios_get_form",
       "alterios_get_role",
       "alterios_get_user",
@@ -125,7 +139,9 @@
       "alterios_list_comments",
       "alterios_list_content_types",
       "alterios_list_fields",
+      "alterios_list_files",
       "alterios_list_groups",
+      "alterios_list_notifications",
       "alterios_list_objects",
       "alterios_list_process_tasks",
       "alterios_list_profiles",
@@ -138,6 +154,8 @@
       "alterios_live_task_preflight",
       "alterios_profile_smoke_matrix",
       "alterios_project_health",
+      "alterios_read_all_objects",
+      "alterios_relation_graph",
       "alterios_replay_smoke",
       "alterios_report_full",
       "alterios_resolve_project_icon",
@@ -170,6 +188,7 @@
     "full": [
       "alterios_add_comment",
       "alterios_analyze_form_surface",
+      "alterios_audit_log",
       "alterios_bulk_update_selected_content_fields",
       "alterios_call_readonly_service",
       "alterios_call_write_service",
@@ -184,10 +203,13 @@
       "alterios_delete_user",
       "alterios_delete_user_group",
       "alterios_diagnose_report_viewer",
+      "alterios_diagnose_view",
       "alterios_discover_readonly",
+      "alterios_download_files",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
       "alterios_execute_manual_script",
+      "alterios_export_dataset",
       "alterios_export_project_icons",
       "alterios_fast_live_bulk_delete",
       "alterios_fast_live_bulk_manual_script",
@@ -195,6 +217,7 @@
       "alterios_fast_live_write",
       "alterios_file_metadata",
       "alterios_file_upload_to_field",
+      "alterios_find_usages",
       "alterios_get_form",
       "alterios_get_role",
       "alterios_get_user",
@@ -204,7 +227,9 @@
       "alterios_list_comments",
       "alterios_list_content_types",
       "alterios_list_fields",
+      "alterios_list_files",
       "alterios_list_groups",
+      "alterios_list_notifications",
       "alterios_list_objects",
       "alterios_list_process_tasks",
       "alterios_list_profiles",
@@ -222,6 +247,8 @@
       "alterios_plan_content_type_publish",
       "alterios_profile_smoke_matrix",
       "alterios_project_health",
+      "alterios_read_all_objects",
+      "alterios_relation_graph",
       "alterios_replay_smoke",
       "alterios_report_full",
       "alterios_resolve_project_icon",
@@ -281,6 +308,7 @@
     "live": [
       "alterios_add_comment",
       "alterios_analyze_form_surface",
+      "alterios_audit_log",
       "alterios_bulk_update_selected_content_fields",
       "alterios_clone_shared_content_type",
       "alterios_complete_task",
@@ -290,21 +318,27 @@
       "alterios_create_process_flow",
       "alterios_create_report_tab",
       "alterios_diagnose_report_viewer",
+      "alterios_diagnose_view",
+      "alterios_download_files",
       "alterios_ensure_project_icon_library",
       "alterios_ensure_project_icons",
       "alterios_execute_manual_script",
+      "alterios_export_dataset",
       "alterios_fast_live_bulk_manual_script",
       "alterios_fast_live_bulk_process",
       "alterios_fast_live_write",
       "alterios_file_metadata",
       "alterios_file_upload_to_field",
+      "alterios_find_usages",
       "alterios_get_form",
       "alterios_get_view",
       "alterios_get_write_plan",
       "alterios_list_comments",
       "alterios_list_content_types",
       "alterios_list_fields",
+      "alterios_list_files",
       "alterios_list_groups",
+      "alterios_list_notifications",
       "alterios_list_objects",
       "alterios_list_process_tasks",
       "alterios_list_profiles",
@@ -319,6 +353,8 @@
       "alterios_plan_content_type_publish",
       "alterios_profile_smoke_matrix",
       "alterios_project_health",
+      "alterios_read_all_objects",
+      "alterios_relation_graph",
       "alterios_replay_smoke",
       "alterios_report_full",
       "alterios_resolve_project_icon",
@@ -363,7 +399,7 @@
       "gitea_workboard_probe"
     ]
   },
-  "tool_count": 109,
+  "tool_count": 118,
   "tools": {
     "alterios_add_comment": {
       "properties": {
@@ -482,6 +518,63 @@
         }
       },
       "title": "alterios_analyze_form_surfaceArguments",
+      "type": "object"
+    },
+    "alterios_audit_log": {
+      "properties": {
+        "controller": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Controller"
+        },
+        "max_pages": {
+          "default": 20,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 4000,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Id"
+        },
+        "page_size": {
+          "default": 200,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id"
+      ],
+      "title": "alterios_audit_logArguments",
       "type": "object"
     },
     "alterios_bulk_update_selected_content_fields": {
@@ -2140,6 +2233,46 @@
       "title": "alterios_diagnose_report_viewerArguments",
       "type": "object"
     },
+    "alterios_diagnose_view": {
+      "properties": {
+        "content_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Id"
+        },
+        "limit": {
+          "default": 20,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "view_id": {
+          "title": "View Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "view_id"
+      ],
+      "title": "alterios_diagnose_viewArguments",
+      "type": "object"
+    },
     "alterios_discover_readonly": {
       "properties": {
         "profile": {
@@ -2168,6 +2301,42 @@
         }
       },
       "title": "alterios_discover_readonlyArguments",
+      "type": "object"
+    },
+    "alterios_download_files": {
+      "properties": {
+        "file_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "File Ids",
+          "type": "array"
+        },
+        "max_file_bytes": {
+          "default": 10485760,
+          "title": "Max File Bytes",
+          "type": "integer"
+        },
+        "max_total_bytes": {
+          "default": 52428800,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "file_ids"
+      ],
+      "title": "alterios_download_filesArguments",
       "type": "object"
     },
     "alterios_ensure_project_icon_library": {
@@ -2428,6 +2597,57 @@
         "args"
       ],
       "title": "alterios_execute_manual_scriptArguments",
+      "type": "object"
+    },
+    "alterios_export_dataset": {
+      "properties": {
+        "include_details": {
+          "default": false,
+          "title": "Include Details",
+          "type": "boolean"
+        },
+        "kinds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Kinds",
+          "type": "array"
+        },
+        "max_detail_objects": {
+          "default": 200,
+          "title": "Max Detail Objects",
+          "type": "integer"
+        },
+        "max_pages": {
+          "default": 100,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 10000,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "page_size": {
+          "default": 200,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "kinds"
+      ],
+      "title": "alterios_export_datasetArguments",
       "type": "object"
     },
     "alterios_export_project_icons": {
@@ -3210,6 +3430,39 @@
       "title": "alterios_file_upload_to_fieldArguments",
       "type": "object"
     },
+    "alterios_find_usages": {
+      "properties": {
+        "max_matches": {
+          "default": 200,
+          "title": "Max Matches",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "title": "Snapshot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "snapshot_id",
+        "query"
+      ],
+      "title": "alterios_find_usagesArguments",
+      "type": "object"
+    },
     "alterios_get_form": {
       "properties": {
         "form_id": {
@@ -3593,6 +3846,36 @@
       "title": "alterios_list_fieldsArguments",
       "type": "object"
     },
+    "alterios_list_files": {
+      "properties": {
+        "folder_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder Hash"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id"
+      ],
+      "title": "alterios_list_filesArguments",
+      "type": "object"
+    },
     "alterios_list_groups": {
       "properties": {
         "profile": {
@@ -3621,6 +3904,51 @@
         }
       },
       "title": "alterios_list_groupsArguments",
+      "type": "object"
+    },
+    "alterios_list_notifications": {
+      "properties": {
+        "max_pages": {
+          "default": 20,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 4000,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Id"
+        },
+        "page_size": {
+          "default": 200,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id"
+      ],
+      "title": "alterios_list_notificationsArguments",
       "type": "object"
     },
     "alterios_list_objects": {
@@ -4638,6 +4966,97 @@
         }
       },
       "title": "alterios_project_healthArguments",
+      "type": "object"
+    },
+    "alterios_read_all_objects": {
+      "properties": {
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filters"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "max_pages": {
+          "default": 20,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 2000,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "page_size": {
+          "default": 200,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "kind"
+      ],
+      "title": "alterios_read_all_objectsArguments",
+      "type": "object"
+    },
+    "alterios_relation_graph": {
+      "properties": {
+        "max_edges": {
+          "default": 5000,
+          "title": "Max Edges",
+          "type": "integer"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "root_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Root Id"
+        },
+        "snapshot_id": {
+          "title": "Snapshot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "project_id",
+        "snapshot_id"
+      ],
+      "title": "alterios_relation_graphArguments",
       "type": "object"
     },
     "alterios_replay_smoke": {

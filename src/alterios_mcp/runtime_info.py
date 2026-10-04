@@ -20,7 +20,7 @@ from .ux_contract import UX_CONTRACT_VERSION
 
 
 PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-MCP_TOOL_SCHEMA_VERSION = "2026-07-17.9"
+MCP_TOOL_SCHEMA_VERSION = "2026-10-04.1"
 DEFAULT_PROCESS_CACHE_TTL_SECONDS = 15
 ALTERIOS_MCP_COMMAND_RE = re.compile(
     r"(?:^|[\\/\s\"'])alterios-mcp(?:\.exe)?(?:$|[\s\"'])|-m\s+alterios_mcp\.server",
@@ -122,6 +122,7 @@ def collect_alterios_mcp_instances(processes: list[dict[str, Any]] | None = None
         instances.append(
             {
                 "root_pid": root_pid,
+                "owner_pid": root.get("parent_pid"),
                 "created_at": root.get("created_at"),
                 "process_count": len(sorted_items),
                 "current_process": any(item.get("current_process") for item in sorted_items),
@@ -185,10 +186,32 @@ def clear_process_snapshot_cache() -> None:
         _PROCESS_SNAPSHOT_CACHE.clear()
 
 
+def process_hygiene(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Separate observed servers from proven conflicts; stdio clients may coexist.
+
+    OS parent PIDs identify launchers, not MCP sessions. Even siblings may serve
+    independent clients, so process count alone must never authorize termination.
+    """
+    instances = snapshot["instances"]
+    return {
+        "process_count": len(snapshot["processes"]),
+        "instance_count": len(instances),
+        "additional_instance_count": max(0, len(instances) - 1),
+        "duplicate_instance_count": 0,
+        "duplicate_process_count": 0,
+        "ownership_verified": False,
+        "classification": "multiple_servers_unverified" if len(instances) > 1 else "single_or_no_server",
+        "cache": snapshot.get("cache", {}),
+        "cleanup_command": None,
+        "guidance": "Inspect client ownership before selecting explicit root PIDs; count is not evidence of a duplicate.",
+    }
+
+
 def cleanup_alterios_mcp_processes(
     *,
     keep_newest: int = 1,
     dry_run: bool = True,
+    root_pids: list[int] | None = None,
 ) -> dict[str, Any]:
     if keep_newest < 0:
         raise ValueError("keep_newest must be >= 0.")
@@ -200,7 +223,17 @@ def cleanup_alterios_mcp_processes(
         instance
         for instance in instances[keep_newest:]
         if instance.get("root_pid") is not None and instance.get("root_pid") != current_pid
+        and not instance.get("current_process")
     ]
+    if root_pids is not None:
+        eligible = {item["root_pid"]: item for item in instances
+                    if item.get("root_pid") is not None and not item.get("current_process")
+                    and item["root_pid"] != current_pid}
+        if not root_pids or len(set(root_pids)) != len(root_pids) or any(pid not in eligible for pid in root_pids):
+            raise ValueError("Select distinct observed root PIDs excluding this runtime and its launcher")
+        candidates = [eligible[pid] for pid in root_pids]
+    elif not dry_run:
+        raise ValueError("Cleanup apply requires explicit root_pids after reviewing client ownership")
     stopped: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     if not dry_run:
@@ -412,6 +445,7 @@ def main() -> None:
         help="Stop duplicate alterios-mcp processes after keeping the newest N processes.",
     )
     parser.add_argument("--keep-newest", type=int, default=1, help="How many newest alterios-mcp processes to keep.")
+    parser.add_argument("--root-pid", type=int, action="append", help="Explicit reviewed server root PID to stop; repeat for multiple servers.")
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -424,6 +458,7 @@ def main() -> None:
         payload["process_hygiene"] = cleanup_alterios_mcp_processes(
             keep_newest=args.keep_newest,
             dry_run=not args.apply,
+            root_pids=args.root_pid,
         ) if args.cleanup_stale else {
             "process_count": len(snapshot["processes"]),
             "instance_count": len(snapshot["instances"]),

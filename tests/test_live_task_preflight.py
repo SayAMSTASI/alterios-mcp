@@ -124,7 +124,15 @@ def test_live_task_preflight_blocks_project_health_errors(monkeypatch) -> None:
     assert "project_health_errors" in {item["code"] for item in result["blockers"]}
 
 
-def test_live_task_preflight_blocks_duplicate_mcp_processes(monkeypatch) -> None:
+def test_live_task_preflight_count_matches_composed_registry(monkeypatch):
+    from alterios_mcp.tools import all_tool_names
+    from alterios_mcp.tool_profiles import allowed_tool_names
+    monkeypatch.setenv("ALTERIOS_MCP_TOOL_PROFILE", "live")
+    assert live_task_preflight._server_tool_count() == len(allowed_tool_names(all_tool_names(), "live"))
+    assert live_task_preflight._server_tool_count() > 0
+
+
+def test_live_task_preflight_does_not_infer_conflict_from_multiple_servers(monkeypatch) -> None:
     monkeypatch.setattr(live_task_preflight, "build_runtime_fingerprint", lambda tool_count=None: _runtime())
     monkeypatch.setattr(
         live_task_preflight,
@@ -146,10 +154,10 @@ def test_live_task_preflight_blocks_duplicate_mcp_processes(monkeypatch) -> None
             verify_gitea_evidence=False,
         )
 
-    assert result["summary"]["ok"] is False
-    assert "duplicate_mcp_processes" in {item["code"] for item in result["blockers"]}
-    assert result["checks"][1]["process_hygiene"]["duplicate_process_count"] == 1
-    assert result["checks"][1]["process_hygiene"]["duplicate_instance_count"] == 1
+    assert result["summary"]["ok"] is True
+    assert "duplicate_mcp_processes" not in {item["code"] for item in result["blockers"]}
+    assert result["checks"][1]["process_hygiene"]["additional_instance_count"] == 1
+    assert result["checks"][1]["process_hygiene"]["ownership_verified"] is False
 
 
 def test_live_task_preflight_cli_and_server_tool_use_safe_readonly_defaults(monkeypatch, capsys) -> None:
