@@ -20,6 +20,7 @@ from .tool_profiles import allowed_tool_names
 from .ux_contract import UX_CONTRACT_VERSION
 from .scoped_health import run_scoped_health
 from .response_output import present
+from .read_evidence import now
 
 
 LIVE_TASK_PREFLIGHT_SCHEMA_VERSION = 1
@@ -111,7 +112,8 @@ def run_live_task_preflight(
             if not health["summary"]["ok"]:
                 blockers.append({"code": "scoped_health_errors", "message": "Scoped checks failed or exceeded their coverage budget."})
             checks.append({"name": "scoped_health", "ok": health["summary"]["ok"],
-                           "result": present(health)})
+                           "result": present(health, target={"profile": target_profile, "project_id": target_project_id},
+                                             source={"mode": "live", "observed_at": now(), "tool": "scoped_health"})})
             warnings.append({"code": "scoped_health_only", "message": "Only explicit objects and supported outgoing references were checked; project-wide and incoming impact remain unverified."})
         except (AlteriosConfigError, AlteriosRequestError, OSError, ValueError) as exc:
             blockers.append({"code": "scoped_health_failed", "message": type(exc).__name__})

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..read_freshness import assert_read_freshness, guarded_existing
 from ..authoring_policy import has_managed_marker
 from .views_forms import alterios_upsert_form
 
@@ -38,12 +39,14 @@ def alterios_upsert_script(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios web/cron/manual/event/library/diagram script."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_script(client, script_id=script_id, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="scripts", existing=existing)
     if existing:
         _assert_managed_or_allowed(existing, kind="Script", allow_unmanaged_update=allow_unmanaged_update)
     elif body is None:
@@ -86,6 +89,8 @@ def alterios_upsert_script(
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="scripts", object_id=(existing or {}).get("_id"))
     saved = client.save_script(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback = client.script_by_id(saved_id).as_dict() if saved_id else {"body": _find_script(client, name=name)}
@@ -130,12 +135,14 @@ def alterios_upsert_bpmn_diagram(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update a BPMN diagram."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_diagram(client, diagram_id=diagram_id, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="diagrams", existing=existing)
     if existing:
         _assert_managed_or_allowed(existing, kind="Diagram", allow_unmanaged_update=allow_unmanaged_update)
     elif value is None or content_type_id is None:
@@ -172,6 +179,8 @@ def alterios_upsert_bpmn_diagram(
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="diagrams", object_id=(existing or {}).get("_id"))
     saved = client.save_diagram(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback = client.diagram_by_id(saved_id).as_dict() if saved_id else {"body": _find_diagram(client, name=name)}

@@ -4,6 +4,7 @@ from typing import Any, Callable
 from ..scenarios import read_workflows as scenarios
 
 TOOL_NAMES = (
+    "alterios_read_result", "alterios_read_object_evidence", "alterios_verify_read_evidence",
     "alterios_export_dataset", "alterios_read_all_objects", "alterios_find_usages",
     "alterios_relation_graph", "alterios_diagnose_view", "alterios_audit_log",
     "alterios_list_notifications",

@@ -8,8 +8,11 @@
 dry-run -> проверенный `plan_id` -> запись -> API/UI readback -> приватный отчёт
 о результате.
 
-Текущая версия: **0.4.0**. Актуальный состав и доступность инструментов:
+Текущая версия: **0.5.0**. Актуальный состав и доступность инструментов:
 [автоматически проверяемый каталог](docs/capabilities.md).
+
+[Проверяемые ответы 0.5.0](docs/read-evidence.md): дочитывание результатов через MCP,
+явная полнота и источник, состояния полей и проверка свежести перед обновлением.
 
 [Оптимизация 0.4.0](docs/performance.md): компактные ответы с полными файлами,
 адресный preflight, ограниченная параллельность, кеш снимков и воспроизводимые
@@ -89,7 +92,7 @@ python -m venv .venv
 
 ```powershell
 .\manage_release.ps1 -Action Update `
-  -Package "C:\packages\alterios_mcp-0.4.0-py3-none-any.whl" `
+  -Package "C:\packages\alterios_mcp-0.5.0-py3-none-any.whl" `
   -ExpectedSha256 "<sha256>" `
   -DotenvPath "C:\path\to\private\alterios.env"
 ```
@@ -188,10 +191,10 @@ $env:ALTERIOS_DOTENV_PATH = "C:\path\to\private\alterios.env"
 
 | Профиль | Tools | Назначение |
 |---|---:|---|
-| `live` | 91 | Основной профиль: health, scenarios, typed writes и проверка результата |
-| `discovery` | 65 | Read-only исследование, inventory и validators |
-| `admin` | 116 | Администрирование, security и controlled destructive operations |
-| `full` | 118 | Разработка MCP и исследование неизвестных routes |
+| `live` | 94 | Основной профиль: health, scenarios, typed writes и проверка результата |
+| `discovery` | 68 | Read-only исследование, inventory и validators |
+| `admin` | 119 | Администрирование, security и controlled destructive operations |
+| `full` | 121 | Разработка MCP и исследование неизвестных routes |
 
 Профиль выбирается до запуска процесса через `ALTERIOS_MCP_TOOL_PROFILE`.
 Для обычных задач используйте `live`. `full` не является режимом повышенного

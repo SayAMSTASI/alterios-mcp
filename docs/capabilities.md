@@ -1,6 +1,6 @@
 # Каталог инструментов MCP
 
-Версия пакета: `0.4.0`.
+Версия пакета: `0.5.0`.
 
 Сгенерировано командой `python -m alterios_mcp.capabilities`. Не редактировать вручную.
 
@@ -8,10 +8,10 @@
 
 | Профиль | Инструментов |
 |---|---:|
-| full | 118 |
-| live | 91 |
-| discovery | 65 |
-| admin | 116 |
+| full | 121 |
+| live | 94 |
+| discovery | 68 |
+| admin | 119 |
 
 | Инструмент | Класс | full | live | discovery | admin |
 |---|---|---|---|---|---|
@@ -77,6 +77,8 @@
 | `alterios_profile_smoke_matrix` | runtime_guard | да | да | да | да |
 | `alterios_project_health` | runtime_guard | да | да | да | да |
 | `alterios_read_all_objects` | read_only_discovery | да | да | да | да |
+| `alterios_read_object_evidence` | read_only_discovery | да | да | да | да |
+| `alterios_read_result` | read_only_discovery | да | да | да | да |
 | `alterios_relation_graph` | read_only_discovery | да | да | да | да |
 | `alterios_replay_smoke` | runtime_guard | да | да | да | да |
 | `alterios_report_full` | read_only_discovery | да | да | да | да |
@@ -112,6 +114,7 @@
 | `alterios_validate_script` | read_only_discovery | да | да | да | да |
 | `alterios_validate_stimulsoft_layout` | read_only_discovery | да | да | да | да |
 | `alterios_verify_delivery_evidence` | runtime_guard | да | да | да | да |
+| `alterios_verify_read_evidence` | read_only_discovery | да | да | да | да |
 | `alterios_view_data` | read_only_discovery | да | да | да | да |
 | `alterios_view_data_simplified` | read_only_discovery | да | да | да | да |
 | `alterios_view_entities` | read_only_discovery | да | да | да | да |

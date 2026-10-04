@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..read_freshness import assert_read_freshness, guarded_existing
 from ..ux_contract import assert_form_contract
 from ..validators.module_contract import (
     assert_module_contract,
@@ -24,12 +25,14 @@ def alterios_upsert_view(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios view. Execution requires explicit write gates."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_view(client, view_id=view_id, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="views", existing=existing)
     if existing:
         _assert_managed_or_allowed(existing, kind="View", allow_unmanaged_update=allow_unmanaged_update)
     merged_settings = dict((existing or {}).get("settings") or {})
@@ -74,6 +77,8 @@ def alterios_upsert_view(
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="views", object_id=(existing or {}).get("_id"))
     saved = client.save_view(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback_body = client.view_by_id(saved_id).as_dict() if saved_id else {"body": _find_view(client, name=name)}
@@ -278,12 +283,14 @@ def alterios_upsert_form(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios form. Execution requires explicit write gates."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_form(client, form_id=form_id, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="forms", existing=existing)
     if existing:
         _assert_managed_or_allowed(existing, kind="Form", allow_unmanaged_update=allow_unmanaged_update)
     elif tabs is None:
@@ -328,6 +335,8 @@ def alterios_upsert_form(
         blocking = ", ".join(ux_contract.get("blocking_issues_by_code", {}))
         raise ValueError(f"Alterios UX contract blocks form apply: {blocking}")
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="forms", object_id=(existing or {}).get("_id"))
     saved = client.save_form(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback_body = client.form_by_id(saved_id).as_dict() if saved_id else {"body": _find_form(client, name=name)}

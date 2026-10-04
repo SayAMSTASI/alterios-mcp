@@ -12,7 +12,7 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 118 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 91 tools. Актуальная матрица автоматически проверяется в [capabilities.md](capabilities.md). |
+| MCP tools | 121 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 94 tools. Актуальная матрица автоматически проверяется в [capabilities.md](capabilities.md). |
 | Write-like MCP tools | 44 | Сценарные, typed, security, dangerous и raw-write инструменты по классификации `tool_profiles.py`; в число сценарных входят `alterios_fast_live_write`, `alterios_fast_live_bulk_manual_script`, `alterios_fast_live_bulk_process` и admin-only `alterios_fast_live_bulk_delete`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |

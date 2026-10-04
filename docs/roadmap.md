@@ -1,6 +1,6 @@
 # Дорожная карта Alterios MCP
 
-Актуальный состав выпуска 0.3.0: [capabilities.md](capabilities.md).
+Актуальный состав выпуска 0.5.0: [capabilities.md](capabilities.md).
 Первый этап доработок по рабочим сценариям и оставшиеся задачи:
 [read-workflows.md](read-workflows.md). Ниже сохранён исторический план июля.
 
@@ -13,9 +13,9 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 | Область | Подтвержденное состояние |
 |---|---|
-| Версия | `0.3.0` |
-| Публичный MCP registry | 118 tools |
-| Профили tools | `live` - 91, `discovery` - 65, `admin` - 116, `full` - 118 |
+| Версия | `0.5.0` |
+| Публичный MCP registry | 121 tools |
+| Профили tools | `live` - 94, `discovery` - 68, `admin` - 119, `full` - 121 |
 | Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
 | Рабочие слои | `tools/`, `scenarios/`, `builders/`, `validators/` |
 | Запись | typed writes, сценарии, `plan_id`, write journal, readback и dangerous gates |

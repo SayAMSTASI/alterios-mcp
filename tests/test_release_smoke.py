@@ -22,5 +22,5 @@ def test_release_smoke_checks_profiles_doctor_and_replay(monkeypatch) -> None:
 
     assert result["summary"]["ok"] is True
     profile_check = next(item for item in result["checks"] if item["name"] == "tool_profiles")
-    assert profile_check["tool_count"] == 118
-    assert profile_check["profile_counts"] == {"full": 118, "live": 91, "discovery": 65, "admin": 116}
+    assert profile_check["tool_count"] == 121
+    assert profile_check["profile_counts"] == {"full": 121, "live": 94, "discovery": 68, "admin": 119}
