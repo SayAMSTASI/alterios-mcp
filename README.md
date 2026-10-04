@@ -8,7 +8,7 @@
 dry-run -> проверенный `plan_id` -> запись -> API/UI readback -> приватный отчёт
 о результате.
 
-Текущая версия: **0.3.0**. Актуальный состав и доступность инструментов:
+Текущая версия: **0.3.1**. Актуальный состав и доступность инструментов:
 [автоматически проверяемый каталог](docs/capabilities.md).
 
 Новые [сценарии чтения](docs/read-workflows.md): выгрузка с контролем полноты,
@@ -84,7 +84,7 @@ python -m venv .venv
 
 ```powershell
 .\manage_release.ps1 -Action Update `
-  -Package "C:\packages\alterios_mcp-0.3.0-py3-none-any.whl" `
+  -Package "C:\packages\alterios_mcp-0.3.1-py3-none-any.whl" `
   -ExpectedSha256 "<sha256>" `
   -DotenvPath "C:\path\to\private\alterios.env"
 ```

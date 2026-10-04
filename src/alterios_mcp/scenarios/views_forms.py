@@ -44,7 +44,7 @@ def alterios_upsert_view(
     payload = {
         **(existing or {}),
         "name": name,
-        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp view.",
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: Представление данных проекта.",
         "format": effective_format,
         "settings": merged_settings,
         "strict": strict if strict is not None else (existing or {}).get("strict") or False,
@@ -292,7 +292,7 @@ def alterios_upsert_form(
         **(existing or {}),
         "name": name,
         "pageTitle": page_title if page_title is not None else (existing or {}).get("pageTitle") or name,
-        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp form.",
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: Форма работы с данными проекта.",
         "tabs": tabs if tabs is not None else (existing or {}).get("tabs") or [],
         "formActionContainers": (
             form_action_containers

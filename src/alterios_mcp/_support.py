@@ -13,6 +13,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
+from .authoring_policy import MANAGED_MARKER, LEGACY_MANAGED_MARKER, has_managed_marker
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.sax.saxutils import escape as _xml_escape
@@ -350,7 +351,6 @@ def _file_values(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
 
 
-MANAGED_MARKER = "Codex-managed"
 
 PROJECT_ICON_SCHEMA_VERSION = 1
 PROJECT_PUBLIC_FOLDER_HASH = "public_L3B1YmxpYw"
@@ -1674,12 +1674,12 @@ def _printable_smoke_rows(template: dict[str, Any], count: int = 3) -> list[dict
 
 
 def _report_is_manageable(existing: dict[str, Any], full: Any) -> bool:
-    if MANAGED_MARKER in str(existing.get("description") or ""):
+    if has_managed_marker(existing.get("description")):
         return True
-    if isinstance(full, dict) and MANAGED_MARKER in str(full.get("description") or ""):
+    if isinstance(full, dict) and has_managed_marker(full.get("description")):
         return True
     template = _report_template_payload(full)
-    return isinstance(template, dict) and MANAGED_MARKER in str(template.get("CodexMarker") or "")
+    return isinstance(template, dict) and has_managed_marker(template.get("CodexMarker"))
 
 
 def _report_project_base_validation(
@@ -1717,7 +1717,7 @@ def _response_body(value: Any) -> Any:
 
 
 def _managed_description(text: str | None, fallback: str) -> str:
-    description = (text or fallback).strip()
+    description = (text or fallback).strip().replace(LEGACY_MANAGED_MARKER, MANAGED_MARKER)
     if MANAGED_MARKER in description:
         return description
     return f"{MANAGED_MARKER}: {description}"

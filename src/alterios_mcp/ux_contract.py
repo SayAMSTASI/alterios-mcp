@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-UX_CONTRACT_VERSION = "2026-07-17.2"
+UX_CONTRACT_VERSION = "2026-10-04.2"
 
 BLOCKING_FORM_ISSUE_CODES = frozenset(
     {

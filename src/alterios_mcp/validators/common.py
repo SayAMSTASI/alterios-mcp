@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any
+from ..authoring_policy import has_managed_marker
 
 
 ALTERIOS_SCRIPT_TYPES = {"web", "cron", "manual", "event", "library", "diagram"}
-MANAGED_MARKER = "Codex-managed"
 
 def _validate_script_type_config(script_type: str, config: dict[str, Any]) -> None:
     if script_type not in ALTERIOS_SCRIPT_TYPES:
@@ -66,14 +66,14 @@ def _downloaded_icon_payload_valid(data: bytes, *, filename: str, content_type: 
 def _assert_managed_or_allowed(resource: dict[str, Any], *, kind: str, allow_unmanaged_update: bool) -> None:
     if allow_unmanaged_update:
         return
-    if MANAGED_MARKER in str(resource.get("description") or ""):
+    if has_managed_marker(resource.get("description")):
         return
     raise ValueError(f"{kind} {resource.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
 
 def _assert_help_managed_or_allowed(resource: dict[str, Any], *, allow_unmanaged_update: bool) -> None:
     if allow_unmanaged_update:
         return
-    if MANAGED_MARKER in str(resource.get("description") or "") or MANAGED_MARKER in str(resource.get("value") or ""):
+    if has_managed_marker(resource.get("description")) or has_managed_marker(resource.get("value")):
         return
     raise ValueError(f"Help {resource.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
 

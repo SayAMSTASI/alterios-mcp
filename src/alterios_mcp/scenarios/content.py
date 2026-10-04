@@ -318,7 +318,7 @@ def alterios_upsert_field(
         "description": description
         if description is not None
         else (existing or {}).get("description")
-        or f"{MANAGED_MARKER}: alterios-mcp field.",
+        or f"{MANAGED_MARKER}: Поле типа материала {content_type_id}.",
         "settings": settings if settings is not None else (existing or {}).get("settings") or {},
         "formDisplay": form_display if form_display is not None else (existing or {}).get("formDisplay") or {},
     }
@@ -482,7 +482,7 @@ def alterios_upsert_group(
         "description": description
         if description is not None
         else (existing or {}).get("description")
-        or f"{MANAGED_MARKER}: alterios-mcp group.",
+        or f"{MANAGED_MARKER}: Группа элементов навигации.",
         "root": payload_root,
         "children": children if children is not None else (existing or {}).get("children") or [],
         "publish": payload_publish,
@@ -562,7 +562,7 @@ def alterios_upsert_help(
         "description": description
         if description is not None
         else (existing or {}).get("description")
-        or f"{MANAGED_MARKER}: alterios-mcp help.",
+        or f"{MANAGED_MARKER}: Справка по работе с элементами проекта.",
     }
     operation = _resource_operation(
         name=("PATCH /api/helps/{id}" if existing else "POST /api/helps"),

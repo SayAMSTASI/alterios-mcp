@@ -31,7 +31,7 @@ def alterios_upsert_report(
     payload = {
         **(existing or {}),
         "name": name,
-        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: alterios-mcp report.",
+        "description": description if description is not None else (existing or {}).get("description") or f"{MANAGED_MARKER}: Отчёт по данным проекта.",
         "type": report_type if report_type is not None else existing_type or full_type or "dashboard",
         "template": template if template is not None else existing_template,
     }
@@ -401,7 +401,7 @@ def alterios_create_report_tab(
         )
 
     view_fields = _view_fields_body(client, normalized_view_id)
-    resolved_marker = marker or f"{MANAGED_MARKER}: alterios-mcp report tab {normalized_report_name}."
+    resolved_marker = marker or f"{MANAGED_MARKER}: Вкладка отчёта «{normalized_report_name}»."
     report_columns = _project_database_columns(view_fields)
     client_config = getattr(client, "config", None)
     base_url = str(getattr(client_config, "base_url", "") or "")

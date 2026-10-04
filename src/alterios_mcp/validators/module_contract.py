@@ -420,7 +420,7 @@ def _css_pixel_value(value: Any) -> int | None:
 
 
 def _meaningful_text(value: Any, *, minimum: int) -> bool:
-    text = re.sub(r"(?i)codex-managed\s*:?", "", str(value or "")).strip(" .:-")
+    text = re.sub(r"(?i)(?:codex-managed|управляется автоматизацией)\s*:?", "", str(value or "")).strip(" .:-")
     return len(text) >= minimum
 
 
