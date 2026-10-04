@@ -1,11 +1,9 @@
 """Bounded previews with the complete redacted result in a private artifact."""
 from __future__ import annotations
 
-import hashlib
-import uuid
 from .performance import json_bytes
 from .read_workflows import safe_payload
-from .write_plan import artifact_root
+from .read_evidence import persist_result, evidence
 
 DEFAULT_FIELDS = ("_id", "id", "name", "mname", "kind", "type", "key", "source", "target",
                   "path", "object_id", "match_type", "ok", "code", "error_type", "date", "hash", "mime", "size")
@@ -22,21 +20,19 @@ def validate_output(response_mode="compact", fields=None, preview_rows=20, max_r
         raise ValueError("fields must contain at most 32 literal top-level field names")
 
 
-def present(payload, *, response_mode="compact", fields=None, preview_rows=20, max_response_bytes=16384):
+def present(payload, *, response_mode="compact", fields=None, preview_rows=20, max_response_bytes=16384,
+            target=None, source=None, guard=None):
     validate_output(response_mode, fields, preview_rows, max_response_bytes)
     safe = safe_payload(payload)
     raw = json_bytes(safe)
     # Reserve space for final per-call telemetry added by the scenario decorator.
     budget = max_response_bytes - 512
-    if response_mode == "full" and len(raw) + 256 <= budget:
-        return {**safe, "presentation": {"mode": "full", "truncated": False,
-                                         "source_bytes": len(raw), "max_response_bytes": max_response_bytes}}
-    root = artifact_root() / "read-results"
-    root.mkdir(parents=True, exist_ok=True)
-    path = root / ("result_" + uuid.uuid4().hex + ".json")
-    with path.open("xb") as stream:
-        stream.write(raw)
-    artifact = {"path": str(path), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+    artifact, metadata = persist_result(safe, target=target, source=source, guard=guard)
+    full = {**safe, "presentation": {"mode": "full", "truncated": False,
+             "source_bytes": len(raw), "max_response_bytes": max_response_bytes, "artifact": artifact},
+            "evidence": evidence(safe, safe, metadata, truncated=False)}
+    if response_mode == "full" and len(json_bytes(full)) <= budget:
+        return full
     changed = False
 
     def preview(value, key="", depth=0):
@@ -82,6 +78,7 @@ def present(payload, *, response_mode="compact", fields=None, preview_rows=20, m
     if isinstance(safe.get("cache"), dict):
         presentation["cache_hit"] = safe["cache"].get("hit") is True
     result["presentation"] = presentation
+    result["evidence"] = evidence(safe, result, metadata, truncated=changed)
     if len(json_bytes(result)) > budget:
         # Keep source completeness distinct from omitted presentation details.
         result = {k: safe[k] for k in ("complete", "complete_within_snapshot", "readonly", "loaded", "total",
@@ -89,6 +86,7 @@ def present(payload, *, response_mode="compact", fields=None, preview_rows=20, m
         presentation["truncated"] = True
         presentation["preview_omitted"] = True
         result["presentation"] = presentation
+        result["evidence"] = evidence(safe, result, metadata, truncated=True)
     if len(json_bytes(result)) > budget:
         raise ValueError("Artifact receipt exceeds output budget")
     return result

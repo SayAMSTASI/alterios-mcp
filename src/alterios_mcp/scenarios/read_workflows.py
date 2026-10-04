@@ -1,7 +1,7 @@
 """Public workflow entrypoints; remote operations in this module are read-only."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from .._support import _client
 from .. import read_workflows as workflows
@@ -9,6 +9,48 @@ from ..file_export import export_files
 from ..performance import measured
 from ..response_output import present, validate_output
 from ..snapshot_index import get_index
+from ..read_evidence import read_result, now
+from ..read_freshness import source_guard, check_freshness
+
+
+def _origin(profile, project_id, tool, scope, *, snapshot=None, cache=None):
+    return {"target": {"profile": profile, "project_id": project_id},
+            "source": {"mode": "snapshot" if snapshot else "live", "tool": tool, "scope": scope,
+                       "observed_at": snapshot.get("finished_at") if snapshot else now(),
+                       "snapshot_id": snapshot.get("snapshot_id") if snapshot else None,
+                       "index_cache_hit": bool(cache and cache.get("hit"))}}
+
+
+@measured
+def alterios_read_result(profile: str, project_id: str, result_id: str, json_pointer: str = "/rows",
+                        offset: int = 0, limit: int = 20, text_limit: int = 4096,
+                        fields: list[str] | None = None, object_ids: list[str] | None = None,
+                        max_response_bytes: int = 16384) -> dict[str, Any]:
+    """Read saved evidence by opaque result ID and JSON pointer without contacting Alterios. Missing means missing in this saved result only. Continue with next_offset or narrow fields/pointer if an item is too large."""
+    return read_result(result_id, profile=profile, project_id=project_id, json_pointer=json_pointer,
+                       offset=offset, limit=limit, text_limit=text_limit, fields=fields, object_ids=object_ids,
+                       max_response_bytes=max_response_bytes)
+
+
+@measured
+def alterios_read_object_evidence(profile: str, project_id: str,
+                                 kind: Literal["content_types", "fields", "views", "forms", "scripts", "reports", "diagrams"], object_id: str,
+                                 max_response_bytes: int = 16384) -> dict[str, Any]:
+    """Read one exact form/view/field/content_type/script/report/diagram and save a target-bound freshness receipt. Use the result ID on supported upserts; read full fields through alterios_read_result at /object."""
+    validate_output(max_response_bytes=max_response_bytes)
+    client = _target(profile, project_id)
+    body, guard = source_guard(client, kind, object_id)
+    return present({"readonly": True, "object": body, "complete": True}, guard=guard,
+        max_response_bytes=max_response_bytes,
+        **_origin(profile, project_id, "alterios_read_object_evidence", {"kind": kind, "object_id": object_id}))
+
+
+@measured
+def alterios_verify_read_evidence(profile: str, project_id: str, result_id: str,
+                                 max_age_seconds: int = 300) -> dict[str, Any]:
+    """Freshly compare an exact object against a saved evidence fingerprint. Changed/expired evidence must be reread and reviewed. This does not write or provide atomic locking."""
+    return {"readonly": True, **check_freshness(_target(profile, project_id), result_id,
+                                               max_age_seconds=max_age_seconds)}
 
 
 def _target(profile: str, project_id: str):
@@ -41,7 +83,8 @@ def alterios_read_all_objects(profile: str, project_id: str, kind: str,
     result = workflows.read_kind(_target(profile, project_id), kind,
         filters=filters, page_size=page_size, max_pages=max_pages, max_rows=max_rows)
     return present(result, response_mode=response_mode, fields=fields, preview_rows=preview_rows,
-                   max_response_bytes=max_response_bytes)
+                   max_response_bytes=max_response_bytes,
+                   **_origin(profile, project_id, "alterios_read_all_objects", {"kind": kind, "filters": filters, "max_rows": max_rows}))
 
 
 @measured
@@ -54,7 +97,8 @@ def alterios_find_usages(profile: str, project_id: str, snapshot_id: str,
     index, cache = get_index(snapshot_id, profile=profile, project_id=project_id, refresh=refresh_cache)
     result = index.find(query, max_matches=max_matches)
     result["cache"] = cache
-    return present(result, response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes)
+    return present(result, response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes,
+        **_origin(profile, project_id, "alterios_find_usages", {"query": query, "max_matches": max_matches}, snapshot=index.snapshot, cache=cache))
 
 
 @measured
@@ -67,7 +111,8 @@ def alterios_relation_graph(profile: str, project_id: str, snapshot_id: str,
     index, cache = get_index(snapshot_id, profile=profile, project_id=project_id, refresh=refresh_cache)
     result = index.graph(root_id=root_id, max_edges=max_edges)
     result["cache"] = cache
-    return present(result, response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes)
+    return present(result, response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes,
+        **_origin(profile, project_id, "alterios_relation_graph", {"root_id": root_id, "max_edges": max_edges}, snapshot=index.snapshot, cache=cache))
 
 
 @measured
@@ -78,7 +123,8 @@ def alterios_diagnose_view(profile: str, project_id: str, view_id: str,
     """Compare view definition and unscoped/contentId/dataId samples. Compact preview by default; inspect presentation.artifact for full diagnostics."""
     validate_output(response_mode, None, preview_rows, max_response_bytes)
     return present(workflows.diagnose_view(_target(profile, project_id), view_id, content_id=content_id, limit=limit),
-                   response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes)
+                   response_mode=response_mode, preview_rows=preview_rows, max_response_bytes=max_response_bytes,
+                   **_origin(profile, project_id, "alterios_diagnose_view", {"view_id": view_id, "content_id": content_id, "limit": limit}))
 
 
 @measured
@@ -116,7 +162,8 @@ def alterios_audit_log(profile: str, project_id: str, object_id: str | None = No
         "limitations": ["Observed dates cover only retrieved rows; even a complete scan does not prove no older events existed.",
                          "Structured author names and credentials are redacted; author identifiers are retained where present."]})
     return present(result, response_mode=response_mode, fields=fields, preview_rows=preview_rows,
-                   max_response_bytes=max_response_bytes)
+                   max_response_bytes=max_response_bytes,
+                   **_origin(profile, project_id, "alterios_audit_log", {"object_id": object_id, "controller": controller, "max_rows": max_rows}))
 
 
 @measured
@@ -136,7 +183,8 @@ def alterios_list_notifications(profile: str, project_id: str,
     result.update({"readonly": True, "visibility": "configured account only",
                    "delivery_verified": False, "read_receipt_verified": False})
     return present(result, response_mode=response_mode, fields=fields, preview_rows=preview_rows,
-                   max_response_bytes=max_response_bytes)
+                   max_response_bytes=max_response_bytes,
+                   **_origin(profile, project_id, "alterios_list_notifications", {"object_id": object_id, "max_rows": max_rows}))
 
 
 @measured
@@ -148,7 +196,8 @@ def alterios_list_files(profile: str, project_id: str, folder_hash: str | None =
     response = _target(profile, project_id).file_elfinder(command="open", target=folder_hash)
     return present({"readonly": True, "recursive": False, "body": response.body},
                    response_mode=response_mode, fields=fields, preview_rows=preview_rows,
-                   max_response_bytes=max_response_bytes)
+                   max_response_bytes=max_response_bytes,
+                   **_origin(profile, project_id, "alterios_list_files", {"folder_hash": folder_hash}))
 
 
 def alterios_download_files(profile: str, project_id: str, file_ids: list[str],

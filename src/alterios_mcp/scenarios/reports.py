@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..read_freshness import assert_read_freshness, guarded_existing
 from ..ux_contract import assert_form_contract
 from .views_forms import alterios_upsert_form
 
@@ -14,13 +15,15 @@ def alterios_upsert_report(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios report and read it back through report full."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_report(client, report_id=report_id, name=name)
-    full = client.report_by_id(existing["_id"]).body if existing and existing.get("_id") else None
+    existing = guarded_existing(client, expected_read_result_id, kind="reports", existing=existing)
+    full = existing if expected_read_result_id else (client.report_by_id(existing["_id"]).body if existing and existing.get("_id") else None)
     if existing and not allow_unmanaged_update and not _report_is_manageable(existing, full):
         raise ValueError(f"Report {existing.get('_id')!r} is not marked as Codex-managed; pass allow_unmanaged_update=True.")
     elif not existing and template is None:
@@ -58,6 +61,8 @@ def alterios_upsert_report(
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="reports", object_id=(existing or {}).get("_id"))
     saved = client.save_report(payload).as_dict()
     saved_id = ((saved.get("body") or {}) if isinstance(saved, dict) else {}).get("_id") or payload.get("_id")
     readback = client.report_by_id(saved_id).as_dict() if saved_id else {"body": _find_report(client, name=name)}

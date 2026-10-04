@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._support import *
+from ..read_freshness import assert_read_freshness, guarded_existing
 from ..validators.module_contract import is_meaningful_description
 
 def alterios_list_comments(
@@ -68,12 +69,14 @@ def alterios_upsert_content_type(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios content type. Execution requires explicit write gates."""
     if not name.strip():
         raise ValueError("name must not be empty.")
     client = _client(profile, project_id)
     existing = _find_content_type(client, content_type_id=content_type_id, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="content_types", existing=existing)
     if existing:
         _assert_managed_or_allowed(existing, kind="Content type", allow_unmanaged_update=allow_unmanaged_update)
     elif not field_name_prefix:
@@ -150,6 +153,8 @@ def alterios_upsert_content_type(
             "Pass a meaningful content type description before apply."
         )
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="content_types", object_id=(existing or {}).get("_id"))
     saved = client.save_content_type(payload).as_dict()
     saved_id = _extract_response_id(saved) or payload.get("_id")
     readback = client.content_type_by_id(saved_id).as_dict() if saved_id else {"body": _find_content_type(client, name=name)}
@@ -287,6 +292,7 @@ def alterios_upsert_field(
     dry_run: bool = True,
     profile: str | None = None,
     project_id: str | None = None,
+    expected_read_result_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan or create/update an Alterios content type field. Execution requires explicit write gates."""
     if not content_type_id.strip():
@@ -300,6 +306,7 @@ def alterios_upsert_field(
     if not parent:
         raise ValueError(f"Content type {content_type_id!r} was not found.")
     existing = _find_field(client, content_type_id=content_type_id, field_id=field_id, mname=mname, name=name)
+    existing = guarded_existing(client, expected_read_result_id, kind="fields", existing=existing)
     if existing:
         existing_content_type_id = existing.get("contentTypeId") or existing.get("content_type_id")
         if existing_content_type_id and existing_content_type_id != content_type_id:
@@ -375,6 +382,8 @@ def alterios_upsert_field(
     if dry_run:
         return controlled_write_result(audit=audit, response=response_payload)
     assert_write_allowed(profile=profile, project_id=project_id, operation=operation, write_enabled=_write_enabled())
+    response_payload["read_freshness"] = assert_read_freshness(client, expected_read_result_id,
+        kind="fields", object_id=(existing or {}).get("_id"))
     saved = client.save_field(payload).as_dict()
     saved_id = _extract_response_id(saved) or payload.get("_id")
     if saved_id:

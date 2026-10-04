@@ -246,6 +246,7 @@ LIVE_WRITE_HELPER_TOOL_NAMES = frozenset(
 )
 
 READ_WORKFLOW_TOOL_NAMES = frozenset({
+    "alterios_read_result", "alterios_read_object_evidence", "alterios_verify_read_evidence",
     "alterios_export_dataset", "alterios_read_all_objects", "alterios_find_usages",
     "alterios_relation_graph", "alterios_diagnose_view", "alterios_audit_log",
     "alterios_list_notifications",
