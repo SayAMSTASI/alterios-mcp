@@ -26,6 +26,20 @@ def main() -> int:
         release_smoke = scripts_dir / ("alterios-release-smoke.exe" if os.name == "nt" else "alterios-release-smoke")
 
         subprocess.run([str(python), "-m", "pip", "install", str(wheel)], check=True)
+        # Doctor/replay can inspect the registry without importing FastMCP.
+        # Exercise the actual installed server and schemas with no source overlay.
+        clean_env = dict(os.environ)
+        clean_env.pop("PYTHONPATH", None)
+        clean_env["ALTERIOS_MCP_TOOL_PROFILE"] = "full"
+        subprocess.run(
+            [str(python), "-c",
+             "import asyncio, importlib.metadata; from alterios_mcp.server import mcp; "
+             "tools=asyncio.run(mcp.list_tools()); "
+             "assert len(tools)==len({t.name for t in tools}); "
+             "assert 'alterios_export_dataset' in {t.name for t in tools}; "
+             "print('Installed server:', len(tools), 'tools; mcp', importlib.metadata.version('mcp'))"],
+            cwd=temp_dir, env=clean_env, check=True, timeout=60,
+        )
         subprocess.run([str(doctor), "--skip-startup-benchmark", "--json"], check=True)
         subprocess.run([str(release_smoke), "--skip-startup-benchmark", "--json"], check=True)
 

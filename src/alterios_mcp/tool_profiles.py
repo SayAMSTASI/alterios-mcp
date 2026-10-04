@@ -245,6 +245,15 @@ LIVE_WRITE_HELPER_TOOL_NAMES = frozenset(
     }
 )
 
+READ_WORKFLOW_TOOL_NAMES = frozenset({
+    "alterios_export_dataset", "alterios_read_all_objects", "alterios_find_usages",
+    "alterios_relation_graph", "alterios_diagnose_view", "alterios_audit_log",
+    "alterios_list_notifications",
+    "alterios_list_files", "alterios_download_files",
+})
+READ_ONLY_DISCOVERY_TOOL_NAMES = READ_ONLY_DISCOVERY_TOOL_NAMES | READ_WORKFLOW_TOOL_NAMES
+LIVE_READ_HELPER_TOOL_NAMES = LIVE_READ_HELPER_TOOL_NAMES | READ_WORKFLOW_TOOL_NAMES
+
 LIVE_TOOL_NAMES = frozenset(
     RUNTIME_AND_GUARD_TOOL_NAMES
     | SCENARIO_TOOL_NAMES

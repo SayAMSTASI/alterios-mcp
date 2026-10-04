@@ -1,6 +1,8 @@
 # Дорожная карта Alterios MCP
 
-Актуализировано: 17 июля 2026 года.
+Актуальный состав выпуска 0.3.0: [capabilities.md](capabilities.md).
+Первый этап доработок по рабочим сценариям и оставшиеся задачи:
+[read-workflows.md](read-workflows.md). Ниже сохранён исторический план июля.
 
 Roadmap отделяет подтвержденное состояние продукта от прогноза. Дата этапа
 является целевым сроком, а не обещанием: этап закрывается только после выполнения
@@ -11,9 +13,9 @@ stage gate. Если внешний Alterios-контур, browser evidence ил
 
 | Область | Подтвержденное состояние |
 |---|---|
-| Версия | `0.2.4` |
-| Публичный MCP registry | 109 tools |
-| Профили tools | `live` - 82, `discovery` - 56, `admin` - 107, `full` - 109 |
+| Версия | `0.3.0` |
+| Публичный MCP registry | 118 tools |
+| Профили tools | `live` - 91, `discovery` - 65, `admin` - 116, `full` - 118 |
 | Архитектура | `server.py` - composition root на 102 строки; регистрация разделена на 12 доменов |
 | Рабочие слои | `tools/`, `scenarios/`, `builders/`, `validators/` |
 | Запись | typed writes, сценарии, `plan_id`, write journal, readback и dangerous gates |

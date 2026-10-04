@@ -19,6 +19,7 @@ from .scenarios import processes as _processes_scenarios
 from .scenarios import reports as _reports_scenarios
 from .scenarios import live as _live_scenarios
 from .scenarios import diagnostics as _diagnostics_scenarios
+from .scenarios import read_workflows as _read_workflow_scenarios
 from .tool_profiles import apply_tool_profile
 from .tools import all_tool_functions, all_tool_names, register_all_tools
 
@@ -40,6 +41,7 @@ _SCENARIO_MODULES = (
     _reports_scenarios,
     _live_scenarios,
     _diagnostics_scenarios,
+    _read_workflow_scenarios,
 )
 _PATCHABLE_COMPAT_BINDINGS = (
     "AlteriosClient",

@@ -12,7 +12,7 @@ profiles, identifiers and live evidence are intentionally excluded.
 
 | Уровень | Количество | Что считается |
 |---|---:|---|
-| MCP tools | 109 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 82 tools. |
+| MCP tools | 118 | Полный callable registry собран доменными модулями `src/alterios_mcp/tools/`; профиль `live` публикует 91 tools. Актуальная матрица автоматически проверяется в [capabilities.md](capabilities.md). |
 | Write-like MCP tools | 44 | Сценарные, typed, security, dangerous и raw-write инструменты по классификации `tool_profiles.py`; в число сценарных входят `alterios_fast_live_write`, `alterios_fast_live_bulk_manual_script`, `alterios_fast_live_bulk_process` и admin-only `alterios_fast_live_bulk_delete`. |
 | Runtime service methods | 14 | Известные script-service имена в `src/alterios_mcp/services.py`. |
 | Live read-only REST probes | 15 | Маршруты в `READONLY_ROUTES`, проверяемые discovery matrix. |
@@ -43,7 +43,10 @@ browser/HAR capture и sandbox write-практику.
 | Users/groups/security | Частично | users, user groups, groups, roles | Sandbox create/update/delete and cleanup are verified; production security writes remain dangerous-gated. |
 | Reports/dashboards | Да | report full/read/save | Dashboard report created/updated in sandbox with Stimulsoft template and full readback. |
 
-## MCP Tools: 107
+## Базовые MCP tools
+
+Девять новых инструментов чтения описаны в [read-workflows.md](read-workflows.md).
+Полный автоматически проверяемый перечень — [capabilities.md](capabilities.md).
 
 | Tool | Вид |
 |---|---|

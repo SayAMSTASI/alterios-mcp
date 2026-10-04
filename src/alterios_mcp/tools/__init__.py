@@ -16,6 +16,7 @@ from . import processes
 from . import reports
 from . import live
 from . import diagnostics
+from . import read_workflows
 
 
 DOMAIN_MODULES = (
@@ -31,6 +32,7 @@ DOMAIN_MODULES = (
     reports,
     live,
     diagnostics,
+    read_workflows,
 )
 
 

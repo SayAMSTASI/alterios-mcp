@@ -28,11 +28,14 @@
 - список локальных процессов, похожих на `alterios-mcp`;
 - `instance_count`: количество логических MCP-серверов после группировки
   Windows launcher/python child;
-- количество дубликатов MCP instances.
+- число дополнительных серверов и границы проверки их владельцев.
 
 На Windows один нормальный MCP запуск может отображаться несколькими
 OS-процессами: `alterios-mcp.exe` launcher и дочерний `python.exe`. Для live-gate
-важен не сырой `process_count`, а `instance_count` и `duplicate_instance_count`.
+Серверы разных stdio-клиентов могут работать одновременно. Ни `process_count`,
+ни `instance_count` сами по себе не доказывают конфликт. В версии 0.3.0
+`ownership_verified=false` означает, что принадлежность сессиям не подтверждена;
+`additional_instance_count` показывает наблюдаемое количество дополнительных серверов.
 
 MCP-вызов `alterios_runtime_info(include_processes=true)` использует общий
 process snapshot с TTL 15 секунд. Повторные runtime/preflight проверки внутри
@@ -49,16 +52,16 @@ TTL не запускают новый Windows CIM scan. Для принудит
 .\.venv\Scripts\alterios-runtime-info.exe --processes --cleanup-stale --keep-newest 1 --pretty
 ```
 
-Применить очистку:
+После проверки владельца выбрать конкретный PID. Применить очистку:
 
 ```powershell
-.\.venv\Scripts\alterios-runtime-info.exe --processes --cleanup-stale --keep-newest 1 --apply --pretty
+.\.venv\Scripts\alterios-runtime-info.exe --processes --cleanup-stale --root-pid <reviewed-root-pid> --apply --pretty
 ```
 
-Если нужно полностью остановить MCP перед новым запуском:
+Для нескольких проверенных серверов повторите параметр PID:
 
 ```powershell
-.\.venv\Scripts\alterios-runtime-info.exe --processes --cleanup-stale --keep-newest 0 --apply --pretty
+.\.venv\Scripts\alterios-runtime-info.exe --cleanup-stale --root-pid <first-reviewed-pid> --root-pid <second-reviewed-pid> --apply --pretty
 ```
 
 После очистки перезапустите MCP/Codex и проверьте:
@@ -80,7 +83,7 @@ OS-process scan. Для проверки количества экземпляр
 и stale-проверку, но не задерживает обычный live preflight.
 
 Перед live-задачей запускайте один read-only gate. Он собирает runtime freshness,
-дубликаты MCP instances, project health, replay smoke и наличие приватной
+сведения о серверах, project health, replay smoke и наличие приватной
 delivery evidence в единый результат `ready/blocked`:
 
 ```powershell

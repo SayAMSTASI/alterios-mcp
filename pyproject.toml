@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alterios-mcp"
-version = "0.2.4"
+version = "0.3.0"
 description = "MCP server and discovery toolkit for Alterios/LIMS"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.8.0",
+    "mcp>=1.8.0,<2",
 ]
 
 [project.optional-dependencies]

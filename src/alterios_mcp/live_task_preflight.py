@@ -15,6 +15,7 @@ from .gitea_workboard import GiteaClient, GiteaConfig
 from .project_health import run_project_health
 from .replay_smoke import run_replay_smoke
 from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_process_snapshot
+from .runtime_info import process_hygiene
 from .tool_profiles import allowed_tool_names
 from .ux_contract import UX_CONTRACT_VERSION
 
@@ -194,7 +195,8 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
     snapshot = collect_alterios_mcp_process_snapshot(cache_ttl_seconds=15)
     processes = snapshot["processes"]
     instances = snapshot["instances"]
-    duplicate_instance_count = max(0, len(instances) - 1)
+    hygiene = process_hygiene(snapshot)
+    duplicate_instance_count = hygiene["duplicate_instance_count"]
     ok = not runtime["stale"] and matches_expected and duplicate_instance_count == 0
     if runtime["stale"]:
         blockers.append({"code": "runtime_stale", "message": "Running MCP code/skills fingerprint is stale."})
@@ -212,14 +214,7 @@ def _runtime_check(*, expected_fingerprint: str | None, blockers: list[dict[str,
         "git": runtime.get("git"),
         "tool_schema_version": runtime.get("tool_schema_version"),
         "ux_contract_version": runtime.get("ux_contract_version"),
-            "process_hygiene": {
-                "process_count": len(processes),
-                "instance_count": len(instances),
-                "duplicate_instance_count": duplicate_instance_count,
-                "duplicate_process_count": duplicate_instance_count,
-                "cache": snapshot["cache"],
-                "cleanup_command": "alterios-runtime-info --processes --cleanup-stale --keep-newest 1 --apply --pretty",
-            },
+        "process_hygiene": hygiene,
     }
 
 
@@ -440,16 +435,10 @@ def _next_actions(*, ok: bool, blockers: list[dict[str, str]], scenario_tool: st
 
 
 def _server_tool_count() -> int | None:
-    try:
-        source = Path(__file__).with_name("server.py").read_text(encoding="utf-8")
-    except OSError:
-        return None
-    names = re.findall(
-        r"^@mcp\.tool\(\)\s*\r?\ndef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
-        source,
-        flags=re.MULTILINE,
-    )
-    return len(allowed_tool_names(names))
+    # Imports are deferred because scenario modules import this preflight.
+    # The composition root has no @mcp.tool decorators; source scanning returned 0.
+    from .tools import all_tool_names
+    return len(allowed_tool_names(all_tool_names()))
 
 
 def _utc_now() -> str:

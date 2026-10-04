@@ -13,7 +13,7 @@ from typing import Any
 
 from . import __version__
 from .client import configured_profiles, redact_sensitive, safe_error
-from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_process_snapshot
+from .runtime_info import build_runtime_fingerprint, collect_alterios_mcp_process_snapshot, process_hygiene
 from .tool_profiles import normalize_tool_profile
 
 
@@ -159,12 +159,13 @@ def run_doctor(
         try:
             snapshot = collect_alterios_mcp_process_snapshot(refresh=True)
             instances = snapshot.get("instances") or []
-            duplicate_count = max(0, len(instances) - 1)
+            hygiene = process_hygiene(snapshot)
+            duplicate_count = hygiene["duplicate_instance_count"]
             checks.append(
                 _check(
                     "process_hygiene",
                     "fail" if duplicate_count else "pass",
-                    f"Logical MCP instances: {len(instances)}; duplicates: {duplicate_count}.",
+                    f"Logical MCP instances: {len(instances)}; ownership is unverified, count alone is not a conflict.",
                     process_count=len(snapshot.get("processes") or []),
                     instance_count=len(instances),
                     duplicate_instance_count=duplicate_count,

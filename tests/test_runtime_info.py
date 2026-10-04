@@ -135,7 +135,11 @@ def test_cleanup_alterios_mcp_processes_is_dry_run_by_default(monkeypatch) -> No
     monkeypatch.setattr(runtime_info, "_terminate_process", lambda pid: stopped.append(pid))
 
     dry_run = runtime_info.cleanup_alterios_mcp_processes(keep_newest=1)
-    applied = runtime_info.cleanup_alterios_mcp_processes(keep_newest=1, dry_run=False)
+    import pytest
+    with pytest.raises(ValueError, match="explicit root_pids"):
+        runtime_info.cleanup_alterios_mcp_processes(keep_newest=1, dry_run=False)
+    assert stopped == []
+    applied = runtime_info.cleanup_alterios_mcp_processes(keep_newest=1, dry_run=False, root_pids=[202, 203])
 
     assert dry_run["dry_run"] is True
     assert [item["root_pid"] for item in dry_run["kept"]] == [201]
@@ -211,3 +215,25 @@ def test_runtime_refresh_does_not_spawn_git_in_hot_path(monkeypatch) -> None:
     result = build_runtime_fingerprint()
 
     assert result["git"] == runtime_info._LOADED_IDENTITY["git"]
+
+
+def test_cleanup_cannot_stop_current_launcher_or_unobserved_pid(monkeypatch):
+    import pytest
+    monkeypatch.setattr(runtime_info, "collect_alterios_mcp_processes", lambda: [
+        {"pid": 500, "parent_pid": 100, "current_process": False},
+        {"pid": 501, "parent_pid": 500, "current_process": True},
+    ])
+    for selected in ([500], [501], [999]):
+        with pytest.raises(ValueError):
+            runtime_info.cleanup_alterios_mcp_processes(root_pids=selected, dry_run=False)
+
+
+def test_runtime_multiple_clients_are_observations_not_conflicts(monkeypatch):
+    monkeypatch.setattr(runtime_scenario, "_runtime_fingerprint", lambda: {
+        "fingerprint": "current", "stale": False, "source_hashes": {}, "disk": {}})
+    monkeypatch.setattr(runtime_scenario, "collect_alterios_mcp_process_snapshot", lambda **_: {
+        "processes": [{"pid": 1}, {"pid": 2}], "instances": [{"root_pid": 1}, {"root_pid": 2}], "cache": {}})
+    result = runtime_scenario.alterios_runtime_info(include_processes=True)
+    assert result["ok"]
+    assert result["process_hygiene"]["additional_instance_count"] == 1
+    assert result["process_hygiene"]["cleanup_command"] is None

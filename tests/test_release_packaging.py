@@ -14,7 +14,8 @@ def test_release_version_and_console_scripts_are_synchronized() -> None:
     project = pyproject["project"]
     scripts = project["scripts"]
 
-    assert project["version"] == __version__ == "0.2.4"
+    assert project["version"] == __version__ == "0.3.0"
+    assert "mcp>=1.8.0,<2" in project["dependencies"]
     assert scripts["alterios-mcp"] == "alterios_mcp.server:main"
     assert scripts["alterios-doctor"] == "alterios_mcp.doctor:main"
     assert scripts["alterios-suggest-fixes"] == "alterios_mcp.suggest_fixes:main"
@@ -24,6 +25,9 @@ def test_release_version_and_console_scripts_are_synchronized() -> None:
 def test_release_workflow_and_management_script_cover_delivery_contract() -> None:
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     manager = (ROOT / "scripts" / "manage_release.ps1").read_text(encoding="utf-8")
+    verifier = (ROOT / "scripts" / "verify_release_wheel.py").read_text(encoding="utf-8")
+    assert 'from alterios_mcp.server import mcp' in verifier
+    assert 'clean_env.pop("PYTHONPATH", None)' in verifier
 
     assert 'tags:' in release_workflow
     assert 'python -m pip install -e ".[dev]"' in release_workflow
